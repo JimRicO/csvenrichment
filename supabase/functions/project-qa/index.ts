@@ -78,17 +78,16 @@ ${row.scraped_content?.substring(0, 5000) || 'No content available'}
 
     const context = contextParts.join('\n\n---\n\n');
 
+    // Build system prompt with all scraped data context
+    const systemPrompt = `You are an AI assistant helping to analyze scraped web data. Below is all the scraped content from a data extraction project:
+
+${context}
+
+Please answer questions about this data accurately and concisely. Base your answers strictly on the information provided above.`;
+
     // Build conversation history for Claude
     const conversationHistory = job.conversation || [];
     const messages = [
-      {
-        role: 'user',
-        content: `You are an AI assistant helping to analyze scraped web data. Below is all the scraped content from a data extraction project:\n\n${context}\n\nPlease answer questions about this data accurately and concisely.`
-      },
-      {
-        role: 'assistant',
-        content: 'I understand. I have access to the scraped data and I\'m ready to answer your questions about it.'
-      },
       ...conversationHistory.map((msg: any) => ({
         role: msg.role,
         content: msg.content
@@ -99,7 +98,9 @@ ${row.scraped_content?.substring(0, 5000) || 'No content available'}
       }
     ];
 
-    console.log('Calling Claude Haiku API...');
+    console.log('Calling Claude Haiku API with context...');
+    console.log(`System prompt length: ${systemPrompt.length} chars`);
+    console.log(`Conversation history: ${conversationHistory.length} messages`);
 
     // Call Claude Haiku API
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -112,7 +113,8 @@ ${row.scraped_content?.substring(0, 5000) || 'No content available'}
       body: JSON.stringify({
         model: 'claude-3-haiku-20240307',
         max_tokens: 2048,
-        messages: messages.slice(2) // Remove the initial system context from messages array
+        system: systemPrompt,
+        messages: messages
       })
     });
 
