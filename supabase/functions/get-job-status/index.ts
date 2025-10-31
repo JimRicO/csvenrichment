@@ -12,8 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const url = new URL(req.url);
-    const job_id = url.searchParams.get('job_id');
+    const { job_id } = await req.json();
 
     if (!job_id) {
       return new Response(
