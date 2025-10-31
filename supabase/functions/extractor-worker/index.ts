@@ -41,15 +41,14 @@ serve(async (req) => {
       );
     }
 
-    // Find one row ready for extraction
-    const { data: row, error: queryError } = await supabase
+    // Find and lock one row ready for extraction (prevents race conditions)
+    const { data: rows, error: queryError } = await supabase
       .from('scraped_rows')
       .select('*')
       .eq('scrape_status', 'completed')
       .eq('extraction_status', 'pending')
       .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
 
     if (queryError) {
       console.error('Query error:', queryError);
@@ -59,14 +58,31 @@ serve(async (req) => {
       );
     }
 
-    // No pending work - exit gracefully
-    if (!row) {
+    if (!rows || rows.length === 0) {
       console.log('No rows ready for extraction');
       return new Response(
         JSON.stringify({ message: 'No pending work' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    const row = rows[0];
+    
+    // Immediately mark as processing to prevent other workers from picking it up
+    const { error: lockError } = await supabase
+      .from('scraped_rows')
+      .update({ extraction_status: 'processing' })
+      .eq('id', row.id)
+      .eq('extraction_status', 'pending'); // Only update if still pending
+    
+    if (lockError) {
+      console.error('Failed to lock row:', lockError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to lock row' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
 
     console.log(`Extracting data from row ${row.id}`);
 

@@ -26,15 +26,14 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Find one pending row to scrape
-    const { data: row, error: queryError } = await supabase
+    // Find and lock one pending row to scrape (prevents race conditions)
+    const { data: rows, error: queryError } = await supabase
       .from('scraped_rows')
       .select('*')
       .eq('scrape_status', 'pending')
       .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
+      .limit(1);
+    
     if (queryError) {
       console.error('Query error:', queryError);
       return new Response(
@@ -42,15 +41,32 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    // No pending work - exit gracefully
-    if (!row) {
+    
+    if (!rows || rows.length === 0) {
       console.log('No pending rows to scrape');
       return new Response(
         JSON.stringify({ message: 'No pending work' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    const row = rows[0];
+    
+    // Immediately mark as processing to prevent other workers from picking it up
+    const { error: lockError } = await supabase
+      .from('scraped_rows')
+      .update({ scrape_status: 'processing' })
+      .eq('id', row.id)
+      .eq('scrape_status', 'pending'); // Only update if still pending
+    
+    if (lockError) {
+      console.error('Failed to lock row:', lockError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to lock row' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
 
     console.log(`Scraping row ${row.id} - ${row.website_url}`);
 
