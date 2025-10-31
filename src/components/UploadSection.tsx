@@ -52,7 +52,8 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
   };
 
   const processFile = (uploadedFile: File) => {
-    if (uploadedFile.type !== "text/csv" && !uploadedFile.name.endsWith('.csv')) {
+    // Check file extension (more reliable on mobile than MIME type)
+    if (!uploadedFile.name.toLowerCase().endsWith('.csv')) {
       toast.error("Please upload a CSV file");
       return;
     }
@@ -196,7 +197,7 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
             <>
               <input
                 type="file"
-                accept=".csv"
+                accept=".csv,text/csv,application/csv,text/plain"
                 onChange={handleFileInput}
                 className="hidden"
                 id="file-upload"
