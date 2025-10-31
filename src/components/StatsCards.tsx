@@ -116,8 +116,8 @@ const StatsCards = () => {
                 {stat.trend}
               </span>
             </div>
-            <div>
-              <p className="text-3xl font-bold text-foreground mb-1">{stat.value}</p>
+            <div className="min-w-0">
+              <p className="text-2xl md:text-3xl font-bold text-foreground mb-1 break-all">{stat.value}</p>
               <p className="text-sm text-muted-foreground">{stat.title}</p>
             </div>
           </Card>

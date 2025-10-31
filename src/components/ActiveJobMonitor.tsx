@@ -42,9 +42,9 @@ const ActiveJobMonitor = ({ jobId, projectId }: ActiveJobMonitorProps) => {
   return (
     <Card className="p-8 gradient-card border-border/50 space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground mb-1">Active Job: {projectId}</h2>
-          <p className="text-sm text-muted-foreground">Job ID: {jobId}</p>
+        <div className="min-w-0">
+          <h2 className="text-xl md:text-2xl font-bold text-foreground mb-1 truncate">Active Job: {projectId}</h2>
+          <p className="text-xs md:text-sm text-muted-foreground truncate">Job ID: {jobId}</p>
         </div>
         {isComplete ? (
           <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-success/20 border border-success/50">

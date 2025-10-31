@@ -152,8 +152,8 @@ const JobsTable = () => {
                   key={job.id}
                   className="border-border hover:bg-secondary/50 transition-smooth cursor-pointer"
                 >
-                  <TableCell className="font-medium text-foreground">
-                    {job.project_id}
+                  <TableCell className="font-medium text-foreground max-w-[200px]">
+                    <div className="truncate">{job.project_id}</div>
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={job.status} />
@@ -177,7 +177,7 @@ const JobsTable = () => {
                   <TableCell className="text-foreground font-medium">
                     ${parseFloat(job.estimated_cost_usd.toString()).toFixed(4)}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
                     {new Date(job.created_at).toLocaleString()}
                   </TableCell>
                   <TableCell>
