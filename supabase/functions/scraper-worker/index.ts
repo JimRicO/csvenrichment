@@ -60,7 +60,7 @@ serve(async (req) => {
     try {
       const scrapeResult = await firecrawl.scrapeUrl(row.website_url, {
         formats: ['markdown', 'html'],
-        onlyMainContent: true,
+        onlyMainContent: false,
       });
 
       if (!scrapeResult.success) {
