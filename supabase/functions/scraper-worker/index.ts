@@ -87,16 +87,21 @@ serve(async (req) => {
       }
 
       // Update job statistics
-      await supabase
+      const { data: currentJob } = await supabase
         .from('scraping_jobs')
-        .update({
-          total_pages_scraped: supabase.rpc('increment', { row_name: 'total_pages_scraped' }),
-          total_characters_scraped: supabase.rpc('increment', {
-            row_name: 'total_characters_scraped',
-            x: characterCount
-          }),
-        })
-        .eq('id', row.job_id);
+        .select('total_pages_scraped, total_characters_scraped')
+        .eq('id', row.job_id)
+        .single();
+
+      if (currentJob) {
+        await supabase
+          .from('scraping_jobs')
+          .update({
+            total_pages_scraped: currentJob.total_pages_scraped + 1,
+            total_characters_scraped: currentJob.total_characters_scraped + characterCount,
+          })
+          .eq('id', row.job_id);
+      }
 
       console.log(`Successfully scraped ${row.website_url} (${characterCount} chars)`);
 

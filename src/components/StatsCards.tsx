@@ -1,45 +1,107 @@
+import { useEffect, useState } from "react";
 import { TrendingUp, DollarSign, Globe, Zap } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
 
-const stats = [
-  {
-    title: "Total Jobs",
-    value: "2",
-    icon: Globe,
-    trend: "+100%",
-    color: "text-primary",
-    bgColor: "bg-primary/20",
-  },
-  {
-    title: "Pages Scraped",
-    value: "137",
-    icon: Zap,
-    trend: "+37",
-    color: "text-accent",
-    bgColor: "bg-accent/20",
-  },
-  {
-    title: "Success Rate",
-    value: "98.5%",
-    icon: TrendingUp,
-    trend: "+2.1%",
-    color: "text-success",
-    bgColor: "bg-success/20",
-  },
-  {
-    title: "Total Cost",
-    value: "$3.65",
-    icon: DollarSign,
-    trend: "+$1.20",
-    color: "text-warning",
-    bgColor: "bg-warning/20",
-  },
-];
+interface Stats {
+  totalJobs: number;
+  pagesScraped: number;
+  successRate: number;
+  totalCost: number;
+}
 
 const StatsCards = () => {
+  const [stats, setStats] = useState<Stats>({
+    totalJobs: 0,
+    pagesScraped: 0,
+    successRate: 0,
+    totalCost: 0,
+  });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      const { data: jobs } = await supabase
+        .from('scraping_jobs')
+        .select('total_pages_scraped, estimated_cost_usd, status, processed_rows, total_rows');
+
+      if (jobs) {
+        const totalJobs = jobs.length;
+        const pagesScraped = jobs.reduce((sum, job) => sum + (job.total_pages_scraped || 0), 0);
+        const totalCost = jobs.reduce((sum, job) => sum + parseFloat(job.estimated_cost_usd.toString()), 0);
+        
+        const completedJobs = jobs.filter(j => j.status === 'completed');
+        const successRate = totalJobs > 0 ? (completedJobs.length / totalJobs) * 100 : 0;
+
+        setStats({
+          totalJobs,
+          pagesScraped,
+          successRate,
+          totalCost,
+        });
+      }
+    };
+
+    fetchStats();
+
+    // Set up realtime subscription
+    const channel = supabase
+      .channel('stats-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'scraping_jobs'
+        },
+        () => {
+          fetchStats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const statsData = [
+    {
+      title: "Total Jobs",
+      value: stats.totalJobs.toString(),
+      icon: Globe,
+      trend: `${stats.totalJobs} total`,
+      color: "text-primary",
+      bgColor: "bg-primary/20",
+    },
+    {
+      title: "Pages Scraped",
+      value: stats.pagesScraped.toString(),
+      icon: Zap,
+      trend: `+${stats.pagesScraped}`,
+      color: "text-accent",
+      bgColor: "bg-accent/20",
+    },
+    {
+      title: "Success Rate",
+      value: `${stats.successRate.toFixed(1)}%`,
+      icon: TrendingUp,
+      trend: `${stats.successRate.toFixed(1)}%`,
+      color: "text-success",
+      bgColor: "bg-success/20",
+    },
+    {
+      title: "Total Cost",
+      value: `$${stats.totalCost.toFixed(4)}`,
+      icon: DollarSign,
+      trend: `$${stats.totalCost.toFixed(4)}`,
+      color: "text-warning",
+      bgColor: "bg-warning/20",
+    },
+  ];
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {stats.map((stat) => {
+      {statsData.map((stat) => {
         const Icon = stat.icon;
         return (
           <Card

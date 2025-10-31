@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Clock, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,29 +10,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { supabase } from "@/integrations/supabase/client";
 
-const mockJobs = [
-  {
-    id: "job-001",
-    project_id: "demo-project",
-    status: "processing",
-    total_rows: 150,
-    processed_rows: 87,
-    total_pages_scraped: 87,
-    estimated_cost_usd: 2.45,
-    created_at: "2025-01-15T10:30:00Z",
-  },
-  {
-    id: "job-002",
-    project_id: "test-websites",
-    status: "completed",
-    total_rows: 50,
-    processed_rows: 50,
-    total_pages_scraped: 50,
-    estimated_cost_usd: 1.20,
-    created_at: "2025-01-15T09:15:00Z",
-  },
-];
+interface Job {
+  id: string;
+  project_id: string;
+  status: string;
+  total_rows: number;
+  processed_rows: number;
+  total_pages_scraped: number;
+  estimated_cost_usd: number;
+  created_at: string;
+}
 
 const StatusBadge = ({ status }: { status: string }) => {
   const configs = {
@@ -53,6 +43,48 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 const JobsTable = () => {
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchJobs = async () => {
+      const { data, error } = await supabase
+        .from('scraping_jobs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error('Error fetching jobs:', error);
+      } else {
+        setJobs(data || []);
+      }
+      setIsLoading(false);
+    };
+
+    fetchJobs();
+
+    // Set up realtime subscription
+    const channel = supabase
+      .channel('jobs-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'scraping_jobs'
+        },
+        () => {
+          fetchJobs();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   return (
     <Card className="gradient-card border-border/50 overflow-hidden">
       <div className="p-6 border-b border-border">
@@ -61,55 +93,65 @@ const JobsTable = () => {
       </div>
       
       <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="border-border hover:bg-transparent">
-              <TableHead className="text-muted-foreground">Project ID</TableHead>
-              <TableHead className="text-muted-foreground">Status</TableHead>
-              <TableHead className="text-muted-foreground">Progress</TableHead>
-              <TableHead className="text-muted-foreground">Pages</TableHead>
-              <TableHead className="text-muted-foreground">Cost</TableHead>
-              <TableHead className="text-muted-foreground">Created</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {mockJobs.map((job) => (
-              <TableRow
-                key={job.id}
-                className="border-border hover:bg-secondary/50 transition-smooth cursor-pointer"
-              >
-                <TableCell className="font-medium text-foreground">
-                  {job.project_id}
-                </TableCell>
-                <TableCell>
-                  <StatusBadge status={job.status} />
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-                      <div
-                        className="h-full gradient-primary transition-smooth"
-                        style={{
-                          width: `${(job.processed_rows / job.total_rows) * 100}%`,
-                        }}
-                      />
-                    </div>
-                    <span className="text-sm text-muted-foreground whitespace-nowrap">
-                      {job.processed_rows}/{job.total_rows}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-foreground">{job.total_pages_scraped}</TableCell>
-                <TableCell className="text-foreground font-medium">
-                  ${job.estimated_cost_usd.toFixed(2)}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {new Date(job.created_at).toLocaleString()}
-                </TableCell>
+        {isLoading ? (
+          <div className="flex items-center justify-center p-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : jobs.length === 0 ? (
+          <div className="text-center p-12 text-muted-foreground">
+            No jobs yet. Upload a CSV to get started!
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="border-border hover:bg-transparent">
+                <TableHead className="text-muted-foreground">Project ID</TableHead>
+                <TableHead className="text-muted-foreground">Status</TableHead>
+                <TableHead className="text-muted-foreground">Progress</TableHead>
+                <TableHead className="text-muted-foreground">Pages</TableHead>
+                <TableHead className="text-muted-foreground">Cost</TableHead>
+                <TableHead className="text-muted-foreground">Created</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {jobs.map((job) => (
+                <TableRow
+                  key={job.id}
+                  className="border-border hover:bg-secondary/50 transition-smooth cursor-pointer"
+                >
+                  <TableCell className="font-medium text-foreground">
+                    {job.project_id}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={job.status} />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
+                        <div
+                          className="h-full gradient-primary transition-smooth"
+                          style={{
+                            width: `${(job.processed_rows / job.total_rows) * 100}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="text-sm text-muted-foreground whitespace-nowrap">
+                        {job.processed_rows}/{job.total_rows}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-foreground">{job.total_pages_scraped}</TableCell>
+                  <TableCell className="text-foreground font-medium">
+                    ${parseFloat(job.estimated_cost_usd.toString()).toFixed(4)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {new Date(job.created_at).toLocaleString()}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </div>
     </Card>
   );
