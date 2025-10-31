@@ -1,0 +1,128 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { job_id } = await req.json();
+
+    if (!job_id) {
+      return new Response(
+        JSON.stringify({ error: 'job_id parameter is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get job info
+    const { data: job, error: jobError } = await supabase
+      .from('scraping_jobs')
+      .select('project_id')
+      .eq('id', job_id)
+      .single();
+
+    if (jobError || !job) {
+      return new Response(
+        JSON.stringify({ error: 'Job not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get all completed rows
+    const { data: rows, error: rowsError } = await supabase
+      .from('scraped_rows')
+      .select('*')
+      .eq('job_id', job_id)
+      .eq('extraction_status', 'completed')
+      .order('created_at');
+
+    if (rowsError) {
+      console.error('Error fetching rows:', rowsError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch data' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!rows || rows.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'No completed extractions found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Generate CSV
+    const csvHeaders = [
+      'Website URL',
+      'Business Description',
+      'Team Members',
+      'Instagram',
+      'Facebook',
+      'LinkedIn',
+      'Twitter',
+      'WhatsApp Contact',
+      'Custom Answer 1',
+      'Custom Answer 2',
+      'Scraped At',
+      'Extracted At'
+    ];
+
+    const csvRows = rows.map(row => {
+      const socialMedia = row.social_media || {};
+      return [
+        escapeCSV(row.website_url),
+        escapeCSV(row.business_description),
+        escapeCSV(row.team_members),
+        escapeCSV(socialMedia.instagram),
+        escapeCSV(socialMedia.facebook),
+        escapeCSV(socialMedia.linkedin),
+        escapeCSV(socialMedia.twitter),
+        escapeCSV(row.whatsapp_contact),
+        escapeCSV(row.custom_answer_1),
+        escapeCSV(row.custom_answer_2),
+        row.scraped_at ? new Date(row.scraped_at).toISOString() : '',
+        row.extracted_at ? new Date(row.extracted_at).toISOString() : '',
+      ].join(',');
+    });
+
+    const csv = [csvHeaders.join(','), ...csvRows].join('\n');
+
+    return new Response(csv, {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'text/csv',
+        'Content-Disposition': `attachment; filename="${job.project_id}_enriched.csv"`,
+      },
+    });
+
+  } catch (error) {
+    console.error('Error in download-csv:', error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
+
+function escapeCSV(value: any): string {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  const str = String(value);
+  // Escape quotes and wrap in quotes if contains comma, quote, or newline
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}

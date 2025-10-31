@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Clock, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Clock, CheckCircle2, AlertCircle, Loader2, Download } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -11,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface Job {
   id: string;
@@ -45,6 +47,36 @@ const StatusBadge = ({ status }: { status: string }) => {
 const JobsTable = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [downloadingJobId, setDownloadingJobId] = useState<string | null>(null);
+
+  const handleDownload = async (jobId: string, projectId: string) => {
+    setDownloadingJobId(jobId);
+    try {
+      const { data, error } = await supabase.functions.invoke('download-csv', {
+        body: { job_id: jobId },
+      });
+
+      if (error) throw error;
+
+      // Create blob and download
+      const blob = new Blob([data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${projectId}_enriched.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast.success('CSV downloaded successfully!');
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to download CSV');
+    } finally {
+      setDownloadingJobId(null);
+    }
+  };
 
   useEffect(() => {
     const fetchJobs = async () => {
@@ -111,6 +143,7 @@ const JobsTable = () => {
                 <TableHead className="text-muted-foreground">Pages</TableHead>
                 <TableHead className="text-muted-foreground">Cost</TableHead>
                 <TableHead className="text-muted-foreground">Created</TableHead>
+                <TableHead className="text-muted-foreground">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -146,6 +179,25 @@ const JobsTable = () => {
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {new Date(job.created_at).toLocaleString()}
+                  </TableCell>
+                  <TableCell>
+                    {job.status === 'completed' && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleDownload(job.id, job.project_id)}
+                        disabled={downloadingJobId === job.id}
+                        className="gradient-primary hover:opacity-90 transition-smooth"
+                      >
+                        {downloadingJobId === job.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Download className="h-4 w-4 mr-2" />
+                            Download
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
