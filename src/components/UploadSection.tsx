@@ -2,11 +2,30 @@ import { useState } from "react";
 import { Upload, FileText, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import Papa from "papaparse";
+import { supabase } from "@/integrations/supabase/client";
 
-const UploadSection = () => {
+interface UploadSectionProps {
+  onJobCreated: (jobId: string, projectId: string) => void;
+}
+
+const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [csvData, setCsvData] = useState<any[] | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Extraction config
+  const [extractBusiness, setExtractBusiness] = useState(true);
+  const [extractTeam, setExtractTeam] = useState(true);
+  const [extractSocial, setExtractSocial] = useState(true);
+  const [extractWhatsApp, setExtractWhatsApp] = useState(true);
+  const [customQuestion1, setCustomQuestion1] = useState("");
+  const [customQuestion2, setCustomQuestion2] = useState("");
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -22,28 +41,83 @@ const UploadSection = () => {
     setIsDragging(false);
     
     const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile?.type === "text/csv") {
-      setFile(droppedFile);
-      toast.success(`File "${droppedFile.name}" uploaded successfully`);
-    } else {
-      toast.error("Please upload a CSV file");
-    }
+    processFile(droppedFile);
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      setFile(selectedFile);
-      toast.success(`File "${selectedFile.name}" uploaded successfully`);
+      processFile(selectedFile);
     }
   };
 
-  const handleCreateJob = () => {
-    if (!file) {
+  const processFile = (uploadedFile: File) => {
+    if (uploadedFile.type !== "text/csv" && !uploadedFile.name.endsWith('.csv')) {
+      toast.error("Please upload a CSV file");
+      return;
+    }
+
+    setFile(uploadedFile);
+    
+    // Parse CSV
+    Papa.parse(uploadedFile, {
+      header: true,
+      complete: (results) => {
+        setCsvData(results.data);
+        toast.success(`File "${uploadedFile.name}" uploaded successfully - ${results.data.length} rows found`);
+      },
+      error: (error) => {
+        toast.error(`Failed to parse CSV: ${error.message}`);
+      },
+    });
+  };
+
+  const handleCreateJob = async () => {
+    if (!csvData || csvData.length === 0) {
       toast.error("Please upload a CSV file first");
       return;
     }
-    toast.info("Job creation will be implemented with backend");
+
+    // Validate at least one field is selected
+    if (!extractBusiness && !extractTeam && !extractSocial && !extractWhatsApp) {
+      toast.error("Please select at least one field to extract");
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('create-scraping-job', {
+        body: {
+          csv_rows: csvData,
+          extraction_config: {
+            business_description: extractBusiness,
+            team_members: extractTeam,
+            social_media: extractSocial,
+            whatsapp_contact: extractWhatsApp,
+            custom_question_1: customQuestion1 || null,
+            custom_question_2: customQuestion2 || null,
+          },
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      toast.success("Job created! Workers are processing your requests...");
+      onJobCreated(data.job_id, data.project_id);
+      
+      // Reset form
+      setFile(null);
+      setCsvData(null);
+      
+    } catch (error) {
+      console.error('Error creating job:', error);
+      toast.error(error instanceof Error ? error.message : "Failed to create job");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -52,7 +126,7 @@ const UploadSection = () => {
         <div>
           <h2 className="text-2xl font-bold text-foreground mb-2">Upload CSV File</h2>
           <p className="text-muted-foreground">
-            Upload a CSV file with website URLs to start scraping and AI extraction
+            Upload a CSV with website URLs and select what data to extract
           </p>
         </div>
 
@@ -60,7 +134,7 @@ const UploadSection = () => {
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`border-2 border-dashed rounded-xl p-12 transition-smooth text-center ${
+          className={`border-2 border-dashed rounded-xl p-8 transition-smooth text-center ${
             isDragging
               ? "border-primary bg-primary/5 glow-primary"
               : "border-border hover:border-primary/50 hover:bg-secondary/30"
@@ -74,12 +148,15 @@ const UploadSection = () => {
               <div>
                 <p className="text-lg font-medium text-foreground">{file.name}</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {(file.size / 1024).toFixed(2)} KB
+                  {csvData?.length || 0} rows • {(file.size / 1024).toFixed(2)} KB
                 </p>
               </div>
               <Button
                 variant="outline"
-                onClick={() => setFile(null)}
+                onClick={() => {
+                  setFile(null);
+                  setCsvData(null);
+                }}
                 className="transition-smooth hover:border-primary/50"
               >
                 Remove File
@@ -115,25 +192,105 @@ const UploadSection = () => {
           )}
         </div>
 
-        <div className="flex items-start gap-3 p-4 rounded-lg bg-primary/5 border border-primary/20">
-          <AlertCircle className="h-5 w-5 text-primary mt-0.5" />
-          <div className="text-sm text-muted-foreground">
-            <p className="font-medium text-foreground mb-1">CSV Format Requirements:</p>
-            <ul className="list-disc list-inside space-y-1">
-              <li>Must contain a column with website URLs</li>
-              <li>One URL per row</li>
-              <li>Supported formats: http:// or https://</li>
-            </ul>
-          </div>
-        </div>
+        {csvData && (
+          <>
+            <div className="space-y-4">
+              <h3 className="font-semibold text-foreground">Select Data to Extract:</h3>
+              
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="business" 
+                    checked={extractBusiness}
+                    onCheckedChange={(checked) => setExtractBusiness(checked as boolean)}
+                  />
+                  <Label htmlFor="business" className="text-sm cursor-pointer">
+                    Business Description
+                  </Label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="team" 
+                    checked={extractTeam}
+                    onCheckedChange={(checked) => setExtractTeam(checked as boolean)}
+                  />
+                  <Label htmlFor="team" className="text-sm cursor-pointer">
+                    Team Members
+                  </Label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="social" 
+                    checked={extractSocial}
+                    onCheckedChange={(checked) => setExtractSocial(checked as boolean)}
+                  />
+                  <Label htmlFor="social" className="text-sm cursor-pointer">
+                    Social Media (Instagram, Facebook, LinkedIn, Twitter)
+                  </Label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="whatsapp" 
+                    checked={extractWhatsApp}
+                    onCheckedChange={(checked) => setExtractWhatsApp(checked as boolean)}
+                  />
+                  <Label htmlFor="whatsapp" className="text-sm cursor-pointer">
+                    WhatsApp Contact
+                  </Label>
+                </div>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <Label htmlFor="custom1" className="text-sm">
+                  Custom Question 1 (optional)
+                </Label>
+                <Input
+                  id="custom1"
+                  placeholder="e.g., What are their office hours?"
+                  value={customQuestion1}
+                  onChange={(e) => setCustomQuestion1(e.target.value)}
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <Label htmlFor="custom2" className="text-sm">
+                  Custom Question 2 (optional)
+                </Label>
+                <Input
+                  id="custom2"
+                  placeholder="e.g., Do they offer remote services?"
+                  value={customQuestion2}
+                  onChange={(e) => setCustomQuestion2(e.target.value)}
+                  className="bg-secondary/50 border-border"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-primary/5 border border-primary/20">
+              <AlertCircle className="h-5 w-5 text-primary mt-0.5" />
+              <div className="text-sm text-muted-foreground">
+                <p className="font-medium text-foreground mb-1">How it works:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Pipelined workers process scraping and extraction in parallel</li>
+                  <li>Each website is scraped once, then analyzed by AI</li>
+                  <li>Real-time progress tracking with per-row status</li>
+                </ul>
+              </div>
+            </div>
+          </>
+        )}
 
         <Button
           onClick={handleCreateJob}
-          disabled={!file}
+          disabled={!csvData || isProcessing}
           className="w-full gradient-primary hover:opacity-90 transition-smooth disabled:opacity-50 glow-primary"
           size="lg"
         >
-          Create Scraping Job
+          {isProcessing ? "Creating Job..." : "Let's Go! 🚀"}
         </Button>
       </div>
     </Card>
