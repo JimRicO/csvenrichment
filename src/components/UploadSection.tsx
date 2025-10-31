@@ -72,6 +72,33 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
     });
   };
 
+  const startWorkerOrchestration = async (jobId: string) => {
+    // Call workers in parallel repeatedly until job is complete
+    const checkAndRunWorkers = async () => {
+      try {
+        // Run both workers in parallel - they'll handle "no work" gracefully
+        await Promise.all([
+          supabase.functions.invoke('scraper-worker'),
+          supabase.functions.invoke('extractor-worker'),
+        ]);
+      } catch (error) {
+        console.error('Worker invocation error:', error);
+      }
+    };
+
+    // Run workers immediately
+    checkAndRunWorkers();
+
+    // Then run every 5 seconds for up to 10 minutes
+    const interval = setInterval(checkAndRunWorkers, 5000);
+    
+    // Stop after 10 minutes max (failsafe)
+    setTimeout(() => clearInterval(interval), 600000);
+    
+    // Store interval ID in case we need to clear it
+    return interval;
+  };
+
   const handleCreateJob = async () => {
     if (!csvData || csvData.length === 0) {
       toast.error("Please upload a CSV file first");
@@ -107,6 +134,9 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
 
       toast.success("Job created! Workers are processing your requests...");
       onJobCreated(data.job_id, data.project_id);
+      
+      // Start worker orchestration
+      startWorkerOrchestration(data.job_id);
       
       // Reset form
       setFile(null);
