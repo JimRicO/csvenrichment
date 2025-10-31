@@ -223,6 +223,26 @@ serve(async (req) => {
         })
         .eq('id', row.id);
 
+      // Update job statistics even for failed rows (so job can complete)
+      const { data: job } = await supabase
+        .from('scraping_jobs')
+        .select('processed_rows, total_rows')
+        .eq('id', row.job_id)
+        .single();
+
+      if (job) {
+        const newProcessedRows = job.processed_rows + 1;
+        const isComplete = newProcessedRows >= job.total_rows;
+
+        await supabase
+          .from('scraping_jobs')
+          .update({
+            processed_rows: newProcessedRows,
+            status: isComplete ? 'completed' : 'processing',
+          })
+          .eq('id', row.job_id);
+      }
+
       return new Response(
         JSON.stringify({
           success: false,
