@@ -193,16 +193,7 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
               </Button>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/20 border border-primary/50 glow-primary">
-                <Upload className="h-8 w-8 text-primary" />
-              </div>
-              <div>
-                <p className="text-lg font-medium text-foreground mb-2">
-                  Drop your CSV file here
-                </p>
-                <p className="text-sm text-muted-foreground">or click to browse</p>
-              </div>
+            <>
               <input
                 type="file"
                 accept=".csv"
@@ -210,15 +201,26 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
                 className="hidden"
                 id="file-upload"
               />
-              <label htmlFor="file-upload">
-                <Button
-                  asChild
-                  className="gradient-primary hover:opacity-90 transition-smooth cursor-pointer"
-                >
-                  <span>Select CSV File</span>
-                </Button>
+              <label htmlFor="file-upload" className="cursor-pointer block">
+                <div className="space-y-4">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/20 border border-primary/50 glow-primary">
+                    <Upload className="h-8 w-8 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-lg font-medium text-foreground mb-2">
+                      Drop your CSV file here
+                    </p>
+                    <p className="text-sm text-muted-foreground">or tap to browse</p>
+                  </div>
+                  <Button
+                    type="button"
+                    className="gradient-primary hover:opacity-90 transition-smooth pointer-events-none"
+                  >
+                    Select CSV File
+                  </Button>
+                </div>
               </label>
-            </div>
+            </>
           )}
         </div>
 
