@@ -14,7 +14,183 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ai_extraction_models: {
+        Row: {
+          created_at: string
+          description: string | null
+          extraction_prompt: string
+          id: string
+          input_cost_per_mtok: number
+          is_active: boolean
+          model_name: string
+          model_version: string
+          output_cost_per_mtok: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          extraction_prompt: string
+          id?: string
+          input_cost_per_mtok: number
+          is_active?: boolean
+          model_name: string
+          model_version: string
+          output_cost_per_mtok: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          extraction_prompt?: string
+          id?: string
+          input_cost_per_mtok?: number
+          is_active?: boolean
+          model_name?: string
+          model_version?: string
+          output_cost_per_mtok?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      scraped_rows: {
+        Row: {
+          business_description: string | null
+          created_at: string
+          custom_answer_1: string | null
+          custom_answer_2: string | null
+          extracted_at: string | null
+          extraction_error_message: string | null
+          extraction_status: string
+          id: string
+          input_tokens: number | null
+          job_id: string
+          model_id: string | null
+          output_tokens: number | null
+          project_id: string
+          scrape_error_message: string | null
+          scrape_status: string
+          scraped_at: string | null
+          scraped_content: string | null
+          social_media: Json | null
+          team_members: string | null
+          updated_at: string
+          website_url: string
+          whatsapp_contact: string | null
+        }
+        Insert: {
+          business_description?: string | null
+          created_at?: string
+          custom_answer_1?: string | null
+          custom_answer_2?: string | null
+          extracted_at?: string | null
+          extraction_error_message?: string | null
+          extraction_status?: string
+          id?: string
+          input_tokens?: number | null
+          job_id: string
+          model_id?: string | null
+          output_tokens?: number | null
+          project_id: string
+          scrape_error_message?: string | null
+          scrape_status?: string
+          scraped_at?: string | null
+          scraped_content?: string | null
+          social_media?: Json | null
+          team_members?: string | null
+          updated_at?: string
+          website_url: string
+          whatsapp_contact?: string | null
+        }
+        Update: {
+          business_description?: string | null
+          created_at?: string
+          custom_answer_1?: string | null
+          custom_answer_2?: string | null
+          extracted_at?: string | null
+          extraction_error_message?: string | null
+          extraction_status?: string
+          id?: string
+          input_tokens?: number | null
+          job_id?: string
+          model_id?: string | null
+          output_tokens?: number | null
+          project_id?: string
+          scrape_error_message?: string | null
+          scrape_status?: string
+          scraped_at?: string | null
+          scraped_content?: string | null
+          social_media?: Json | null
+          team_members?: string | null
+          updated_at?: string
+          website_url?: string
+          whatsapp_contact?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scraped_rows_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "scraping_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scraped_rows_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "ai_extraction_models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scraping_jobs: {
+        Row: {
+          created_at: string
+          estimated_cost_usd: number
+          extraction_config: Json | null
+          id: string
+          processed_rows: number
+          project_id: string
+          status: string
+          total_characters_scraped: number
+          total_input_tokens: number
+          total_output_tokens: number
+          total_pages_scraped: number
+          total_rows: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          estimated_cost_usd?: number
+          extraction_config?: Json | null
+          id?: string
+          processed_rows?: number
+          project_id: string
+          status?: string
+          total_characters_scraped?: number
+          total_input_tokens?: number
+          total_output_tokens?: number
+          total_pages_scraped?: number
+          total_rows?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          estimated_cost_usd?: number
+          extraction_config?: Json | null
+          id?: string
+          processed_rows?: number
+          project_id?: string
+          status?: string
+          total_characters_scraped?: number
+          total_input_tokens?: number
+          total_output_tokens?: number
+          total_pages_scraped?: number
+          total_rows?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
