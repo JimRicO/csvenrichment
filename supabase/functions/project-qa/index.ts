@@ -98,11 +98,11 @@ Please answer questions about this data accurately and concisely. Base your answ
       }
     ];
 
-    console.log('Calling Claude Haiku API with context...');
+    console.log('Calling Claude Sonnet 4.5 API with context...');
     console.log(`System prompt length: ${systemPrompt.length} chars`);
     console.log(`Conversation history: ${conversationHistory.length} messages`);
 
-    // Call Claude Haiku API
+    // Call Claude Sonnet 4.5 API
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -111,8 +111,8 @@ Please answer questions about this data accurately and concisely. Base your answ
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
-        max_tokens: 2048,
+        model: 'claude-sonnet-4-5',
+        max_tokens: 4096,
         system: systemPrompt,
         messages: messages
       })
