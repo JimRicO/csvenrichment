@@ -1,12 +1,23 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import Header from "@/components/Header";
+import UploadSection from "@/components/UploadSection";
+import StatsCards from "@/components/StatsCards";
+import JobsTable from "@/components/JobsTable";
 
 const Index = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <Header />
+      <main className="container mx-auto px-6 py-8 space-y-8">
+        <StatsCards />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-1">
+            <UploadSection />
+          </div>
+          <div className="lg:col-span-2">
+            <JobsTable />
+          </div>
+        </div>
+      </main>
     </div>
   );
 };
