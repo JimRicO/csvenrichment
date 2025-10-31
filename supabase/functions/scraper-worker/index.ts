@@ -134,14 +134,36 @@ serve(async (req) => {
     } catch (scrapeError) {
       console.error('Scraping error:', scrapeError);
       
-      // Mark row as failed
+      // Mark row as failed (both scrape and extraction since we can't extract without content)
       await supabase
         .from('scraped_rows')
         .update({
           scrape_status: 'failed',
           scrape_error_message: scrapeError instanceof Error ? scrapeError.message : 'Unknown error',
+          extraction_status: 'failed',
+          extraction_error_message: 'Cannot extract - scraping failed',
         })
         .eq('id', row.id);
+      
+      // Update job to mark this row as processed (even though failed)
+      const { data: currentJob } = await supabase
+        .from('scraping_jobs')
+        .select('processed_rows, total_rows')
+        .eq('id', row.job_id)
+        .single();
+      
+      if (currentJob) {
+        const newProcessedRows = currentJob.processed_rows + 1;
+        const isComplete = newProcessedRows >= currentJob.total_rows;
+        
+        await supabase
+          .from('scraping_jobs')
+          .update({
+            processed_rows: newProcessedRows,
+            status: isComplete ? 'completed' : 'processing',
+          })
+          .eq('id', row.job_id);
+      }
 
       return new Response(
         JSON.stringify({
