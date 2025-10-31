@@ -145,6 +145,7 @@ export type Database = {
       }
       scraping_jobs: {
         Row: {
+          conversation: Json | null
           created_at: string
           estimated_cost_usd: number
           extraction_config: Json | null
@@ -160,6 +161,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          conversation?: Json | null
           created_at?: string
           estimated_cost_usd?: number
           extraction_config?: Json | null
@@ -175,6 +177,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          conversation?: Json | null
           created_at?: string
           estimated_cost_usd?: number
           extraction_config?: Json | null

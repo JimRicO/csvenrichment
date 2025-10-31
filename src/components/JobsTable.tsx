@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Clock, CheckCircle2, AlertCircle, Loader2, Download } from "lucide-react";
+import { Clock, CheckCircle2, AlertCircle, Loader2, Download, MessageCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import ProjectQADialog from "./ProjectQADialog";
 
 interface Job {
   id: string;
@@ -23,6 +24,7 @@ interface Job {
   total_pages_scraped: number;
   estimated_cost_usd: number;
   created_at: string;
+  conversation?: any[];
 }
 
 const StatusBadge = ({ status }: { status: string }) => {
@@ -48,6 +50,8 @@ const JobsTable = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [downloadingJobId, setDownloadingJobId] = useState<string | null>(null);
+  const [qaDialogOpen, setQaDialogOpen] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
 
   const handleDownload = async (jobId: string, projectId: string) => {
     setDownloadingJobId(jobId);
@@ -89,7 +93,7 @@ const JobsTable = () => {
       if (error) {
         console.error('Error fetching jobs:', error);
       } else {
-        setJobs(data || []);
+        setJobs((data || []) as Job[]);
       }
       setIsLoading(false);
     };
@@ -181,23 +185,39 @@ const JobsTable = () => {
                     {new Date(job.created_at).toLocaleString()}
                   </TableCell>
                   <TableCell>
-                    {job.status === 'completed' && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleDownload(job.id, job.project_id)}
-                        disabled={downloadingJobId === job.id}
-                        className="gradient-primary hover:opacity-90 transition-smooth"
-                      >
-                        {downloadingJobId === job.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <>
-                            <Download className="h-4 w-4 mr-2" />
-                            Download
-                          </>
-                        )}
-                      </Button>
-                    )}
+                    <div className="flex gap-2">
+                      {job.status === 'completed' && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedJob(job);
+                              setQaDialogOpen(true);
+                            }}
+                            className="hover:bg-primary/10 transition-smooth"
+                          >
+                            <MessageCircle className="h-4 w-4 mr-2" />
+                            Q&A
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleDownload(job.id, job.project_id)}
+                            disabled={downloadingJobId === job.id}
+                            className="gradient-primary hover:opacity-90 transition-smooth"
+                          >
+                            {downloadingJobId === job.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <>
+                                <Download className="h-4 w-4 mr-2" />
+                                Download
+                              </>
+                            )}
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -205,6 +225,19 @@ const JobsTable = () => {
           </Table>
         )}
       </div>
+
+      {selectedJob && (
+        <ProjectQADialog
+          jobId={selectedJob.id}
+          projectId={selectedJob.project_id}
+          isOpen={qaDialogOpen}
+          onClose={() => {
+            setQaDialogOpen(false);
+            setSelectedJob(null);
+          }}
+          initialConversation={selectedJob.conversation || []}
+        />
+      )}
     </Card>
   );
 };
