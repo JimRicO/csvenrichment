@@ -69,7 +69,6 @@ const StatsCards = () => {
       title: "Total Jobs",
       value: stats.totalJobs.toString(),
       icon: Globe,
-      trend: `${stats.totalJobs} total`,
       color: "text-primary",
       bgColor: "bg-primary/20",
     },
@@ -77,7 +76,6 @@ const StatsCards = () => {
       title: "Pages Scraped",
       value: stats.pagesScraped.toString(),
       icon: Zap,
-      trend: `+${stats.pagesScraped}`,
       color: "text-accent",
       bgColor: "bg-accent/20",
     },
@@ -85,7 +83,6 @@ const StatsCards = () => {
       title: "Success Rate",
       value: `${stats.successRate.toFixed(1)}%`,
       icon: TrendingUp,
-      trend: `${stats.successRate.toFixed(1)}%`,
       color: "text-success",
       bgColor: "bg-success/20",
     },
@@ -93,7 +90,6 @@ const StatsCards = () => {
       title: "Total Cost",
       value: `$${stats.totalCost.toFixed(4)}`,
       icon: DollarSign,
-      trend: `$${stats.totalCost.toFixed(4)}`,
       color: "text-warning",
       bgColor: "bg-warning/20",
     },
@@ -108,13 +104,10 @@ const StatsCards = () => {
             key={stat.title}
             className="p-6 gradient-card border-border/50 hover:border-primary/30 transition-smooth group"
           >
-            <div className="flex items-start justify-between mb-4">
-              <div className={`p-3 rounded-lg ${stat.bgColor} border border-current/20 group-hover:glow-primary transition-smooth`}>
+            <div className="mb-4">
+              <div className={`p-3 rounded-lg ${stat.bgColor} border border-current/20 group-hover:glow-primary transition-smooth inline-flex`}>
                 <Icon className={`h-5 w-5 ${stat.color}`} />
               </div>
-              <span className={`text-sm font-medium ${stat.color}`}>
-                {stat.trend}
-              </span>
             </div>
             <div className="min-w-0">
               <p className="text-2xl md:text-3xl font-bold text-foreground mb-1 break-all">{stat.value}</p>
