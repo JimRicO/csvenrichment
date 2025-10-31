@@ -86,6 +86,34 @@ serve(async (req) => {
 
     console.log(`Extracting data from row ${row.id}`);
 
+    // Get job's extraction config to retrieve custom questions
+    const { data: job, error: jobError } = await supabase
+      .from('scraping_jobs')
+      .select('extraction_config')
+      .eq('id', row.job_id)
+      .single();
+
+    if (jobError) {
+      console.error('Failed to fetch job config:', jobError);
+      throw new Error('Failed to fetch job configuration');
+    }
+
+    // Build dynamic prompt with custom questions
+    let dynamicPrompt = modelConfig.extraction_prompt;
+    
+    // Replace the generic custom answer section with actual questions
+    const customQuestions: string[] = [];
+    if (job.extraction_config?.custom_question_1) {
+      customQuestions.push(`custom_answer_1: ${job.extraction_config.custom_question_1}`);
+    }
+    if (job.extraction_config?.custom_question_2) {
+      customQuestions.push(`custom_answer_2: ${job.extraction_config.custom_question_2}`);
+    }
+    
+    if (customQuestions.length > 0) {
+      dynamicPrompt += `\n\n### CUSTOM QUESTIONS TO ANSWER:\n${customQuestions.join('\n')}`;
+    }
+
     // Call Claude API using model configuration from database
     const anthropic = new Anthropic({ apiKey: anthropicApiKey });
 
@@ -95,7 +123,7 @@ serve(async (req) => {
         max_tokens: 2048,
         messages: [{
           role: 'user',
-          content: `${modelConfig.extraction_prompt}\n\nWebsite Content:\n${row.scraped_content}`,
+          content: `${dynamicPrompt}\n\nWebsite Content:\n${row.scraped_content}`,
         }],
       });
 
