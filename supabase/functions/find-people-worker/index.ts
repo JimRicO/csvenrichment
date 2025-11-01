@@ -196,48 +196,85 @@ Extract team members:`
 
 // Helper function to find team page URL in scraped content
 function findTeamPageUrl(scrapedContent: string, baseUrl: string): string | null {
-  const teamPatterns = [
-    // Markdown link patterns
-    /\[.*?\]\((\/team[^)]*)\)/i,
-    /\[.*?\]\((\/our-team[^)]*)\)/i,
-    /\[.*?\]\((\/meet-the-team[^)]*)\)/i,
-    /\[.*?\]\((\/people[^)]*)\)/i,
-    /\[.*?\]\((\/staff[^)]*)\)/i,
-    /\[.*?\]\((\/members[^)]*)\)/i,
-    /\[.*?\]\((\/founders?[^)]*)\)/i,
-    /\[.*?\]\((\/about[^)]*)\)/i,
-    /\[.*?\]\((\/about-us[^)]*)\)/i,
-    /\[.*?\]\((\/who-we-are[^)]*)\)/i,
-    /\[.*?\]\((\/company[^)]*)\)/i,
-    /\[.*?\]\((\/leadership[^)]*)\)/i,
-    /\[.*?\]\((\/management[^)]*)\)/i,
-    /\[.*?\]\((\/executive[^)]*)\)/i,
-    /\[.*?\]\((\/contact[^)]*)\)/i,
-    
-    // HTML href patterns (in case HTML is in content)
-    /href=["'](\/team[^"']*)["']/i,
-    /href=["'](\/our-team[^"']*)["']/i,
-    /href=["'](\/about[^"']*)["']/i,
-    /href=["'](\/founders?[^"']*)["']/i,
-    /href=["'](\/people[^"']*)["']/i,
-    /href=["'](\/leadership[^"']*)["']/i,
+  console.log(`[Find People] Searching in ${scrapedContent.length} characters of content`);
+  
+  // Comprehensive list of keywords to search for
+  const keywords = [
+    'team', 'our-team', 'meet-the-team', 'meet-our-team',
+    'people', 'our-people',
+    'staff', 'our-staff',
+    'members', 'our-members',
+    'founder', 'founders', 'our-founders',
+    'about', 'about-us', 'aboutus', 'who-we-are',
+    'company', 'our-company',
+    'leadership', 'our-leadership',
+    'management', 'our-management',
+    'executive', 'executives',
+    'contact', 'contact-us', 'contactus'
   ];
 
-  for (const pattern of teamPatterns) {
-    const match = scrapedContent.match(pattern);
-    if (match) {
-      const path = match[1];
-      try {
-        const url = new URL(path, baseUrl);
-        console.log(`[Find People] Found team page URL: ${url.href}`);
-        return url.href;
-      } catch (e) {
-        console.error(`[Find People] Invalid URL construction: ${path}`, e);
-        continue;
+  // Pattern 1: Markdown links [text](url)
+  const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/gi;
+  let match;
+  
+  while ((match = markdownLinkRegex.exec(scrapedContent)) !== null) {
+    const linkText = match[1].toLowerCase();
+    const linkUrl = match[2];
+    
+    // Check if link text or URL contains any of our keywords
+    for (const keyword of keywords) {
+      if (linkText.includes(keyword) || linkUrl.toLowerCase().includes(keyword)) {
+        try {
+          const url = new URL(linkUrl, baseUrl);
+          console.log(`[Find People] Found via markdown link: ${url.href} (text: "${match[1]}")`);
+          return url.href;
+        } catch (e) {
+          continue;
+        }
       }
     }
   }
 
-  console.log('[Find People] No team page URL found in content');
+  // Pattern 2: HTML href attributes
+  const hrefRegex = /href=["']([^"']+)["'][^>]*>([^<]*)</gi;
+  
+  while ((match = hrefRegex.exec(scrapedContent)) !== null) {
+    const linkUrl = match[1];
+    const linkText = match[2].toLowerCase();
+    
+    for (const keyword of keywords) {
+      if (linkText.includes(keyword) || linkUrl.toLowerCase().includes(keyword)) {
+        try {
+          const url = new URL(linkUrl, baseUrl);
+          console.log(`[Find People] Found via HTML href: ${url.href}`);
+          return url.href;
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+  }
+
+  // Pattern 3: Look for URLs in plain text that contain keywords
+  const urlRegex = /(https?:\/\/[^\s]+|\/[a-zA-Z0-9\-_\/]+)/gi;
+  
+  while ((match = urlRegex.exec(scrapedContent)) !== null) {
+    const potentialUrl = match[1];
+    
+    for (const keyword of keywords) {
+      if (potentialUrl.toLowerCase().includes(keyword)) {
+        try {
+          const url = new URL(potentialUrl, baseUrl);
+          console.log(`[Find People] Found via plain text URL: ${url.href}`);
+          return url.href;
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+  }
+
+  console.log('[Find People] No team/about page URL found after comprehensive search');
+  console.log(`[Find People] Sample content: ${scrapedContent.substring(0, 500)}...`);
   return null;
 }
