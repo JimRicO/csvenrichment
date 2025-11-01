@@ -141,19 +141,44 @@ serve(async (req) => {
     // Step 5: Parse JSON response
     let extractedPeople;
     try {
+      // Remove markdown code blocks if present
+      let cleanedResponse = responseText.trim();
+      if (cleanedResponse.startsWith('```')) {
+        // Extract JSON from markdown code blocks
+        const match = cleanedResponse.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (match) {
+          cleanedResponse = match[1].trim();
+        }
+      }
+      
       // Try to parse as JSON array
-      extractedPeople = JSON.parse(responseText);
+      extractedPeople = JSON.parse(cleanedResponse);
     } catch {
       // If not valid JSON, try to extract JSON from the response
       const jsonMatch = responseText.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
         extractedPeople = JSON.parse(jsonMatch[0]);
       } else {
+        console.error('[Find People] Failed to parse response:', responseText);
         throw new Error('Failed to parse people extraction response as JSON');
       }
     }
 
-    // Step 6: Prepare people for insertion
+    console.log(`[Find People] Parsed ${extractedPeople?.length || 0} people from response`);
+
+    // Step 6: Delete existing automated people for this row (to avoid duplicates on refresh)
+    const { error: deleteError } = await supabase
+      .from('people')
+      .delete()
+      .eq('scraped_row_id', row_id)
+      .eq('source', 'automated');
+    
+    if (deleteError) {
+      console.error('[Find People] Error deleting old people:', deleteError);
+      // Continue anyway
+    }
+
+    // Step 7: Prepare people for insertion
     const peopleToInsert = [];
     
     if (Array.isArray(extractedPeople) && extractedPeople.length > 0) {
@@ -254,14 +279,16 @@ function findTeamPageUrl(scrapedContent: string, baseUrl: string): string | null
   
   // Prioritized list of keywords to search for (ordered by priority)
   const keywordGroups = [
-    // High priority - most likely to have team info
-    { keywords: ['about-us', 'about', 'team', 'our-team', 'meet-the-team', 'meet-our-team', 'story', 'our-story', 'ourstory'], priority: 1 },
+    // Highest priority - dedicated team/pros pages
+    { keywords: ['all-pros', 'pros', 'our-pros', 'meet-the-pros', 'team', 'our-team', 'meet-the-team', 'meet-our-team'], priority: 1 },
+    // High priority - about/story pages  
+    { keywords: ['about-us', 'about', 'story', 'our-story', 'ourstory', 'who-we-are'], priority: 2 },
     // Medium priority
-    { keywords: ['people', 'our-people', 'staff', 'our-staff', 'leadership', 'our-leadership', 'who-we-are'], priority: 2 },
+    { keywords: ['people', 'our-people', 'staff', 'our-staff', 'leadership', 'our-leadership'], priority: 3 },
     // Lower priority
-    { keywords: ['founder', 'founders', 'our-founders', 'management', 'our-management', 'executive', 'executives'], priority: 3 },
+    { keywords: ['founder', 'founders', 'our-founders', 'management', 'our-management', 'executive', 'executives'], priority: 4 },
     // Lowest priority
-    { keywords: ['company', 'our-company', 'contact', 'contact-us', 'contactus'], priority: 4 }
+    { keywords: ['company', 'our-company', 'contact', 'contact-us', 'contactus'], priority: 5 }
   ];
   
   const allMatches: Array<{ url: string; priority: number; keyword: string; context: string }> = [];
