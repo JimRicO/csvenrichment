@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Clock, CheckCircle2, AlertCircle, Loader2, Download, MessageCircle } from "lucide-react";
+import { Clock, CheckCircle2, AlertCircle, Loader2, Download, MessageCircle, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ProjectQADialog from "./ProjectQADialog";
+import ScrapedRowsDialog from "./ScrapedRowsDialog";
 
 interface Job {
   id: string;
@@ -51,6 +52,7 @@ const JobsTable = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [downloadingJobId, setDownloadingJobId] = useState<string | null>(null);
   const [qaDialogOpen, setQaDialogOpen] = useState(false);
+  const [rowsDialogOpen, setRowsDialogOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
 
   const handleDownload = async (jobId: string, projectId: string) => {
@@ -193,6 +195,18 @@ const JobsTable = () => {
                             variant="outline"
                             onClick={() => {
                               setSelectedJob(job);
+                              setRowsDialogOpen(true);
+                            }}
+                            className="hover:bg-primary/10 transition-smooth"
+                          >
+                            <Users className="h-4 w-4 mr-2" />
+                            Find People
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedJob(job);
                               setQaDialogOpen(true);
                             }}
                             className="hover:bg-primary/10 transition-smooth"
@@ -227,16 +241,27 @@ const JobsTable = () => {
       </div>
 
       {selectedJob && (
-        <ProjectQADialog
-          jobId={selectedJob.id}
-          projectId={selectedJob.project_id}
-          isOpen={qaDialogOpen}
-          onClose={() => {
-            setQaDialogOpen(false);
-            setSelectedJob(null);
-          }}
-          initialConversation={selectedJob.conversation || []}
-        />
+        <>
+          <ProjectQADialog
+            jobId={selectedJob.id}
+            projectId={selectedJob.project_id}
+            isOpen={qaDialogOpen}
+            onClose={() => {
+              setQaDialogOpen(false);
+              setSelectedJob(null);
+            }}
+            initialConversation={selectedJob.conversation || []}
+          />
+          
+          <ScrapedRowsDialog
+            jobId={selectedJob.id}
+            isOpen={rowsDialogOpen}
+            onClose={() => {
+              setRowsDialogOpen(false);
+              setSelectedJob(null);
+            }}
+          />
+        </>
       )}
     </Card>
   );

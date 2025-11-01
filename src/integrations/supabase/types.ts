@@ -59,6 +59,7 @@ export type Database = {
           created_at: string
           custom_answer_1: string | null
           custom_answer_2: string | null
+          detailed_team_members: string | null
           extracted_at: string | null
           extraction_error_message: string | null
           extraction_status: string
@@ -67,6 +68,9 @@ export type Database = {
           job_id: string
           model_id: string | null
           output_tokens: number | null
+          people_search_error: string | null
+          people_search_status: string | null
+          people_searched_at: string | null
           project_id: string
           scrape_error_message: string | null
           scrape_status: string
@@ -74,6 +78,7 @@ export type Database = {
           scraped_content: string | null
           social_media: Json | null
           team_members: string | null
+          team_page_url: string | null
           updated_at: string
           website_url: string
           whatsapp_contact: string | null
@@ -83,6 +88,7 @@ export type Database = {
           created_at?: string
           custom_answer_1?: string | null
           custom_answer_2?: string | null
+          detailed_team_members?: string | null
           extracted_at?: string | null
           extraction_error_message?: string | null
           extraction_status?: string
@@ -91,6 +97,9 @@ export type Database = {
           job_id: string
           model_id?: string | null
           output_tokens?: number | null
+          people_search_error?: string | null
+          people_search_status?: string | null
+          people_searched_at?: string | null
           project_id: string
           scrape_error_message?: string | null
           scrape_status?: string
@@ -98,6 +107,7 @@ export type Database = {
           scraped_content?: string | null
           social_media?: Json | null
           team_members?: string | null
+          team_page_url?: string | null
           updated_at?: string
           website_url: string
           whatsapp_contact?: string | null
@@ -107,6 +117,7 @@ export type Database = {
           created_at?: string
           custom_answer_1?: string | null
           custom_answer_2?: string | null
+          detailed_team_members?: string | null
           extracted_at?: string | null
           extraction_error_message?: string | null
           extraction_status?: string
@@ -115,6 +126,9 @@ export type Database = {
           job_id?: string
           model_id?: string | null
           output_tokens?: number | null
+          people_search_error?: string | null
+          people_search_status?: string | null
+          people_searched_at?: string | null
           project_id?: string
           scrape_error_message?: string | null
           scrape_status?: string
@@ -122,6 +136,7 @@ export type Database = {
           scraped_content?: string | null
           social_media?: Json | null
           team_members?: string | null
+          team_page_url?: string | null
           updated_at?: string
           website_url?: string
           whatsapp_contact?: string | null

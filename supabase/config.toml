@@ -21,3 +21,6 @@ verify_jwt = false
 
 [functions.project-qa]
 verify_jwt = false
+
+[functions.find-people-worker]
+verify_jwt = false
