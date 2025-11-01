@@ -176,7 +176,12 @@ const ScrapedRowsDialog = ({ jobId, isOpen, onClose }: ScrapedRowsDialogProps) =
       if (error) throw error;
 
       if (data.success) {
-        toast.success('Team members found!');
+        const peopleCount = data.people_count || 0;
+        if (peopleCount > 0) {
+          toast.success(`Found ${peopleCount} team ${peopleCount === 1 ? 'member' : 'members'}!`);
+        } else {
+          toast.info('Team page found, but no people were extracted');
+        }
         setExpandedRowId(rowId); // Auto-expand to show results
       } else {
         toast.info(data.message || 'No team page found');
