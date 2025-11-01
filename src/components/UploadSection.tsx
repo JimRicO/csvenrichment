@@ -139,7 +139,7 @@ const UploadSection = ({
   return <Card className="p-8 gradient-card border-border/50">
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-foreground mb-2">Upload CSV File</h2>
+          <h2 className="text-2xl font-bold text-foreground mb-2">Upload your CSV file</h2>
           <p className="text-muted-foreground">
             CSV Enrichment with website URLs.
           </p>
