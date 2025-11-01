@@ -141,7 +141,7 @@ const UploadSection = ({
         <div>
           <h2 className="text-2xl font-bold text-foreground mb-2">Upload CSV File</h2>
           <p className="text-muted-foreground">
-            Upload a CSV with website URLs and select what data to extract
+            CSV Enrichment with website URLs. System will search the website and extract the information of your choice.
           </p>
         </div>
 
