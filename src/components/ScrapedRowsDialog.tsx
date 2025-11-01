@@ -58,16 +58,23 @@ interface ScrapedRowsDialogProps {
   onClose: () => void;
 }
 
-const PeopleSearchStatusBadge = ({ status }: { status: string }) => {
+const PeopleSearchStatusBadge = ({ status, peopleCount }: { status: string; peopleCount: number }) => {
   const configs = {
     not_started: { icon: Users, label: "Not Started", className: "bg-muted text-muted-foreground" },
     processing: { icon: Loader2, label: "Searching...", className: "bg-primary/20 text-primary animate-pulse" },
     completed: { icon: CheckCircle2, label: "Found", className: "bg-success/20 text-success" },
+    completed_no_people: { icon: AlertCircle, label: "No person found", className: "bg-destructive/20 text-destructive" },
     failed: { icon: AlertCircle, label: "Failed", className: "bg-destructive/20 text-destructive" },
     no_team_page_found: { icon: AlertCircle, label: "No Team Page", className: "bg-warning/20 text-warning" },
   };
 
-  const config = configs[status as keyof typeof configs] || configs.not_started;
+  // If status is completed but no people found, use special state
+  let effectiveStatus = status;
+  if (status === 'completed' && peopleCount === 0) {
+    effectiveStatus = 'completed_no_people';
+  }
+
+  const config = configs[effectiveStatus as keyof typeof configs] || configs.not_started;
   const Icon = config.icon;
 
   return (
@@ -300,7 +307,7 @@ const ScrapedRowsDialog = ({ jobId, isOpen, onClose }: ScrapedRowsDialogProps) =
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <PeopleSearchStatusBadge status={row.people_search_status} />
+                            <PeopleSearchStatusBadge status={row.people_search_status} peopleCount={rowPeople.length} />
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline">
