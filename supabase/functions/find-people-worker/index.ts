@@ -110,18 +110,18 @@ serve(async (req) => {
         max_tokens: 4096,
         messages: [{
           role: 'user',
-          content: `Extract all team members from this page. For each person, list their name and job title.
+          content: `Extract all people names from this page. For each person, list their name and job title if specified.
 
 Format as a simple list, one person per line:
 - Name (Title)
 - Name (Title)
 
-If no team members are found, respond with "No team members found on this page."
+If no people are found, respond with "No people found on this page."
 
 Page content:
 ${scrapeResult.markdown}
 
-Extract team members:`
+Extract people:`
         }]
       })
     });
