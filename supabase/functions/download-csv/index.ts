@@ -88,15 +88,33 @@ serve(async (req) => {
       }
     }
 
-    // Generate CSV with people rows
-    const csvHeaders = [
+    // Find max number of people for any website to determine column count
+    let maxPeople = 0;
+    for (const row of rows) {
+      const rowPeople = peopleByRow.get(row.id) || [];
+      if (rowPeople.length > maxPeople) {
+        maxPeople = rowPeople.length;
+      }
+    }
+
+    // Generate CSV headers with dynamic person columns
+    const baseHeaders = [
       'Website URL',
       'Business Description',
       'Team Members (Basic)',
-      'Person Name',
-      'Person Title',
-      'Person Description',
-      'Person Source',
+    ];
+
+    const personHeaders = [];
+    for (let i = 1; i <= maxPeople; i++) {
+      personHeaders.push(
+        `Person ${i} Name`,
+        `Person ${i} Title`,
+        `Person ${i} Description`,
+        `Person ${i} Source`
+      );
+    }
+
+    const metadataHeaders = [
       'Instagram',
       'Facebook',
       'LinkedIn',
@@ -109,20 +127,39 @@ serve(async (req) => {
       'Extracted At'
     ];
 
+    const csvHeaders = [...baseHeaders, ...personHeaders, ...metadataHeaders];
+
     const csvRows: string[] = [];
     
     for (const row of rows) {
       const socialMedia = row.social_media || {};
       const rowPeople = peopleByRow.get(row.id) || [];
       
-      // Create base fields that are the same for all people from this website
-      const baseFields = [
+      // Base fields
+      const rowFields = [
         escapeCSV(row.website_url),
         escapeCSV(row.business_description),
         escapeCSV(row.team_members),
       ];
       
-      const socialAndMetadata = [
+      // Add person fields (fill with empty strings if fewer people than maxPeople)
+      for (let i = 0; i < maxPeople; i++) {
+        if (i < rowPeople.length) {
+          const person = rowPeople[i];
+          rowFields.push(
+            escapeCSV(person.name),
+            escapeCSV(person.title),
+            escapeCSV(person.description),
+            escapeCSV(person.source)
+          );
+        } else {
+          // No person at this index, add empty fields
+          rowFields.push('', '', '', '');
+        }
+      }
+      
+      // Add metadata fields
+      rowFields.push(
         escapeCSV(socialMedia.instagram),
         escapeCSV(socialMedia.facebook),
         escapeCSV(socialMedia.linkedin),
@@ -132,25 +169,10 @@ serve(async (req) => {
         escapeCSV(row.custom_answer_2),
         escapeCSV(row.team_page_url),
         row.scraped_at ? new Date(row.scraped_at).toISOString() : '',
-        row.extracted_at ? new Date(row.extracted_at).toISOString() : '',
-      ];
+        row.extracted_at ? new Date(row.extracted_at).toISOString() : ''
+      );
       
-      if (rowPeople.length > 0) {
-        // Create one row per person
-        for (const person of rowPeople) {
-          const personFields = [
-            escapeCSV(person.name),
-            escapeCSV(person.title),
-            escapeCSV(person.description),
-            escapeCSV(person.source),
-          ];
-          csvRows.push([...baseFields, ...personFields, ...socialAndMetadata].join(','));
-        }
-      } else {
-        // No people found - create one row with empty person fields
-        const emptyPersonFields = ['', '', '', ''];
-        csvRows.push([...baseFields, ...emptyPersonFields, ...socialAndMetadata].join(','));
-      }
+      csvRows.push(rowFields.join(','));
     }
 
     const csv = [csvHeaders.join(','), ...csvRows].join('\n');
