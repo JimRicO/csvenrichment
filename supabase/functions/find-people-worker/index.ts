@@ -235,9 +235,9 @@ function findTeamPageUrl(scrapedContent: string, baseUrl: string): string | null
   // Prioritized list of keywords to search for (ordered by priority)
   const keywordGroups = [
     // High priority - most likely to have team info
-    { keywords: ['about-us', 'about', 'team', 'our-team', 'meet-the-team', 'meet-our-team'], priority: 1 },
+    { keywords: ['about-us', 'about', 'team', 'our-team', 'meet-the-team', 'meet-our-team', 'story', 'our-story', 'ourstory'], priority: 1 },
     // Medium priority
-    { keywords: ['people', 'our-people', 'staff', 'our-staff', 'leadership', 'our-leadership'], priority: 2 },
+    { keywords: ['people', 'our-people', 'staff', 'our-staff', 'leadership', 'our-leadership', 'who-we-are'], priority: 2 },
     // Lower priority
     { keywords: ['founder', 'founders', 'our-founders', 'management', 'our-management', 'executive', 'executives'], priority: 3 },
     // Lowest priority
