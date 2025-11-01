@@ -182,6 +182,9 @@ const ScrapedRowsDialog = ({ jobId, isOpen, onClose }: ScrapedRowsDialogProps) =
 
       if (error) throw error;
 
+      // Manually refresh both rows and people to ensure UI is up-to-date
+      await Promise.all([fetchRows(), fetchPeople()]);
+
       if (data.success) {
         const peopleCount = data.people_count || 0;
         if (peopleCount > 0) {
