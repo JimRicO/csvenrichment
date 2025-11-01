@@ -232,38 +232,64 @@ Extract team members:`
 function findTeamPageUrl(scrapedContent: string, baseUrl: string): string | null {
   console.log(`[Find People] Searching in ${scrapedContent.length} characters of content`);
   
-  // Comprehensive list of keywords to search for
-  const keywords = [
-    'team', 'our-team', 'meet-the-team', 'meet-our-team',
-    'people', 'our-people',
-    'staff', 'our-staff',
-    'members', 'our-members',
-    'founder', 'founders', 'our-founders',
-    'about', 'about-us', 'aboutus', 'who-we-are',
-    'company', 'our-company',
-    'leadership', 'our-leadership',
-    'management', 'our-management',
-    'executive', 'executives',
-    'contact', 'contact-us', 'contactus'
+  // Prioritized list of keywords to search for (ordered by priority)
+  const keywordGroups = [
+    // High priority - most likely to have team info
+    { keywords: ['about-us', 'about', 'team', 'our-team', 'meet-the-team', 'meet-our-team'], priority: 1 },
+    // Medium priority
+    { keywords: ['people', 'our-people', 'staff', 'our-staff', 'leadership', 'our-leadership'], priority: 2 },
+    // Lower priority
+    { keywords: ['founder', 'founders', 'our-founders', 'management', 'our-management', 'executive', 'executives'], priority: 3 },
+    // Lowest priority
+    { keywords: ['company', 'our-company', 'contact', 'contact-us', 'contactus'], priority: 4 }
   ];
+  
+  const allMatches: Array<{ url: string; priority: number; keyword: string; context: string }> = [];
+
+  // Helper function to check if a keyword matches in URL or text
+  const matchesKeyword = (text: string, url: string, keyword: string): boolean => {
+    const lowerText = text.toLowerCase();
+    const lowerUrl = url.toLowerCase();
+    
+    // Check for exact segment match in URL path (e.g., "/about-us" or "/about-us/")
+    const urlPath = lowerUrl.split('?')[0].split('#')[0];
+    const segments = urlPath.split('/').filter(s => s.length > 0);
+    if (segments.some(seg => seg === keyword || seg === keyword.replace(/-/g, ''))) {
+      return true;
+    }
+    
+    // Check for word boundary match in text
+    const wordBoundaryRegex = new RegExp(`\\b${keyword.replace(/-/g, '[\\s-]?')}\\b`, 'i');
+    if (wordBoundaryRegex.test(lowerText)) {
+      return true;
+    }
+    
+    return false;
+  };
 
   // Pattern 1: Markdown links [text](url)
   const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/gi;
   let match;
   
   while ((match = markdownLinkRegex.exec(scrapedContent)) !== null) {
-    const linkText = match[1].toLowerCase();
+    const linkText = match[1];
     const linkUrl = match[2];
     
-    // Check if link text or URL contains any of our keywords
-    for (const keyword of keywords) {
-      if (linkText.includes(keyword) || linkUrl.toLowerCase().includes(keyword)) {
-        try {
-          const url = new URL(linkUrl, baseUrl);
-          console.log(`[Find People] Found via markdown link: ${url.href} (text: "${match[1]}")`);
-          return url.href;
-        } catch (e) {
-          continue;
+    // Check against all keyword groups
+    for (const group of keywordGroups) {
+      for (const keyword of group.keywords) {
+        if (matchesKeyword(linkText, linkUrl, keyword)) {
+          try {
+            const url = new URL(linkUrl, baseUrl);
+            allMatches.push({
+              url: url.href,
+              priority: group.priority,
+              keyword,
+              context: `markdown link: "${linkText}"`
+            });
+          } catch (e) {
+            continue;
+          }
         }
       }
     }
@@ -274,16 +300,22 @@ function findTeamPageUrl(scrapedContent: string, baseUrl: string): string | null
   
   while ((match = hrefRegex.exec(scrapedContent)) !== null) {
     const linkUrl = match[1];
-    const linkText = match[2].toLowerCase();
+    const linkText = match[2];
     
-    for (const keyword of keywords) {
-      if (linkText.includes(keyword) || linkUrl.toLowerCase().includes(keyword)) {
-        try {
-          const url = new URL(linkUrl, baseUrl);
-          console.log(`[Find People] Found via HTML href: ${url.href}`);
-          return url.href;
-        } catch (e) {
-          continue;
+    for (const group of keywordGroups) {
+      for (const keyword of group.keywords) {
+        if (matchesKeyword(linkText, linkUrl, keyword)) {
+          try {
+            const url = new URL(linkUrl, baseUrl);
+            allMatches.push({
+              url: url.href,
+              priority: group.priority,
+              keyword,
+              context: `HTML href: "${linkText}"`
+            });
+          } catch (e) {
+            continue;
+          }
         }
       }
     }
@@ -295,17 +327,49 @@ function findTeamPageUrl(scrapedContent: string, baseUrl: string): string | null
   while ((match = urlRegex.exec(scrapedContent)) !== null) {
     const potentialUrl = match[1];
     
-    for (const keyword of keywords) {
-      if (potentialUrl.toLowerCase().includes(keyword)) {
-        try {
-          const url = new URL(potentialUrl, baseUrl);
-          console.log(`[Find People] Found via plain text URL: ${url.href}`);
-          return url.href;
-        } catch (e) {
-          continue;
+    for (const group of keywordGroups) {
+      for (const keyword of group.keywords) {
+        if (matchesKeyword('', potentialUrl, keyword)) {
+          try {
+            const url = new URL(potentialUrl, baseUrl);
+            allMatches.push({
+              url: url.href,
+              priority: group.priority,
+              keyword,
+              context: 'plain text URL'
+            });
+          } catch (e) {
+            continue;
+          }
         }
       }
     }
+  }
+
+  // If we found matches, return the highest priority one
+  if (allMatches.length > 0) {
+    // Sort by priority (lower number = higher priority), then by keyword specificity
+    allMatches.sort((a, b) => {
+      if (a.priority !== b.priority) {
+        return a.priority - b.priority;
+      }
+      // Prefer longer, more specific keywords
+      return b.keyword.length - a.keyword.length;
+    });
+
+    const bestMatch = allMatches[0];
+    console.log(`[Find People] Found ${allMatches.length} potential matches, selecting best:`);
+    console.log(`[Find People] → ${bestMatch.url} (priority: ${bestMatch.priority}, keyword: "${bestMatch.keyword}", ${bestMatch.context})`);
+    
+    // Log other matches for debugging
+    if (allMatches.length > 1) {
+      console.log(`[Find People] Other matches found:`);
+      allMatches.slice(1, 5).forEach(m => {
+        console.log(`[Find People]   - ${m.url} (priority: ${m.priority}, keyword: "${m.keyword}")`);
+      });
+    }
+    
+    return bestMatch.url;
   }
 
   console.log('[Find People] No team/about page URL found after comprehensive search');
