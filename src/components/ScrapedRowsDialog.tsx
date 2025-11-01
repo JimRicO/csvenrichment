@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Users, Loader2, AlertCircle, CheckCircle2, ExternalLink } from "lucide-react";
+import { Users, Loader2, AlertCircle, CheckCircle2, ExternalLink, UserPlus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,6 +17,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -37,6 +39,16 @@ interface ScrapedRow {
   people_search_error: string | null;
   business_description: string | null;
   team_members: string | null;
+  job_id: string;
+}
+
+interface Person {
+  id: string;
+  name: string;
+  title: string | null;
+  website_url: string | null;
+  source: string;
+  scraped_row_id: string;
 }
 
 interface ScrapedRowsDialogProps {
@@ -67,15 +79,19 @@ const PeopleSearchStatusBadge = ({ status }: { status: string }) => {
 
 const ScrapedRowsDialog = ({ jobId, isOpen, onClose }: ScrapedRowsDialogProps) => {
   const [rows, setRows] = useState<ScrapedRow[]>([]);
+  const [people, setPeople] = useState<Person[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processingRowId, setProcessingRowId] = useState<string | null>(null);
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+  const [addingPersonRowId, setAddingPersonRowId] = useState<string | null>(null);
+  const [newPersonName, setNewPersonName] = useState("");
+  const [newPersonTitle, setNewPersonTitle] = useState("");
 
   const fetchRows = async () => {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('scraped_rows')
-      .select('id, website_url, scrape_status, extraction_status, people_search_status, team_page_url, detailed_team_members, people_search_error, business_description, team_members')
+      .select('id, website_url, scrape_status, extraction_status, people_search_status, team_page_url, detailed_team_members, people_search_error, business_description, team_members, job_id')
       .eq('job_id', jobId)
       .order('created_at', { ascending: true });
 
@@ -88,12 +104,27 @@ const ScrapedRowsDialog = ({ jobId, isOpen, onClose }: ScrapedRowsDialogProps) =
     setIsLoading(false);
   };
 
+  const fetchPeople = async () => {
+    const { data, error } = await supabase
+      .from('people')
+      .select('*')
+      .eq('job_id', jobId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching people:', error);
+    } else {
+      setPeople((data || []) as Person[]);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       fetchRows();
+      fetchPeople();
 
-      // Set up realtime subscription for people search updates
-      const channel = supabase
+      // Set up realtime subscription for scraped rows
+      const rowsChannel = supabase
         .channel(`scraped-rows-${jobId}`)
         .on(
           'postgres_changes',
@@ -109,8 +140,26 @@ const ScrapedRowsDialog = ({ jobId, isOpen, onClose }: ScrapedRowsDialogProps) =
         )
         .subscribe();
 
+      // Set up realtime subscription for people
+      const peopleChannel = supabase
+        .channel(`people-${jobId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'people',
+            filter: `job_id=eq.${jobId}`
+          },
+          () => {
+            fetchPeople();
+          }
+        )
+        .subscribe();
+
       return () => {
-        supabase.removeChannel(channel);
+        supabase.removeChannel(rowsChannel);
+        supabase.removeChannel(peopleChannel);
       };
     }
   }, [isOpen, jobId]);
@@ -138,13 +187,54 @@ const ScrapedRowsDialog = ({ jobId, isOpen, onClose }: ScrapedRowsDialogProps) =
     }
   };
 
+  const handleAddPerson = async (row: ScrapedRow) => {
+    if (!newPersonName.trim()) {
+      toast.error('Please enter a name');
+      return;
+    }
+
+    const { error } = await supabase.from('people').insert({
+      job_id: row.job_id,
+      scraped_row_id: row.id,
+      name: newPersonName.trim(),
+      title: newPersonTitle.trim() || null,
+      website_url: row.website_url,
+      source: 'manual'
+    });
+
+    if (error) {
+      console.error('Error adding person:', error);
+      toast.error('Failed to add person');
+      return;
+    }
+
+    toast.success('Person added successfully');
+    setAddingPersonRowId(null);
+    setNewPersonName('');
+    setNewPersonTitle('');
+  };
+
+  const handleDeletePerson = async (personId: string) => {
+    const { error } = await supabase.from('people').delete().eq('id', personId);
+
+    if (error) {
+      console.error('Error deleting person:', error);
+      toast.error('Failed to delete person');
+      return;
+    }
+
+    toast.success('Person deleted successfully');
+  };
+
+  const getRowPeople = (rowId: string) => people.filter(p => p.scraped_row_id === rowId);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle>Scraped Websites</DialogTitle>
+          <DialogTitle>Scraped Websites & People</DialogTitle>
           <DialogDescription>
-            View scraped data and find detailed team information
+            View scraped data, find team members, and manage your contact database
           </DialogDescription>
         </DialogHeader>
 
@@ -165,75 +255,80 @@ const ScrapedRowsDialog = ({ jobId, isOpen, onClose }: ScrapedRowsDialogProps) =
                   <TableHead>Scrape</TableHead>
                   <TableHead>Extract</TableHead>
                   <TableHead>People Search</TableHead>
+                  <TableHead>Saved People</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row) => (
-                  <Collapsible
-                    key={row.id}
-                    open={expandedRowId === row.id}
-                    onOpenChange={(open) => setExpandedRowId(open ? row.id : null)}
-                    asChild
-                  >
-                    <>
-                      <TableRow className="border-border">
-                        <TableCell className="font-medium max-w-[300px]">
-                          <a 
-                            href={row.website_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-primary hover:underline flex items-center gap-1"
-                          >
-                            {row.website_url}
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={row.scrape_status === 'completed' ? 'default' : 'secondary'}>
-                            {row.scrape_status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={row.extraction_status === 'completed' ? 'default' : 'secondary'}>
-                            {row.extraction_status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <PeopleSearchStatusBadge status={row.people_search_status} />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            {row.scrape_status === 'completed' && row.people_search_status !== 'processing' && (
-                              <Button
-                                size="sm"
-                                variant={row.people_search_status === 'completed' ? 'outline' : 'default'}
-                                onClick={() => handleFindPeople(row.id)}
-                                disabled={processingRowId === row.id}
-                              >
-                                {processingRowId === row.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                ) : (
-                                  <Users className="h-4 w-4 mr-2" />
-                                )}
-                                {row.people_search_status === 'completed' ? 'Refresh' : 'Find People'}
-                              </Button>
-                            )}
-                            {row.people_search_status === 'completed' && (
+                {rows.map((row) => {
+                  const rowPeople = getRowPeople(row.id);
+                  return (
+                    <Collapsible
+                      key={row.id}
+                      open={expandedRowId === row.id}
+                      onOpenChange={(open) => setExpandedRowId(open ? row.id : null)}
+                      asChild
+                    >
+                      <>
+                        <TableRow className="border-border">
+                          <TableCell className="font-medium max-w-[300px]">
+                            <a 
+                              href={row.website_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline flex items-center gap-1"
+                            >
+                              {row.website_url}
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={row.scrape_status === 'completed' ? 'default' : 'secondary'}>
+                              {row.scrape_status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={row.extraction_status === 'completed' ? 'default' : 'secondary'}>
+                              {row.extraction_status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <PeopleSearchStatusBadge status={row.people_search_status} />
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {rowPeople.length} {rowPeople.length === 1 ? 'person' : 'people'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              {row.scrape_status === 'completed' && row.people_search_status !== 'processing' && (
+                                <Button
+                                  size="sm"
+                                  variant={row.people_search_status === 'completed' ? 'outline' : 'default'}
+                                  onClick={() => handleFindPeople(row.id)}
+                                  disabled={processingRowId === row.id}
+                                >
+                                  {processingRowId === row.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                  ) : (
+                                    <Users className="h-4 w-4 mr-2" />
+                                  )}
+                                  {row.people_search_status === 'completed' ? 'Refresh' : 'Find People'}
+                                </Button>
+                              )}
                               <CollapsibleTrigger asChild>
                                 <Button size="sm" variant="ghost">
                                   {expandedRowId === row.id ? 'Hide' : 'View'} Details
                                 </Button>
                               </CollapsibleTrigger>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                      
-                      {row.people_search_status === 'completed' && (
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        
                         <CollapsibleContent asChild>
                           <TableRow>
-                            <TableCell colSpan={5} className="bg-muted/50 p-6">
+                            <TableCell colSpan={6} className="bg-muted/50 p-6">
                               <div className="space-y-4">
                                 {row.team_page_url && (
                                   <div>
@@ -250,14 +345,95 @@ const ScrapedRowsDialog = ({ jobId, isOpen, onClose }: ScrapedRowsDialogProps) =
                                   </div>
                                 )}
                                 
-                                {row.detailed_team_members && (
-                                  <div>
-                                    <div className="font-semibold text-sm text-muted-foreground mb-2">Team Members:</div>
-                                    <div className="bg-background p-4 rounded-md border border-border whitespace-pre-wrap text-sm">
-                                      {row.detailed_team_members}
+                                <div>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="font-semibold text-sm text-muted-foreground">
+                                      Saved People ({rowPeople.length}):
                                     </div>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => setAddingPersonRowId(addingPersonRowId === row.id ? null : row.id)}
+                                    >
+                                      <UserPlus className="h-4 w-4 mr-2" />
+                                      Add Person
+                                    </Button>
                                   </div>
-                                )}
+
+                                  {addingPersonRowId === row.id && (
+                                    <div className="bg-background p-4 rounded-md border border-border mb-3 space-y-3">
+                                      <div>
+                                        <Label htmlFor="name">Name *</Label>
+                                        <Input
+                                          id="name"
+                                          value={newPersonName}
+                                          onChange={(e) => setNewPersonName(e.target.value)}
+                                          placeholder="John Doe"
+                                        />
+                                      </div>
+                                      <div>
+                                        <Label htmlFor="title">Title</Label>
+                                        <Input
+                                          id="title"
+                                          value={newPersonTitle}
+                                          onChange={(e) => setNewPersonTitle(e.target.value)}
+                                          placeholder="CEO"
+                                        />
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <Button
+                                          size="sm"
+                                          onClick={() => handleAddPerson(row)}
+                                        >
+                                          Save
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => {
+                                            setAddingPersonRowId(null);
+                                            setNewPersonName('');
+                                            setNewPersonTitle('');
+                                          }}
+                                        >
+                                          Cancel
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {rowPeople.length > 0 ? (
+                                    <div className="grid gap-2">
+                                      {rowPeople.map((person) => (
+                                        <div
+                                          key={person.id}
+                                          className="flex items-center justify-between bg-background p-3 rounded-md border border-border"
+                                        >
+                                          <div className="flex-1">
+                                            <div className="font-medium">{person.name}</div>
+                                            {person.title && (
+                                              <div className="text-sm text-muted-foreground">{person.title}</div>
+                                            )}
+                                            <Badge variant="secondary" className="text-xs mt-1">
+                                              {person.source === 'automated' ? 'Auto-discovered' : 'Manually added'}
+                                            </Badge>
+                                          </div>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => handleDeletePerson(person.id)}
+                                          >
+                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                          </Button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="text-sm text-muted-foreground text-center p-4 border border-dashed border-border rounded-md">
+                                      No people saved yet. Click "Find People" to discover team members automatically, or "Add Person" to add manually.
+                                    </div>
+                                  )}
+                                </div>
 
                                 {row.business_description && (
                                   <div>
@@ -276,23 +452,23 @@ const ScrapedRowsDialog = ({ jobId, isOpen, onClose }: ScrapedRowsDialogProps) =
                             </TableCell>
                           </TableRow>
                         </CollapsibleContent>
-                      )}
 
-                      {row.people_search_status === 'failed' && row.people_search_error && (
-                        <CollapsibleContent asChild>
-                          <TableRow>
-                            <TableCell colSpan={5} className="bg-destructive/5 p-4">
-                              <div className="flex items-center gap-2 text-destructive text-sm">
-                                <AlertCircle className="h-4 w-4" />
-                                Error: {row.people_search_error}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        </CollapsibleContent>
-                      )}
-                    </>
-                  </Collapsible>
-                ))}
+                        {row.people_search_status === 'failed' && row.people_search_error && (
+                          <CollapsibleContent asChild>
+                            <TableRow>
+                              <TableCell colSpan={6} className="bg-destructive/5 p-4">
+                                <div className="flex items-center gap-2 text-destructive text-sm">
+                                  <AlertCircle className="h-4 w-4" />
+                                  Error: {row.people_search_error}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          </CollapsibleContent>
+                        )}
+                      </>
+                    </Collapsible>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

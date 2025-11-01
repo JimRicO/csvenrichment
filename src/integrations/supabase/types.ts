@@ -53,6 +53,42 @@ export type Database = {
         }
         Relationships: []
       }
+      people: {
+        Row: {
+          created_at: string
+          id: string
+          job_id: string
+          name: string
+          scraped_row_id: string
+          source: string
+          title: string | null
+          updated_at: string
+          website_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_id: string
+          name: string
+          scraped_row_id: string
+          source?: string
+          title?: string | null
+          updated_at?: string
+          website_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_id?: string
+          name?: string
+          scraped_row_id?: string
+          source?: string
+          title?: string | null
+          updated_at?: string
+          website_url?: string | null
+        }
+        Relationships: []
+      }
       scraped_rows: {
         Row: {
           business_description: string | null

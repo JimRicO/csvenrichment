@@ -137,7 +137,41 @@ Extract team members:`
 
     console.log(`[Find People] Extracted team members: ${detailedTeamMembers.substring(0, 200)}...`);
 
-    // Step 4: Update database
+    // Step 4: Parse team members and save to people table
+    const peopleToInsert = [];
+    const lines = detailedTeamMembers.split('\n').filter((line: string) => line.trim());
+    
+    for (const line of lines) {
+      // Parse format: "- Name (Title)"
+      const match = line.match(/^-?\s*(.+?)\s*\((.+?)\)\s*$/);
+      if (match) {
+        const [, name, title] = match;
+        peopleToInsert.push({
+          job_id: row.job_id,
+          scraped_row_id: row_id,
+          name: name.trim(),
+          title: title.trim(),
+          website_url: row.website_url,
+          source: 'automated'
+        });
+      }
+    }
+
+    // Insert people into the database
+    if (peopleToInsert.length > 0) {
+      const { error: insertError } = await supabase
+        .from('people')
+        .insert(peopleToInsert);
+
+      if (insertError) {
+        console.error('[Find People] Error inserting people:', insertError);
+        // Continue anyway, we'll still save the text version
+      } else {
+        console.log(`[Find People] Saved ${peopleToInsert.length} people to database`);
+      }
+    }
+
+    // Step 5: Update scraped_rows with results
     await supabase
       .from('scraped_rows')
       .update({
