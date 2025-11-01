@@ -62,11 +62,41 @@ serve(async (req) => {
       );
     }
 
-    // Generate CSV
+    // Get all people for this job
+    const { data: people, error: peopleError } = await supabase
+      .from('people')
+      .select('*')
+      .eq('job_id', job_id)
+      .order('created_at');
+
+    if (peopleError) {
+      console.error('Error fetching people:', peopleError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch people data' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create a map of scraped_row_id -> people[]
+    const peopleByRow = new Map<string, any[]>();
+    if (people) {
+      for (const person of people) {
+        if (!peopleByRow.has(person.scraped_row_id)) {
+          peopleByRow.set(person.scraped_row_id, []);
+        }
+        peopleByRow.get(person.scraped_row_id)!.push(person);
+      }
+    }
+
+    // Generate CSV with people rows
     const csvHeaders = [
       'Website URL',
       'Business Description',
-      'Team Members',
+      'Team Members (Basic)',
+      'Person Name',
+      'Person Title',
+      'Person Description',
+      'Person Source',
       'Instagram',
       'Facebook',
       'LinkedIn',
@@ -74,16 +104,25 @@ serve(async (req) => {
       'WhatsApp Contact',
       'Custom Answer 1',
       'Custom Answer 2',
+      'Team Page URL',
       'Scraped At',
       'Extracted At'
     ];
 
-    const csvRows = rows.map(row => {
+    const csvRows: string[] = [];
+    
+    for (const row of rows) {
       const socialMedia = row.social_media || {};
-      return [
+      const rowPeople = peopleByRow.get(row.id) || [];
+      
+      // Create base fields that are the same for all people from this website
+      const baseFields = [
         escapeCSV(row.website_url),
         escapeCSV(row.business_description),
         escapeCSV(row.team_members),
+      ];
+      
+      const socialAndMetadata = [
         escapeCSV(socialMedia.instagram),
         escapeCSV(socialMedia.facebook),
         escapeCSV(socialMedia.linkedin),
@@ -91,10 +130,28 @@ serve(async (req) => {
         escapeCSV(row.whatsapp_contact),
         escapeCSV(row.custom_answer_1),
         escapeCSV(row.custom_answer_2),
+        escapeCSV(row.team_page_url),
         row.scraped_at ? new Date(row.scraped_at).toISOString() : '',
         row.extracted_at ? new Date(row.extracted_at).toISOString() : '',
-      ].join(',');
-    });
+      ];
+      
+      if (rowPeople.length > 0) {
+        // Create one row per person
+        for (const person of rowPeople) {
+          const personFields = [
+            escapeCSV(person.name),
+            escapeCSV(person.title),
+            escapeCSV(person.description),
+            escapeCSV(person.source),
+          ];
+          csvRows.push([...baseFields, ...personFields, ...socialAndMetadata].join(','));
+        }
+      } else {
+        // No people found - create one row with empty person fields
+        const emptyPersonFields = ['', '', '', ''];
+        csvRows.push([...baseFields, ...emptyPersonFields, ...socialAndMetadata].join(','));
+      }
+    }
 
     const csv = [csvHeaders.join(','), ...csvRows].join('\n');
 
