@@ -77,10 +77,13 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
     // Call workers in parallel repeatedly until job is complete
     const checkAndRunWorkers = async () => {
       try {
-        // Run both workers in parallel - they'll handle "no work" gracefully
+        // Run MULTIPLE workers in parallel for faster processing
+        // Each worker processes one row, so invoke 5 of each type simultaneously
         await Promise.all([
-          supabase.functions.invoke('scraper-worker'),
-          supabase.functions.invoke('extractor-worker'),
+          // Invoke 5 scraper workers in parallel
+          ...Array(5).fill(null).map(() => supabase.functions.invoke('scraper-worker')),
+          // Invoke 5 extractor workers in parallel
+          ...Array(5).fill(null).map(() => supabase.functions.invoke('extractor-worker')),
         ]);
       } catch (error) {
         console.error('Worker invocation error:', error);
@@ -90,8 +93,8 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
     // Run workers immediately
     checkAndRunWorkers();
 
-    // Then run every 5 seconds for up to 10 minutes
-    const interval = setInterval(checkAndRunWorkers, 5000);
+    // Then run every 3 seconds for up to 10 minutes (faster polling)
+    const interval = setInterval(checkAndRunWorkers, 3000);
     
     // Stop after 10 minutes max (failsafe)
     setTimeout(() => clearInterval(interval), 600000);
