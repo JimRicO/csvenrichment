@@ -20,28 +20,13 @@ const Index = () => {
       <main className="container mx-auto px-6 py-8 space-y-8">
         <StatsCards />
         
-        {activeJobId && activeProjectId ? (
-          <div className="space-y-8">
-            <ActiveJobMonitor jobId={activeJobId} projectId={activeProjectId} />
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-1">
-                <UploadSection onJobCreated={handleJobCreated} />
-              </div>
-              <div className="lg:col-span-2">
-                <JobsTable />
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1">
-              <UploadSection onJobCreated={handleJobCreated} />
-            </div>
-            <div className="lg:col-span-2">
-              <JobsTable />
-            </div>
-          </div>
+        <UploadSection onJobCreated={handleJobCreated} />
+        
+        {activeJobId && activeProjectId && (
+          <ActiveJobMonitor jobId={activeJobId} projectId={activeProjectId} />
         )}
+        
+        <JobsTable />
       </main>
     </div>
   );
