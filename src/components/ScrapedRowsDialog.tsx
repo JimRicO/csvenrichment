@@ -46,6 +46,7 @@ interface Person {
   id: string;
   name: string;
   title: string | null;
+  description: string | null;
   website_url: string | null;
   source: string;
   scraped_row_id: string;
@@ -86,6 +87,7 @@ const ScrapedRowsDialog = ({ jobId, isOpen, onClose }: ScrapedRowsDialogProps) =
   const [addingPersonRowId, setAddingPersonRowId] = useState<string | null>(null);
   const [newPersonName, setNewPersonName] = useState("");
   const [newPersonTitle, setNewPersonTitle] = useState("");
+  const [newPersonDescription, setNewPersonDescription] = useState("");
 
   const fetchRows = async () => {
     setIsLoading(true);
@@ -380,6 +382,15 @@ const ScrapedRowsDialog = ({ jobId, isOpen, onClose }: ScrapedRowsDialogProps) =
                                           placeholder="CEO"
                                         />
                                       </div>
+                                      <div>
+                                        <Label htmlFor="description">Description</Label>
+                                        <Input
+                                          id="description"
+                                          value={newPersonDescription}
+                                          onChange={(e) => setNewPersonDescription(e.target.value)}
+                                          placeholder="Brief bio or description"
+                                        />
+                                      </div>
                                       <div className="flex gap-2">
                                         <Button
                                           size="sm"
@@ -394,6 +405,7 @@ const ScrapedRowsDialog = ({ jobId, isOpen, onClose }: ScrapedRowsDialogProps) =
                                             setAddingPersonRowId(null);
                                             setNewPersonName('');
                                             setNewPersonTitle('');
+                                            setNewPersonDescription('');
                                           }}
                                         >
                                           Cancel
@@ -407,12 +419,17 @@ const ScrapedRowsDialog = ({ jobId, isOpen, onClose }: ScrapedRowsDialogProps) =
                                       {rowPeople.map((person) => (
                                         <div
                                           key={person.id}
-                                          className="flex items-center justify-between bg-background p-3 rounded-md border border-border"
+                                          className="flex items-start justify-between bg-background p-3 rounded-md border border-border"
                                         >
                                           <div className="flex-1">
                                             <div className="font-medium">{person.name}</div>
                                             {person.title && (
                                               <div className="text-sm text-muted-foreground">{person.title}</div>
+                                            )}
+                                            {person.description && (
+                                              <div className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                                {person.description}
+                                              </div>
                                             )}
                                             <Badge variant="secondary" className="text-xs mt-1">
                                               {person.source === 'automated' ? 'Auto-discovered' : 'Manually added'}

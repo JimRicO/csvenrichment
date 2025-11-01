@@ -90,13 +90,25 @@ serve(async (req) => {
 
     console.log(`[Find People] Team page scraped, ${scrapeResult.markdown.length} characters`);
 
-    // Step 3: Extract people with Claude
+    // Step 3: Get extraction prompt from database
+    const { data: modelConfig, error: modelError } = await supabase
+      .from('ai_extraction_models')
+      .select('*')
+      .eq('model_version', 'people-finder')
+      .maybeSingle();
+
+    if (modelError || !modelConfig) {
+      console.error('[Find People] No people-finder model configured:', modelError);
+      throw new Error('People finder model not configured in database');
+    }
+
+    // Step 4: Extract people with Claude using database prompt
     const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
     if (!anthropicApiKey) {
       throw new Error('ANTHROPIC_API_KEY not configured');
     }
 
-    console.log('[Find People] Extracting team members with Claude...');
+    console.log('[Find People] Extracting people with Claude...');
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -106,22 +118,11 @@ serve(async (req) => {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: modelConfig.model_name,
         max_tokens: 4096,
         messages: [{
           role: 'user',
-          content: `Extract all people names from this page. For each person, list their name and job title if specified.
-
-Format as a simple list, one person per line:
-- Name (Title)
-- Name (Title)
-
-If no people are found, respond with "No people found on this page."
-
-Page content:
-${scrapeResult.markdown}
-
-Extract people:`
+          content: `${modelConfig.extraction_prompt}\n\nPage content:\n${scrapeResult.markdown}`
         }]
       })
     });
@@ -133,31 +134,45 @@ Extract people:`
     }
 
     const claudeResult = await response.json();
-    const detailedTeamMembers = claudeResult.content[0].text;
+    const responseText = claudeResult.content[0].text;
 
-    console.log(`[Find People] Extracted team members: ${detailedTeamMembers.substring(0, 200)}...`);
+    console.log(`[Find People] Extracted response: ${responseText.substring(0, 200)}...`);
 
-    // Step 4: Parse team members and save to people table
-    const peopleToInsert = [];
-    const lines = detailedTeamMembers.split('\n').filter((line: string) => line.trim());
-    
-    for (const line of lines) {
-      // Parse format: "- Name (Title)"
-      const match = line.match(/^-?\s*(.+?)\s*\((.+?)\)\s*$/);
-      if (match) {
-        const [, name, title] = match;
-        peopleToInsert.push({
-          job_id: row.job_id,
-          scraped_row_id: row_id,
-          name: name.trim(),
-          title: title.trim(),
-          website_url: row.website_url,
-          source: 'automated'
-        });
+    // Step 5: Parse JSON response
+    let extractedPeople;
+    try {
+      // Try to parse as JSON array
+      extractedPeople = JSON.parse(responseText);
+    } catch {
+      // If not valid JSON, try to extract JSON from the response
+      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        extractedPeople = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error('Failed to parse people extraction response as JSON');
       }
     }
 
-    // Insert people into the database
+    // Step 6: Prepare people for insertion
+    const peopleToInsert = [];
+    
+    if (Array.isArray(extractedPeople) && extractedPeople.length > 0) {
+      for (const person of extractedPeople) {
+        if (person.name) {
+          peopleToInsert.push({
+            job_id: row.job_id,
+            scraped_row_id: row_id,
+            name: person.name.trim(),
+            title: person.title ? person.title.trim() : null,
+            description: person.description ? person.description.trim() : null,
+            website_url: row.website_url,
+            source: 'automated'
+          });
+        }
+      }
+    }
+
+    // Step 7: Insert people into the database
     if (peopleToInsert.length > 0) {
       const { error: insertError } = await supabase
         .from('people')
@@ -165,19 +180,23 @@ Extract people:`
 
       if (insertError) {
         console.error('[Find People] Error inserting people:', insertError);
-        // Continue anyway, we'll still save the text version
-      } else {
-        console.log(`[Find People] Saved ${peopleToInsert.length} people to database`);
+        throw insertError;
       }
+      
+      console.log(`[Find People] Saved ${peopleToInsert.length} people to database`);
     }
 
-    // Step 5: Update scraped_rows with results
+    // Step 8: Update scraped_rows with results
+    const summaryText = peopleToInsert.map(p => 
+      `${p.name}${p.title ? ` (${p.title})` : ''}`
+    ).join('\n');
+
     await supabase
       .from('scraped_rows')
       .update({
         people_search_status: 'completed',
         team_page_url: teamPageUrl,
-        detailed_team_members: detailedTeamMembers,
+        detailed_team_members: summaryText || 'No people found',
         people_searched_at: new Date().toISOString()
       })
       .eq('id', row_id);
@@ -188,7 +207,8 @@ Extract people:`
       JSON.stringify({
         success: true,
         team_page_url: teamPageUrl,
-        team_members: detailedTeamMembers
+        people_count: peopleToInsert.length,
+        people: peopleToInsert
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
