@@ -143,6 +143,9 @@ const UploadSection = ({
           <p className="text-muted-foreground">
             CSV Enrichment with website URLs. System will search the website and extract the information of your choice.
           </p>
+          <p className="text-sm text-muted-foreground/80 mt-1">
+            Make sure your table contains a WEBSITE field
+          </p>
         </div>
 
         <div onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} className={`border-2 border-dashed rounded-xl p-8 transition-smooth text-center ${isDragging ? "border-primary bg-primary/5 glow-primary" : "border-border hover:border-primary/50 hover:bg-secondary/30"}`}>

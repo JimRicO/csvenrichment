@@ -28,7 +28,7 @@ serve(async (req) => {
 
     if (websiteUrls.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'Make sure your table contains a WEBSITE field' }),
+        JSON.stringify({ error: 'CSV must contain a "website" or "url" column with valid URLs' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
