@@ -183,8 +183,16 @@ serve(async (req) => {
         .single();
 
       if (job) {
+        // Count actual finished rows (completed or failed in both scrape and extraction)
+        const { count: finishedCount } = await supabase
+          .from('scraped_rows')
+          .select('*', { count: 'exact', head: true })
+          .eq('job_id', row.job_id)
+          .in('scrape_status', ['completed', 'failed'])
+          .in('extraction_status', ['completed', 'failed']);
+
         const newProcessedRows = job.processed_rows + 1;
-        const isComplete = newProcessedRows >= job.total_rows;
+        const isComplete = (finishedCount || 0) >= job.total_rows;
 
         await supabase
           .from('scraping_jobs')
@@ -231,8 +239,16 @@ serve(async (req) => {
         .single();
 
       if (job) {
+        // Count actual finished rows (completed or failed in both scrape and extraction)
+        const { count: finishedCount } = await supabase
+          .from('scraped_rows')
+          .select('*', { count: 'exact', head: true })
+          .eq('job_id', row.job_id)
+          .in('scrape_status', ['completed', 'failed'])
+          .in('extraction_status', ['completed', 'failed']);
+
         const newProcessedRows = job.processed_rows + 1;
-        const isComplete = newProcessedRows >= job.total_rows;
+        const isComplete = (finishedCount || 0) >= job.total_rows;
 
         await supabase
           .from('scraping_jobs')
