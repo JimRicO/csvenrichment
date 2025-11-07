@@ -4,6 +4,7 @@ import UploadSection from "@/components/UploadSection";
 import StatsCards from "@/components/StatsCards";
 import JobsTable from "@/components/JobsTable";
 import ActiveJobMonitor from "@/components/ActiveJobMonitor";
+import { ScreenshotTest } from "@/components/ScreenshotTest";
 
 const Index = () => {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
@@ -19,6 +20,8 @@ const Index = () => {
       <Header />
       <main className="container mx-auto px-6 py-8 space-y-8">
         <StatsCards />
+        
+        <ScreenshotTest />
         
         <UploadSection onJobCreated={handleJobCreated} />
         

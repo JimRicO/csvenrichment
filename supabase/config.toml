@@ -27,3 +27,6 @@ verify_jwt = false
 
 [functions.merge-csv]
 verify_jwt = false
+
+[functions.screenshot-test]
+verify_jwt = false
