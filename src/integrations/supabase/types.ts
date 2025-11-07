@@ -106,6 +106,7 @@ export type Database = {
           input_tokens: number | null
           job_id: string
           model_id: string | null
+          original_row_data: Json | null
           output_tokens: number | null
           people_search_error: string | null
           people_search_status: string | null
@@ -135,6 +136,7 @@ export type Database = {
           input_tokens?: number | null
           job_id: string
           model_id?: string | null
+          original_row_data?: Json | null
           output_tokens?: number | null
           people_search_error?: string | null
           people_search_status?: string | null
@@ -164,6 +166,7 @@ export type Database = {
           input_tokens?: number | null
           job_id?: string
           model_id?: string | null
+          original_row_data?: Json | null
           output_tokens?: number | null
           people_search_error?: string | null
           people_search_status?: string | null

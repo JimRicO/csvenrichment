@@ -62,14 +62,22 @@ serve(async (req) => {
       );
     }
 
-    // Create scraped_rows entries
-    const rows = websiteUrls.map(url => ({
-      job_id: job.id,
-      project_id: job.project_id,
-      website_url: url,
-      scrape_status: 'pending',
-      extraction_status: 'pending',
-    }));
+    // Create scraped_rows entries with original CSV data preserved
+    const rows = csv_rows
+      .map((row, index) => {
+        const url = row.website || row.url || row.Website || row.URL;
+        if (!url) return null;
+        
+        return {
+          job_id: job.id,
+          project_id: job.project_id,
+          website_url: url,
+          scrape_status: 'pending',
+          extraction_status: 'pending',
+          original_row_data: row, // Store entire original CSV row
+        };
+      })
+      .filter(Boolean);
 
     const { error: rowsError } = await supabase
       .from('scraped_rows')

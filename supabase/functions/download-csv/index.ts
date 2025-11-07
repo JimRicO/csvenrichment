@@ -97,9 +97,17 @@ serve(async (req) => {
       }
     }
 
-    // Generate CSV headers with dynamic person columns
-    const baseHeaders = [
-      'Website URL',
+    // Collect all original CSV columns from all rows
+    const originalColumnSet = new Set<string>();
+    for (const row of rows) {
+      if (row.original_row_data && typeof row.original_row_data === 'object') {
+        Object.keys(row.original_row_data).forEach(key => originalColumnSet.add(key));
+      }
+    }
+    const originalColumns = Array.from(originalColumnSet);
+
+    // Generate new extracted field headers
+    const extractedHeaders = [
       'Business Description',
       'Team Members (Basic)',
     ];
@@ -127,20 +135,24 @@ serve(async (req) => {
       'Extracted At'
     ];
 
-    const csvHeaders = [...baseHeaders, ...personHeaders, ...metadataHeaders];
+    // Combine: original columns first, then new extracted fields
+    const csvHeaders = [...originalColumns, ...extractedHeaders, ...personHeaders, ...metadataHeaders];
 
     const csvRows: string[] = [];
     
     for (const row of rows) {
       const socialMedia = row.social_media || {};
       const rowPeople = peopleByRow.get(row.id) || [];
+      const originalData = row.original_row_data || {};
       
-      // Base fields
-      const rowFields = [
-        escapeCSV(row.website_url),
+      // Start with original CSV fields in order
+      const rowFields = originalColumns.map(col => escapeCSV(originalData[col]));
+      
+      // Add extracted fields
+      rowFields.push(
         escapeCSV(row.business_description),
-        escapeCSV(row.team_members),
-      ];
+        escapeCSV(row.team_members)
+      );
       
       // Add person fields (fill with empty strings if fewer people than maxPeople)
       for (let i = 0; i < maxPeople; i++) {
