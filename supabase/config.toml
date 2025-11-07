@@ -24,3 +24,6 @@ verify_jwt = false
 
 [functions.find-people-worker]
 verify_jwt = false
+
+[functions.merge-csv]
+verify_jwt = false

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Clock, CheckCircle2, AlertCircle, Loader2, Download, MessageCircle, Users } from "lucide-react";
+import { Clock, CheckCircle2, AlertCircle, Loader2, Download, MessageCircle, Users, Combine } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ProjectQADialog from "./ProjectQADialog";
 import ScrapedRowsDialog from "./ScrapedRowsDialog";
+import { MergeCsvDialog } from "./MergeCsvDialog";
 
 interface Job {
   id: string;
@@ -53,6 +54,7 @@ const JobsTable = () => {
   const [downloadingJobId, setDownloadingJobId] = useState<string | null>(null);
   const [qaDialogOpen, setQaDialogOpen] = useState(false);
   const [rowsDialogOpen, setRowsDialogOpen] = useState(false);
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
 
   const handleDownload = async (jobId: string, projectId: string) => {
@@ -214,6 +216,20 @@ const JobsTable = () => {
                             <MessageCircle className="h-4 w-4 mr-2" />
                             Q&A
                           </Button>
+                          {job.project_id === 'project_1762544485343_ggshca' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedJob(job);
+                                setMergeDialogOpen(true);
+                              }}
+                              className="hover:bg-primary/10 transition-smooth"
+                            >
+                              <Combine className="h-4 w-4 mr-2" />
+                              Merge CSV
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             onClick={() => handleDownload(job.id, job.project_id)}
@@ -259,6 +275,16 @@ const JobsTable = () => {
             onClose={() => {
               setRowsDialogOpen(false);
               setSelectedJob(null);
+            }}
+          />
+          
+          <MergeCsvDialog
+            jobId={selectedJob.id}
+            projectId={selectedJob.project_id}
+            open={mergeDialogOpen}
+            onOpenChange={(open) => {
+              setMergeDialogOpen(open);
+              if (!open) setSelectedJob(null);
             }}
           />
         </>
