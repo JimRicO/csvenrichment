@@ -46,8 +46,17 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Firecrawl API error:', response.status, errorText);
+      
+      let errorMessage = 'Failed to capture screenshots';
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error || errorMessage;
+      } catch {
+        // If can't parse, use default message
+      }
+      
       return new Response(
-        JSON.stringify({ error: 'Failed to capture screenshots' }),
+        JSON.stringify({ error: errorMessage }),
         { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
