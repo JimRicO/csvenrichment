@@ -38,7 +38,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         url,
-        formats: [{ type: 'screenshot', fullPage: true }],
+        formats: ['screenshot@fullPage'],
         waitFor: 2000,
       }),
     });
