@@ -82,7 +82,7 @@ export const InstagramResultsDialog = ({ jobId, projectId, isOpen, onClose }: In
     });
 
     const { data: jobData } = await supabase
-      .from('scraping_jobs')
+      .from('instagram_jobs')
       .select('estimated_cost_usd')
       .eq('id', jobId)
       .single();

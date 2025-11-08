@@ -57,7 +57,7 @@ serve(async (req) => {
 
       // Validate existing job
       const { data: existingJob, error: jobError } = await supabase
-        .from('scraping_jobs')
+        .from('instagram_jobs')
         .select('id, project_id, total_rows')
         .eq('id', existing_job_id)
         .single();
@@ -74,12 +74,12 @@ serve(async (req) => {
 
       // Get existing Instagram URLs to avoid duplicates
       const { data: existingRows } = await supabase
-        .from('scraped_rows')
-        .select('website_url')
+        .from('instagram_rows')
+        .select('instagram_url')
         .eq('job_id', jobId);
 
       if (existingRows) {
-        existingUrls = new Set(existingRows.map((r: any) => r.website_url));
+        existingUrls = new Set(existingRows.map((r: any) => r.instagram_url));
       }
 
       console.log(`Appending to existing job: ${jobId}, existing URLs: ${existingUrls.size}`);
@@ -89,17 +89,13 @@ serve(async (req) => {
       jobId = `IG${Date.now()}${Math.random().toString(36).substring(2, 9)}`;
       
       const { data: jobData, error: jobError } = await supabase
-        .from('scraping_jobs')
+        .from('instagram_jobs')
         .insert({
           id: jobId,
           project_id: projectId,
           status: 'pending',
           total_rows: 0,
           processed_rows: 0,
-          total_pages_scraped: 0,
-          total_characters_scraped: 0,
-          total_input_tokens: 0,
-          total_output_tokens: 0,
           estimated_cost_usd: 0,
         })
         .select()
@@ -137,10 +133,8 @@ serve(async (req) => {
 
       rowsToInsert.push({
         job_id: jobId,
-        project_id: projectId,
-        website_url: instagramUrl,
+        instagram_url: instagramUrl,
         scrape_status: 'pending',
-        extraction_status: 'not_applicable', // Instagram jobs don't use AI extraction
         original_row_data: row,
       });
     }
@@ -157,7 +151,7 @@ serve(async (req) => {
 
     // Insert rows
     const { error: rowsError } = await supabase
-      .from('scraped_rows')
+      .from('instagram_rows')
       .insert(rowsToInsert);
 
     if (rowsError) {
@@ -165,7 +159,7 @@ serve(async (req) => {
       
       // If appending failed and it's a new job, clean up
       if (!existing_job_id) {
-        await supabase.from('scraping_jobs').delete().eq('id', jobId);
+        await supabase.from('instagram_jobs').delete().eq('id', jobId);
       }
       
       return new Response(
@@ -176,7 +170,7 @@ serve(async (req) => {
 
     // Update job total_rows
     const { data: currentJob } = await supabase
-      .from('scraping_jobs')
+      .from('instagram_jobs')
       .select('total_rows')
       .eq('id', jobId)
       .single();
@@ -184,7 +178,7 @@ serve(async (req) => {
     const newTotalRows = (currentJob?.total_rows || 0) + rowsToInsert.length;
 
     await supabase
-      .from('scraping_jobs')
+      .from('instagram_jobs')
       .update({ 
         total_rows: newTotalRows,
         status: 'processing' 

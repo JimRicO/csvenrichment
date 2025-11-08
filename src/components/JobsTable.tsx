@@ -91,9 +91,11 @@ const JobsTable = () => {
 
   useEffect(() => {
     const fetchJobs = async () => {
+      // Fetch CSV scraper jobs only (exclude legacy Instagram jobs)
       const { data, error } = await supabase
         .from('scraping_jobs')
         .select('*')
+        .not('id', 'like', 'IG%')
         .order('created_at', { ascending: false })
         .limit(10);
 

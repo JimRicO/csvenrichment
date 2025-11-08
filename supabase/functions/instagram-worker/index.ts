@@ -18,11 +18,10 @@ serve(async (req) => {
 
     console.log('Instagram worker checking for pending rows...');
 
-    // Find Instagram jobs (ID starts with 'IG')
+    // Find Instagram jobs (new dedicated table)
     const { data: instagramJobs } = await supabase
-      .from('scraping_jobs')
+      .from('instagram_jobs')
       .select('id, processed_rows, total_rows')
-      .like('id', 'IG%')
       .in('status', ['pending', 'processing']);
 
     if (!instagramJobs || instagramJobs.length === 0) {
@@ -43,7 +42,7 @@ serve(async (req) => {
       for (const job of instagramJobs) {
         if (job.processed_rows >= job.total_rows) {
           await supabase
-            .from('scraping_jobs')
+            .from('instagram_jobs')
             .update({ status: 'completed' })
             .eq('id', job.id);
         }
@@ -59,7 +58,7 @@ serve(async (req) => {
 
     // Get ONE pending row from Instagram jobs
     const { data: pendingRows, error: queryError } = await supabase
-      .from('scraped_rows')
+      .from('instagram_rows')
       .select('*')
       .in('job_id', jobIds)
       .eq('scrape_status', 'pending')
@@ -83,11 +82,11 @@ serve(async (req) => {
     }
 
     const row = pendingRows[0];
-    console.log('Processing Instagram row:', row.id, row.website_url);
+    console.log('Processing Instagram row:', row.id, row.instagram_url);
 
     // Lock the row by updating status to 'processing'
     const { error: lockError, count: lockCount } = await supabase
-      .from('scraped_rows')
+      .from('instagram_rows')
       .update({ scrape_status: 'processing' })
       .eq('id', row.id)
       .eq('scrape_status', 'pending'); // Only update if still pending (avoid race condition)
@@ -137,7 +136,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         row_id: row.id,
-        instagram_url: row.website_url,
+        instagram_url: row.instagram_url,
         scraper_response: scraperData
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

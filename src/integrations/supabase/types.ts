@@ -131,6 +131,83 @@ export type Database = {
           },
         ]
       }
+      instagram_jobs: {
+        Row: {
+          created_at: string
+          estimated_cost_usd: number
+          id: string
+          processed_rows: number
+          project_id: string
+          status: string
+          total_rows: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          estimated_cost_usd?: number
+          id: string
+          processed_rows?: number
+          project_id: string
+          status?: string
+          total_rows?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          estimated_cost_usd?: number
+          id?: string
+          processed_rows?: number
+          project_id?: string
+          status?: string
+          total_rows?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      instagram_rows: {
+        Row: {
+          created_at: string
+          id: string
+          instagram_url: string
+          job_id: string
+          original_row_data: Json | null
+          scrape_error_message: string | null
+          scrape_status: string
+          scraped_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          instagram_url: string
+          job_id: string
+          original_row_data?: Json | null
+          scrape_error_message?: string | null
+          scrape_status?: string
+          scraped_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          instagram_url?: string
+          job_id?: string
+          original_row_data?: Json | null
+          scrape_error_message?: string | null
+          scrape_status?: string
+          scraped_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instagram_rows_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "instagram_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       people: {
         Row: {
           created_at: string
@@ -342,6 +419,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      increment_instagram_job_processed: {
+        Args: { cost_increment: number; job_id_param: string }
+        Returns: {
+          estimated_cost_usd: number
+          processed_rows: number
+          status: string
+          total_rows: number
+        }[]
+      }
       increment_job_processed: {
         Args: { job_id_param: string }
         Returns: {

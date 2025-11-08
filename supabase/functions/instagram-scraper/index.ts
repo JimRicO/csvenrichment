@@ -35,20 +35,20 @@ serve(async (req) => {
       const supabase = createClient(supabaseUrl, supabaseKey);
 
       const { data: rowData, error: rowError } = await supabase
-        .from('scraped_rows')
-        .select('website_url, job_id')
+        .from('instagram_rows')
+        .select('instagram_url, job_id')
         .eq('id', scraped_row_id)
         .single();
 
       if (rowError || !rowData) {
-        console.error('Failed to fetch scraped row:', rowError);
+        console.error('Failed to fetch Instagram row:', rowError);
         return new Response(
-          JSON.stringify({ error: 'Scraped row not found' }),
+          JSON.stringify({ error: 'Instagram row not found' }),
           { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      instagramUrl = rowData.website_url;
+      instagramUrl = rowData.instagram_url;
       jobId = rowData.job_id;
       console.log('Processing row:', scraped_row_id, 'URL:', instagramUrl, 'Job:', jobId);
     }
@@ -170,7 +170,7 @@ serve(async (req) => {
         const supabase = createClient(supabaseUrl, supabaseKey);
         
         await supabase
-          .from('scraped_rows')
+          .from('instagram_rows')
           .update({
             scrape_status: 'failed',
             scrape_error_message: 'No profile data returned',
@@ -178,15 +178,17 @@ serve(async (req) => {
           })
           .eq('id', scraped_row_id);
 
-        // Use conditional increment that prevents exceeding total_rows
+        // Use new Instagram-specific RPC function
         interface JobUpdate {
           processed_rows: number;
           total_rows: number;
+          estimated_cost_usd: number;
           status: string;
         }
         const { data: updatedJob } = await supabase
-          .rpc('increment_job_processed', { 
-            job_id_param: jobId 
+          .rpc('increment_instagram_job_processed', { 
+            job_id_param: jobId,
+            cost_increment: 0
           })
           .single() as { data: JobUpdate | null };
 
@@ -259,25 +261,24 @@ serve(async (req) => {
 
         console.log('Stored Instagram data for:', profileData.username);
 
-        // Update scraped_rows status
+        // Update instagram_rows status
         await supabase
-          .from('scraped_rows')
+          .from('instagram_rows')
           .update({
             scrape_status: 'completed',
             scraped_at: new Date().toISOString()
           })
           .eq('id', scraped_row_id);
 
-        // Use conditional increment that prevents exceeding total_rows
+        // Use new Instagram-specific RPC function
         interface JobUpdateWithCost {
           processed_rows: number;
           total_rows: number;
-          total_pages_scraped: number;
           estimated_cost_usd: number;
           status: string;
         }
         const { data: updatedJob } = await supabase
-          .rpc('increment_job_processed_with_cost', { 
+          .rpc('increment_instagram_job_processed', { 
             job_id_param: jobId,
             cost_increment: 0.0027
           })
@@ -292,7 +293,7 @@ serve(async (req) => {
         
         // Mark row as failed
         await supabase
-          .from('scraped_rows')
+          .from('instagram_rows')
           .update({
             scrape_status: 'failed',
             scrape_error_message: dbError instanceof Error ? dbError.message : 'Database error',

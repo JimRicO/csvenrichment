@@ -21,7 +21,6 @@ interface InstagramJob {
   status: string;
   total_rows: number;
   processed_rows: number;
-  total_pages_scraped: number;
   estimated_cost_usd: number;
   created_at: string;
   profiles_scraped?: number;
@@ -99,11 +98,10 @@ const InstagramJobsTable = () => {
 
   useEffect(() => {
     const fetchJobs = async () => {
-      // Fetch Instagram jobs (id starts with 'IG')
+      // Fetch Instagram jobs from dedicated table
       const { data: jobsData, error: jobsError } = await supabase
-        .from('scraping_jobs')
+        .from('instagram_jobs')
         .select('*')
-        .like('id', 'IG%')
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -153,7 +151,7 @@ const InstagramJobsTable = () => {
         {
           event: '*',
           schema: 'public',
-          table: 'scraping_jobs'
+          table: 'instagram_jobs'
         },
         () => {
           fetchJobs();

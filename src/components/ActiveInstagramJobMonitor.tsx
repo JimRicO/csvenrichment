@@ -1,14 +1,14 @@
 import { CheckCircle2, Loader2, AlertCircle, Instagram, TrendingUp, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { useJobStatus } from "@/hooks/useJobStatus";
+import { useInstagramJobStatus } from "@/hooks/useInstagramJobStatus";
 
 interface ActiveInstagramJobMonitorProps {
   jobId: string;
 }
 
 const ActiveInstagramJobMonitor = ({ jobId }: ActiveInstagramJobMonitorProps) => {
-  const { jobStatus, isLoading, error } = useJobStatus(jobId);
+  const { jobStatus, isLoading, error } = useInstagramJobStatus(jobId);
 
   if (error) {
     return (
@@ -91,9 +91,9 @@ const ActiveInstagramJobMonitor = ({ jobId }: ActiveInstagramJobMonitorProps) =>
         <div className="space-y-1 p-4 rounded-lg bg-accent/10 border border-accent/20">
           <div className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-accent" />
-            <p className="text-xs text-muted-foreground">API Calls</p>
+            <p className="text-xs text-muted-foreground">Total Profiles</p>
           </div>
-          <p className="text-2xl font-bold text-accent">{jobStatus.total_pages_scraped}</p>
+          <p className="text-2xl font-bold text-accent">{jobStatus.total_rows}</p>
         </div>
         
         <div className="space-y-1 p-4 rounded-lg bg-secondary/50 border border-border">

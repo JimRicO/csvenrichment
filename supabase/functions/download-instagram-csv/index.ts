@@ -27,11 +27,10 @@ serve(async (req) => {
 
     console.log('Generating Instagram CSV for job:', job_id);
 
-    // Fetch ALL scraped_rows (to maintain row count with upload) 
-    // and LEFT JOIN to instagram_company_data (for scraped data)
+    // Fetch ALL instagram_rows (to maintain row count with upload) 
     const { data: allRows, error: rowsError } = await supabase
-      .from('scraped_rows')
-      .select('id, website_url, scrape_status, scrape_error_message, created_at')
+      .from('instagram_rows')
+      .select('id, instagram_url, scrape_status, scrape_error_message, created_at')
       .eq('job_id', job_id)
       .order('created_at', { ascending: true });
 
@@ -136,7 +135,7 @@ serve(async (req) => {
         // Row failed or pending - include with empty data
         const emptyRow = [
           escapeCSV(job_id),
-          escapeCSV(row.website_url),
+          escapeCSV(row.instagram_url),
           escapeCSV(row.scrape_status),
           escapeCSV(row.scrape_error_message || ''),
           '', // username

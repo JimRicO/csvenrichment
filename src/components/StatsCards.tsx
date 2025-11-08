@@ -20,9 +20,11 @@ const StatsCards = () => {
 
   useEffect(() => {
     const fetchStats = async () => {
+      // Only fetch CSV scraper jobs (exclude Instagram jobs which are now in separate table)
       const { data: jobs } = await supabase
         .from('scraping_jobs')
-        .select('total_pages_scraped, estimated_cost_usd, status, processed_rows, total_rows');
+        .select('total_pages_scraped, estimated_cost_usd, status, processed_rows, total_rows')
+        .not('id', 'like', 'IG%'); // Exclude any legacy Instagram jobs still in this table
 
       if (jobs) {
         const totalJobs = jobs.length;
