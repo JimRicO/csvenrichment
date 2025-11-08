@@ -96,6 +96,11 @@ serve(async (req) => {
           status: 'pending',
           total_rows: 0,
           processed_rows: 0,
+          total_pages_scraped: 0,
+          total_characters_scraped: 0,
+          total_input_tokens: 0,
+          total_output_tokens: 0,
+          estimated_cost_usd: 0,
         })
         .select()
         .single();
