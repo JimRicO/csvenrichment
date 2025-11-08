@@ -103,9 +103,21 @@ const JobsTable = () => {
         return;
       }
 
-      // Fetch extraction stats for each job
+      // Fetch extraction stats for each job (only for non-Instagram jobs)
       const jobsWithStats = await Promise.all(
         (data || []).map(async (job) => {
+          // Instagram jobs (starting with "IG") don't use extraction
+          const isInstagramJob = job.id.startsWith('IG');
+          
+          if (isInstagramJob) {
+            return {
+              ...job,
+              extraction_completed: job.total_rows, // All rows are ready immediately
+              extraction_pending: 0,
+              extraction_failed: 0,
+            };
+          }
+
           const { data: stats } = await supabase
             .from('scraped_rows')
             .select('extraction_status')
