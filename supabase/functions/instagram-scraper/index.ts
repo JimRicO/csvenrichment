@@ -11,8 +11,8 @@ serve(async (req) => {
   }
 
   try {
-    // HARD BLOCK: Refuse to process this completed job
-    const BLOCKED_JOBS = ['IG1762585877028fqeh107'];
+    // HARD BLOCK: Refuse to process completed jobs
+    const BLOCKED_JOBS = ['IG1762585877028fqeh107', 'IG1762588230856ldsxkt2'];
     
     const { scraped_row_id, url } = await req.json();
 
