@@ -127,7 +127,7 @@ serve(async (req) => {
         project_id: projectId,
         website_url: instagramUrl,
         scrape_status: 'pending',
-        extraction_status: 'not_applicable',
+        extraction_status: 'pending',
         original_row_data: row,
       });
     }
