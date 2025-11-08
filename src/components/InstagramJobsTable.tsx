@@ -99,11 +99,11 @@ const InstagramJobsTable = () => {
 
   useEffect(() => {
     const fetchJobs = async () => {
-      // Fetch Instagram jobs (project_id starts with 'instagram_')
+      // Fetch Instagram jobs (id starts with 'IG')
       const { data: jobsData, error: jobsError } = await supabase
         .from('scraping_jobs')
         .select('*')
-        .like('project_id', 'instagram_%')
+        .like('id', 'IG%')
         .order('created_at', { ascending: false })
         .limit(10);
 
