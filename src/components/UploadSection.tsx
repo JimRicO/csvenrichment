@@ -66,9 +66,22 @@ const UploadSection = ({
     });
   };
   const startWorkerOrchestration = async (jobId: string) => {
+    let interval: NodeJS.Timeout;
+    
     // Call workers in parallel repeatedly until job is complete
     const checkAndRunWorkers = async () => {
       try {
+        // First, check job status to see if we should continue
+        const { data: jobStatus } = await supabase.functions.invoke('get-job-status', {
+          body: { job_id: jobId }
+        });
+
+        if (jobStatus && jobStatus.status === 'completed') {
+          console.log('Job completed, stopping worker orchestration');
+          if (interval) clearInterval(interval);
+          return;
+        }
+
         // Run both workers in parallel - they'll handle "no work" gracefully
         await Promise.all([supabase.functions.invoke('scraper-worker'), supabase.functions.invoke('extractor-worker')]);
       } catch (error) {
@@ -80,7 +93,7 @@ const UploadSection = ({
     checkAndRunWorkers();
 
     // Then run every 5 seconds for up to 10 minutes
-    const interval = setInterval(checkAndRunWorkers, 5000);
+    interval = setInterval(checkAndRunWorkers, 5000);
 
     // Stop after 10 minutes max (failsafe)
     setTimeout(() => clearInterval(interval), 600000);
