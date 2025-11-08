@@ -27,29 +27,44 @@ serve(async (req) => {
 
     console.log('Generating Instagram CSV for job:', job_id);
 
-    // Fetch Instagram company data WITHOUT LIMIT to get all rows
-    const { data: instagramData, error: dataError } = await supabase
-      .from('instagram_company_data')
-      .select('*')
+    // Fetch ALL scraped_rows (to maintain row count with upload) 
+    // and LEFT JOIN to instagram_company_data (for scraped data)
+    const { data: allRows, error: rowsError } = await supabase
+      .from('scraped_rows')
+      .select('id, website_url, scrape_status, scrape_error_message, created_at')
       .eq('job_id', job_id)
       .order('created_at', { ascending: true });
 
-    console.log(`Fetched ${instagramData?.length || 0} profiles for CSV generation`);
-
-    if (dataError) {
-      console.error('Data fetch error:', dataError);
+    if (rowsError) {
+      console.error('Rows fetch error:', rowsError);
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch data' }),
+        JSON.stringify({ error: 'Failed to fetch rows' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (!instagramData || instagramData.length === 0) {
+    if (!allRows || allRows.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'No data found for this job' }),
+        JSON.stringify({ error: 'No rows found for this job' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log(`Fetched ${allRows.length} rows (uploaded count)`);
+
+    // Fetch instagram_company_data for successful scrapes
+    const { data: instagramData } = await supabase
+      .from('instagram_company_data')
+      .select('*')
+      .eq('job_id', job_id);
+
+    // Create map for quick lookup
+    const dataMap = new Map();
+    (instagramData || []).forEach((profile: any) => {
+      dataMap.set(profile.scraped_row_id, profile);
+    });
+
+    console.log(`Matched ${dataMap.size} profiles with scraped data`);
 
     // Helper function to escape CSV values
     const escapeCSV = (value: any): string => {
@@ -92,6 +107,8 @@ serve(async (req) => {
     const headers = [
       'job_id',
       'instagram_url',
+      'scrape_status',
+      'scrape_error',
       'username',
       'full_name',
       'biography',
@@ -112,8 +129,38 @@ serve(async (req) => {
 
     const csvRows = [headers.join(',')];
 
-    // Generate CSV rows
-    for (const profile of instagramData) {
+    // Generate CSV rows (iterate through ALL uploaded rows)
+    for (const row of allRows) {
+      const profile = dataMap.get(row.id); // Get scraped data if exists
+      if (!profile) {
+        // Row failed or pending - include with empty data
+        const emptyRow = [
+          escapeCSV(job_id),
+          escapeCSV(row.website_url),
+          escapeCSV(row.scrape_status),
+          escapeCSV(row.scrape_error_message || ''),
+          '', // username
+          '', // full_name
+          '', // biography
+          '', // external_url
+          '', // followers_count
+          '', // posts_count
+          '', // is_business_account
+          '', // verified
+          '', // related_profiles
+          '', // latest_posts
+          '', // post_dates
+          '', // total_posts_analyzed
+          '', // avg_likes
+          '', // avg_comments
+          '', // avg_video_views
+          ''  // top_hashtags
+        ];
+        csvRows.push(emptyRow.join(','));
+        continue;
+      }
+
+      // Row succeeded - include full data
       const latestPosts = profile.latest_posts || [];
       const relatedProfiles = profile.related_profiles || [];
 
@@ -164,9 +211,11 @@ serve(async (req) => {
       // Extract top hashtags
       const topHashtags = extractHashtags(latestPosts);
 
-      const row = [
+      const successRow = [
         escapeCSV(job_id),
         escapeCSV(profile.instagram_url),
+        escapeCSV('completed'),
+        escapeCSV(''),
         escapeCSV(profile.username),
         escapeCSV(profile.full_name),
         escapeCSV(profile.biography),
@@ -185,12 +234,12 @@ serve(async (req) => {
         escapeCSV(topHashtags)
       ];
 
-      csvRows.push(row.join(','));
+      csvRows.push(successRow.join(','));
     }
 
     const csvContent = csvRows.join('\n');
 
-    console.log(`Generated CSV with ${instagramData.length} profiles`);
+    console.log(`Generated CSV with ${allRows.length} total rows (${dataMap.size} successful, ${allRows.length - dataMap.size} failed/pending)`);
 
     return new Response(csvContent, {
       headers: {

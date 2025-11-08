@@ -140,7 +140,7 @@ serve(async (req) => {
         project_id: projectId,
         website_url: instagramUrl,
         scrape_status: 'pending',
-        extraction_status: 'pending',
+        extraction_status: 'not_applicable', // Instagram jobs don't use AI extraction
         original_row_data: row,
       });
     }

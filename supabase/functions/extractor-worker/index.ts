@@ -41,12 +41,13 @@ serve(async (req) => {
       );
     }
 
-    // Find and lock one row ready for extraction (prevents race conditions)
+    // Find and lock one row ready for extraction (EXCLUDE Instagram jobs)
     const { data: rows, error: queryError } = await supabase
       .from('scraped_rows')
       .select('*')
       .eq('scrape_status', 'completed')
       .eq('extraction_status', 'pending')
+      .not('job_id', 'like', 'IG%')
       .order('created_at', { ascending: true })
       .limit(1);
 
