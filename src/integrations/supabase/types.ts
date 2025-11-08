@@ -119,7 +119,7 @@ export type Database = {
             foreignKeyName: "instagram_company_data_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
-            referencedRelation: "scraping_jobs"
+            referencedRelation: "instagram_jobs"
             referencedColumns: ["id"]
           },
           {
