@@ -100,6 +100,7 @@ serve(async (req) => {
       'verified',
       'related_profiles',
       'latest_posts',
+      'post_dates',
       'total_posts_analyzed',
       'avg_likes',
       'avg_comments',
@@ -148,6 +149,16 @@ serve(async (req) => {
         })
         .join(' | ');
 
+      // Extract post dates (pipe-separated)
+      const postDatesStr = latestPosts
+        .map((post: any) => {
+          if (!post.timestamp) return '';
+          const date = new Date(post.timestamp);
+          return date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+        })
+        .filter((date: string) => date !== '')
+        .join(' | ');
+
       // Extract top hashtags
       const topHashtags = extractHashtags(latestPosts);
 
@@ -164,6 +175,7 @@ serve(async (req) => {
         escapeCSV(profile.verified),
         escapeCSV(relatedProfilesStr),
         escapeCSV(latestPostsStr),
+        escapeCSV(postDatesStr),
         escapeCSV(postsCount),
         escapeCSV(avgLikes),
         escapeCSV(avgComments),
