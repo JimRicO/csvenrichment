@@ -203,31 +203,26 @@ serve(async (req) => {
           })
           .eq('id', scraped_row_id);
 
-        // Count actual completed and failed rows (atomic, no race condition)
-        const { count: completedCount } = await supabase
-          .from('scraped_rows')
-          .select('*', { count: 'exact', head: true })
-          .eq('job_id', jobId)
-          .in('scrape_status', ['completed', 'failed']);
-
+        // Use atomic increment even for failures
         const { data: currentJob } = await supabase
           .from('scraping_jobs')
-          .select('total_rows')
+          .select('processed_rows, total_rows')
           .eq('id', jobId)
           .single();
 
-        if (currentJob && completedCount !== null) {
-          const actualProcessedRows = Math.min(completedCount, currentJob.total_rows);
+        if (currentJob) {
+          const newProcessedRows = currentJob.processed_rows + 1;
+          const isComplete = newProcessedRows >= currentJob.total_rows;
           
           await supabase
             .from('scraping_jobs')
             .update({
-              processed_rows: actualProcessedRows,
-              status: actualProcessedRows >= currentJob.total_rows ? 'completed' : 'processing'
+              processed_rows: newProcessedRows,
+              status: isComplete ? 'completed' : 'processing'
             })
             .eq('id', jobId);
 
-          console.log(`Job ${jobId}: Failed scrape, updated counter to ${actualProcessedRows}/${currentJob.total_rows}`);
+          console.log(`Job ${jobId}: Failed scrape, ${newProcessedRows}/${currentJob.total_rows} rows processed`);
         }
       }
       
@@ -304,34 +299,29 @@ serve(async (req) => {
           })
           .eq('id', scraped_row_id);
 
-        // Count actual completed and failed rows (atomic, no race condition)
-        const { count: completedCount } = await supabase
-          .from('scraped_rows')
-          .select('*', { count: 'exact', head: true })
-          .eq('job_id', jobId)
-          .in('scrape_status', ['completed', 'failed']);
-
+        // Use atomic increment to prevent race conditions
         const { data: currentJob } = await supabase
           .from('scraping_jobs')
-          .select('*')
+          .select('processed_rows, total_rows, total_pages_scraped, estimated_cost_usd')
           .eq('id', jobId)
           .single();
 
-        if (currentJob && completedCount !== null) {
+        if (currentJob) {
+          const newProcessedRows = currentJob.processed_rows + 1;
           const newCost = parseFloat(currentJob.estimated_cost_usd) + 0.0027;
-          const actualProcessedRows = Math.min(completedCount, currentJob.total_rows);
+          const isComplete = newProcessedRows >= currentJob.total_rows;
           
           await supabase
             .from('scraping_jobs')
             .update({
-              processed_rows: actualProcessedRows,
+              processed_rows: newProcessedRows,
               total_pages_scraped: currentJob.total_pages_scraped + 1,
               estimated_cost_usd: newCost,
-              status: actualProcessedRows >= currentJob.total_rows ? 'completed' : 'processing'
+              status: isComplete ? 'completed' : 'processing'
             })
             .eq('id', jobId);
 
-          console.log(`Job ${jobId}: ${actualProcessedRows}/${currentJob.total_rows} (counted from DB), cost: $${newCost.toFixed(4)}`);
+          console.log(`Job ${jobId}: ${newProcessedRows}/${currentJob.total_rows} rows processed, cost: $${newCost.toFixed(4)}`);
         }
 
       } catch (dbError) {
