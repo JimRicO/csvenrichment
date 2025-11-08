@@ -203,26 +203,15 @@ serve(async (req) => {
           })
           .eq('id', scraped_row_id);
 
-        // Use atomic increment even for failures
-        const { data: currentJob } = await supabase
-          .from('scraping_jobs')
-          .select('processed_rows, total_rows')
-          .eq('id', jobId)
+        // Use conditional increment that prevents exceeding total_rows
+        const { data: updatedJob } = await supabase
+          .rpc('increment_job_processed', { 
+            job_id_param: jobId 
+          })
           .single();
 
-        if (currentJob) {
-          const newProcessedRows = currentJob.processed_rows + 1;
-          const isComplete = newProcessedRows >= currentJob.total_rows;
-          
-          await supabase
-            .from('scraping_jobs')
-            .update({
-              processed_rows: newProcessedRows,
-              status: isComplete ? 'completed' : 'processing'
-            })
-            .eq('id', jobId);
-
-          console.log(`Job ${jobId}: Failed scrape, ${newProcessedRows}/${currentJob.total_rows} rows processed`);
+        if (updatedJob) {
+          console.log(`Job ${jobId}: Failed scrape, ${updatedJob.processed_rows}/${updatedJob.total_rows} rows processed`);
         }
       }
       
@@ -299,29 +288,16 @@ serve(async (req) => {
           })
           .eq('id', scraped_row_id);
 
-        // Use atomic increment to prevent race conditions
-        const { data: currentJob } = await supabase
-          .from('scraping_jobs')
-          .select('processed_rows, total_rows, total_pages_scraped, estimated_cost_usd')
-          .eq('id', jobId)
+        // Use conditional increment that prevents exceeding total_rows
+        const { data: updatedJob } = await supabase
+          .rpc('increment_job_processed_with_cost', { 
+            job_id_param: jobId,
+            cost_increment: 0.0027
+          })
           .single();
 
-        if (currentJob) {
-          const newProcessedRows = currentJob.processed_rows + 1;
-          const newCost = parseFloat(currentJob.estimated_cost_usd) + 0.0027;
-          const isComplete = newProcessedRows >= currentJob.total_rows;
-          
-          await supabase
-            .from('scraping_jobs')
-            .update({
-              processed_rows: newProcessedRows,
-              total_pages_scraped: currentJob.total_pages_scraped + 1,
-              estimated_cost_usd: newCost,
-              status: isComplete ? 'completed' : 'processing'
-            })
-            .eq('id', jobId);
-
-          console.log(`Job ${jobId}: ${newProcessedRows}/${currentJob.total_rows} rows processed, cost: $${newCost.toFixed(4)}`);
+        if (updatedJob) {
+          console.log(`Job ${jobId}: ${updatedJob.processed_rows}/${updatedJob.total_rows} rows processed, cost: $${parseFloat(updatedJob.estimated_cost_usd).toFixed(4)}`);
         }
 
       } catch (dbError) {
