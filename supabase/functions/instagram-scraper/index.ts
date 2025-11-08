@@ -29,7 +29,16 @@ serve(async (req) => {
       );
     }
 
-    console.log('Starting Instagram scrape for:', url);
+    // Extract username from URL
+    let username = url;
+    if (url.includes('instagram.com/')) {
+      const match = url.match(/instagram\.com\/([^\/\?]+)/);
+      if (match) {
+        username = match[1];
+      }
+    }
+    
+    console.log('Starting Instagram scrape for username:', username);
 
     // Start Apify actor run
     const runResponse = await fetch(
@@ -38,9 +47,8 @@ serve(async (req) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          directUrls: [url],
+          usernames: [username],
           resultsLimit: 12,
-          resultsType: 'posts',
         }),
       }
     );
@@ -121,7 +129,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Instagram scraper error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
