@@ -38,13 +38,15 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Generate unique project ID
+    // Generate unique project ID and job ID with RICH prefix
     const project_id = `project_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    const job_id = `RICH${Date.now()}${Math.random().toString(36).substring(2, 9)}`;
 
     // Create scraping job
     const { data: job, error: jobError } = await supabase
       .from('scraping_jobs')
       .insert({
+        id: job_id,
         project_id,
         status: 'pending',
         total_rows: websiteUrls.length,

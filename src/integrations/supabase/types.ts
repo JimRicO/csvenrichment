@@ -168,7 +168,15 @@ export type Database = {
           updated_at?: string
           website_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "people_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "scraping_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       scraped_rows: {
         Row: {
@@ -300,7 +308,7 @@ export type Database = {
           created_at?: string
           estimated_cost_usd?: number
           extraction_config?: Json | null
-          id?: string
+          id: string
           processed_rows?: number
           project_id: string
           status?: string

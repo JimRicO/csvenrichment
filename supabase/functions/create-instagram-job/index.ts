@@ -47,17 +47,24 @@ serve(async (req) => {
     let existingUrls = new Set<string>();
 
     if (existing_job_id) {
+      // Validate it's an Instagram job (IG prefix)
+      if (!existing_job_id.startsWith('IG')) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid job ID: must be an Instagram job (IG prefix)' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       // Validate existing job
       const { data: existingJob, error: jobError } = await supabase
         .from('scraping_jobs')
         .select('id, project_id, total_rows')
         .eq('id', existing_job_id)
-        .like('project_id', 'instagram_%')
         .single();
 
       if (jobError || !existingJob) {
         return new Response(
-          JSON.stringify({ error: 'Job not found or not an Instagram job' }),
+          JSON.stringify({ error: 'Job not found' }),
           { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -77,12 +84,14 @@ serve(async (req) => {
 
       console.log(`Appending to existing job: ${jobId}, existing URLs: ${existingUrls.size}`);
     } else {
-      // Create new Instagram job
+      // Create new Instagram job with IG prefix
       projectId = `instagram_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      jobId = `IG${Date.now()}${Math.random().toString(36).substring(2, 9)}`;
       
       const { data: jobData, error: jobError } = await supabase
         .from('scraping_jobs')
         .insert({
+          id: jobId,
           project_id: projectId,
           status: 'pending',
           total_rows: 0,
@@ -99,7 +108,6 @@ serve(async (req) => {
         );
       }
 
-      jobId = jobData.id;
       console.log(`Created new Instagram job: ${jobId}`);
     }
 

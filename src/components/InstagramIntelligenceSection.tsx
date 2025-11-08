@@ -247,13 +247,13 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
           </Label>
           <Input
             id="job-id"
-            placeholder="Enter Job ID to append profiles to existing job"
+            placeholder="e.g., IG1761947648897abc"
             value={existingJobId}
             onChange={(e) => setExistingJobId(e.target.value)}
             className="bg-background border-border"
           />
           <p className="text-xs text-muted-foreground">
-            Note: You still need to upload a CSV with new profiles to add to this job
+            Enter an Instagram job ID (starting with "IG") to add more profiles to an existing job
           </p>
         </div>
 
