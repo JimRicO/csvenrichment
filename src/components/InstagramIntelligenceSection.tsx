@@ -241,21 +241,21 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
           )}
         </div>
 
+        <div className="space-y-2">
+          <Label htmlFor="job-id" className="text-sm font-medium">
+            Job ID (optional - leave empty for new job)
+          </Label>
+          <Input
+            id="job-id"
+            placeholder="Enter Job ID to append profiles to existing job"
+            value={existingJobId}
+            onChange={(e) => setExistingJobId(e.target.value)}
+            className="bg-background border-border"
+          />
+        </div>
+
         {csvData && (
           <>
-            <div className="space-y-2">
-              <Label htmlFor="job-id" className="text-sm font-medium">
-                Job ID (optional - leave empty for new job)
-              </Label>
-              <Input
-                id="job-id"
-                placeholder="Enter Job ID to append profiles to existing job"
-                value={existingJobId}
-                onChange={(e) => setExistingJobId(e.target.value)}
-                className="bg-background border-border"
-              />
-            </div>
-
             <div className="space-y-4">
               <h3 className="font-semibold text-foreground">Data to Extract (pre-selected):</h3>
               
