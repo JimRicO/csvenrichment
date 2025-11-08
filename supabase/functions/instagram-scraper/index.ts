@@ -187,11 +187,13 @@ serve(async (req) => {
             .single();
 
           if (currentJob) {
+            // Prevent counter from exceeding total_rows
+            const newProcessedRows = Math.min(currentJob.processed_rows + 1, currentJob.total_rows);
             await supabase
               .from('scraping_jobs')
               .update({
-                processed_rows: currentJob.processed_rows + 1,
-                status: currentJob.processed_rows + 1 >= currentJob.total_rows ? 'completed' : 'processing'
+                processed_rows: newProcessedRows,
+                status: newProcessedRows >= currentJob.total_rows ? 'completed' : 'processing'
               })
               .eq('id', jobId);
           }
@@ -279,7 +281,8 @@ serve(async (req) => {
           .single();
 
         if (currentJob) {
-          const newProcessedRows = currentJob.processed_rows + 1;
+          // Prevent counter from exceeding total_rows
+          const newProcessedRows = Math.min(currentJob.processed_rows + 1, currentJob.total_rows);
           const newCost = parseFloat(currentJob.estimated_cost_usd) + 0.0027;
           
           await supabase
