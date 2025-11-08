@@ -342,7 +342,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_job_processed: {
+        Args: { job_id_param: string }
+        Returns: {
+          processed_rows: number
+          status: string
+          total_rows: number
+        }[]
+      }
+      increment_job_processed_with_cost: {
+        Args: { cost_increment: number; job_id_param: string }
+        Returns: {
+          estimated_cost_usd: number
+          processed_rows: number
+          status: string
+          total_pages_scraped: number
+          total_rows: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

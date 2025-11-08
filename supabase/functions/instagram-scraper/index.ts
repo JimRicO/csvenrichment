@@ -208,7 +208,7 @@ serve(async (req) => {
           .rpc('increment_job_processed', { 
             job_id_param: jobId 
           })
-          .single();
+          .single() as { data: { processed_rows: number; total_rows: number; status: string } | null };
 
         if (updatedJob) {
           console.log(`Job ${jobId}: Failed scrape, ${updatedJob.processed_rows}/${updatedJob.total_rows} rows processed`);
@@ -294,7 +294,7 @@ serve(async (req) => {
             job_id_param: jobId,
             cost_increment: 0.0027
           })
-          .single();
+          .single() as { data: { processed_rows: number; total_rows: number; total_pages_scraped: number; estimated_cost_usd: string; status: string } | null };
 
         if (updatedJob) {
           console.log(`Job ${jobId}: ${updatedJob.processed_rows}/${updatedJob.total_rows} rows processed, cost: $${parseFloat(updatedJob.estimated_cost_usd).toFixed(4)}`);
