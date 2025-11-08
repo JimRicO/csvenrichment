@@ -11,7 +11,32 @@ serve(async (req) => {
   }
 
   try {
+    // HARD BLOCK: Refuse to process this completed job
+    const BLOCKED_JOBS = ['IG1762585877028fqeh107'];
+    
     const { scraped_row_id, url } = await req.json();
+
+    if (scraped_row_id) {
+      // Check if this row belongs to a blocked job
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      
+      const { data: rowData } = await supabase
+        .from('scraped_rows')
+        .select('job_id')
+        .eq('id', scraped_row_id)
+        .single();
+        
+      if (rowData && BLOCKED_JOBS.includes(rowData.job_id)) {
+        console.log(`BLOCKED: Refusing to process row from blocked job ${rowData.job_id}`);
+        return new Response(
+          JSON.stringify({ message: 'Job is blocked from processing' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
     
     // If scraped_row_id is provided, fetch from database (worker mode)
     // If url is provided, direct scrape mode (legacy)
