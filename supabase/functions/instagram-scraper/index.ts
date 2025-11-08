@@ -204,11 +204,16 @@ serve(async (req) => {
           .eq('id', scraped_row_id);
 
         // Use conditional increment that prevents exceeding total_rows
+        interface JobUpdate {
+          processed_rows: number;
+          total_rows: number;
+          status: string;
+        }
         const { data: updatedJob } = await supabase
           .rpc('increment_job_processed', { 
             job_id_param: jobId 
           })
-          .single() as { data: { processed_rows: number; total_rows: number; status: string } | null };
+          .single() as { data: JobUpdate | null };
 
         if (updatedJob) {
           console.log(`Job ${jobId}: Failed scrape, ${updatedJob.processed_rows}/${updatedJob.total_rows} rows processed`);
@@ -289,15 +294,22 @@ serve(async (req) => {
           .eq('id', scraped_row_id);
 
         // Use conditional increment that prevents exceeding total_rows
+        interface JobUpdateWithCost {
+          processed_rows: number;
+          total_rows: number;
+          total_pages_scraped: number;
+          estimated_cost_usd: number;
+          status: string;
+        }
         const { data: updatedJob } = await supabase
           .rpc('increment_job_processed_with_cost', { 
             job_id_param: jobId,
             cost_increment: 0.0027
           })
-          .single() as { data: { processed_rows: number; total_rows: number; total_pages_scraped: number; estimated_cost_usd: string; status: string } | null };
+          .single() as { data: JobUpdateWithCost | null };
 
         if (updatedJob) {
-          console.log(`Job ${jobId}: ${updatedJob.processed_rows}/${updatedJob.total_rows} rows processed, cost: $${parseFloat(updatedJob.estimated_cost_usd).toFixed(4)}`);
+          console.log(`Job ${jobId}: ${updatedJob.processed_rows}/${updatedJob.total_rows} rows processed, cost: $${updatedJob.estimated_cost_usd.toFixed(4)}`);
         }
 
       } catch (dbError) {
