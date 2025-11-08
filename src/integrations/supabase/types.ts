@@ -126,7 +126,7 @@ export type Database = {
             foreignKeyName: "instagram_company_data_scraped_row_id_fkey"
             columns: ["scraped_row_id"]
             isOneToOne: true
-            referencedRelation: "scraped_rows"
+            referencedRelation: "instagram_rows"
             referencedColumns: ["id"]
           },
         ]
