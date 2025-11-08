@@ -65,7 +65,10 @@ serve(async (req) => {
     console.log('Firecrawl response:', JSON.stringify(data, null, 2));
 
     const screenshots = data?.data?.actions?.screenshots || [];
+    console.log('Screenshots array:', screenshots);
+    
     const screenshot = screenshots.find((s: any) => s.type === 'screenshot@fullPage');
+    console.log('Found screenshot:', screenshot);
 
     return new Response(
       JSON.stringify({

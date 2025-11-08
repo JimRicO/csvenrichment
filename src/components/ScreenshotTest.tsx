@@ -32,11 +32,19 @@ export const ScreenshotTest = () => {
 
       if (error) throw error;
 
-      if (data?.success) {
+      console.log('Screenshot response:', data);
+      
+      if (data?.success && data.screenshot) {
         setScreenshot(data.screenshot);
         toast({
           title: "Success",
           description: "Screenshot captured successfully",
+        });
+      } else if (data?.success && !data.screenshot) {
+        toast({
+          title: "Warning",
+          description: "Screenshot completed but no image was returned",
+          variant: "destructive",
         });
       } else {
         throw new Error("Failed to capture screenshots");
