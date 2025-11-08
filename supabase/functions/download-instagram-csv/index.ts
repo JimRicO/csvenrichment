@@ -88,6 +88,7 @@ serve(async (req) => {
 
     // Generate CSV header
     const headers = [
+      'job_id',
       'instagram_url',
       'username',
       'full_name',
@@ -151,6 +152,7 @@ serve(async (req) => {
       const topHashtags = extractHashtags(latestPosts);
 
       const row = [
+        escapeCSV(job_id),
         escapeCSV(profile.instagram_url),
         escapeCSV(profile.username),
         escapeCSV(profile.full_name),
