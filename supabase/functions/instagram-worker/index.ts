@@ -35,14 +35,10 @@ serve(async (req) => {
 
     const jobIds = instagramJobs.map(j => j.id);
 
-    // Get ONE pending row from Instagram jobs
-    const { data: pendingRows, error: queryError } = await supabase
-      .from('scraped_rows')
-      .select('*')
-      .in('job_id', jobIds)
-      .eq('scrape_status', 'pending')
-      .order('created_at', { ascending: true })
-      .limit(1);
+    // Atomically get and lock ONE pending row using raw SQL to prevent race conditions
+    const { data: pendingRows, error: queryError } = await supabase.rpc('get_and_lock_instagram_row', {
+      p_job_ids: jobIds
+    });
 
     if (queryError) {
       console.error('Query error:', queryError);
@@ -62,21 +58,6 @@ serve(async (req) => {
 
     const row = pendingRows[0];
     console.log('Processing Instagram row:', row.id, row.website_url);
-
-    // Lock the row by updating status to 'processing'
-    const { error: lockError } = await supabase
-      .from('scraped_rows')
-      .update({ scrape_status: 'processing' })
-      .eq('id', row.id)
-      .eq('scrape_status', 'pending'); // Only update if still pending (avoid race condition)
-
-    if (lockError) {
-      console.error('Lock error:', lockError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to lock row' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
 
     // Call instagram-scraper edge function
     console.log('Invoking instagram-scraper for row:', row.id);
