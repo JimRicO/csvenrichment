@@ -27,12 +27,14 @@ serve(async (req) => {
 
     console.log('Generating Instagram CSV for job:', job_id);
 
-    // Fetch Instagram company data
+    // Fetch Instagram company data WITHOUT LIMIT to get all rows
     const { data: instagramData, error: dataError } = await supabase
       .from('instagram_company_data')
       .select('*')
       .eq('job_id', job_id)
       .order('created_at', { ascending: true });
+
+    console.log(`Fetched ${instagramData?.length || 0} profiles for CSV generation`);
 
     if (dataError) {
       console.error('Data fetch error:', dataError);

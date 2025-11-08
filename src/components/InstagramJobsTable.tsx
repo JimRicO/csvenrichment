@@ -58,14 +58,27 @@ const InstagramJobsTable = () => {
   const handleDownload = async (jobId: string, projectId: string) => {
     setDownloadingJobId(jobId);
     try {
-      const { data, error } = await supabase.functions.invoke('download-instagram-csv', {
-        body: { job_id: jobId },
+      // Use direct fetch to edge function to handle large CSV responses
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      
+      const response = await fetch(`${supabaseUrl}/functions/v1/download-instagram-csv`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`
+        },
+        body: JSON.stringify({ job_id: jobId })
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error('Failed to download CSV');
+      }
 
+      const csvText = await response.text();
+      
       // Create blob and download
-      const blob = new Blob([data], { type: 'text/csv' });
+      const blob = new Blob([csvText], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
