@@ -90,7 +90,7 @@ serve(async (req) => {
     console.log('Processing Instagram row:', row.id, row.website_url);
 
     // Lock the row by updating status to 'processing'
-    const { error: lockError } = await supabase
+    const { error: lockError, count: lockCount } = await supabase
       .from('scraped_rows')
       .update({ scrape_status: 'processing' })
       .eq('id', row.id)
@@ -101,6 +101,15 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Failed to lock row' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // If no rows were updated, it means another worker already took it or it's not pending
+    if (lockCount === 0) {
+      console.log('Row already locked or not pending, skipping');
+      return new Response(
+        JSON.stringify({ message: 'Row already processed' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
