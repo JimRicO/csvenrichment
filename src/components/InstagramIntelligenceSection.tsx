@@ -289,7 +289,7 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
                     onCheckedChange={(checked) => setExtractPosts(checked as boolean)}
                   />
                   <Label htmlFor="posts" className="text-sm cursor-pointer">
-                    Latest Posts (3-5 posts with performance data, captions, hashtags)
+                    Latest Posts (performance data, captions, hashtags)
                   </Label>
                 </div>
               </div>
