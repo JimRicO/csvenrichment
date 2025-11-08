@@ -227,12 +227,12 @@ serve(async (req) => {
           is_business_account: profileData.isBusinessAccount || false,
           verified: profileData.verified || false,
           related_profiles: profileData.relatedProfiles ? 
-            profileData.relatedProfiles.slice(0, 10).map((p: any) => ({
+            profileData.relatedProfiles.map((p: any) => ({
               username: p.username,
               full_name: p.fullName
             })) : [],
           latest_posts: profileData.latestPosts ?
-            profileData.latestPosts.slice(0, 5).map((post: any) => ({
+            profileData.latestPosts.map((post: any) => ({
               id: post.id,
               type: post.type,
               timestamp: post.timestamp,
