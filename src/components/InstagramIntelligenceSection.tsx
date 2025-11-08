@@ -252,6 +252,9 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
             onChange={(e) => setExistingJobId(e.target.value)}
             className="bg-background border-border"
           />
+          <p className="text-xs text-muted-foreground">
+            Note: You still need to upload a CSV with new profiles to add to this job
+          </p>
         </div>
 
         {csvData && (
@@ -312,7 +315,7 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
           className="w-full gradient-primary hover:opacity-90 transition-smooth disabled:opacity-50 glow-primary"
           size="lg"
         >
-          {isProcessing ? "Creating Job..." : "Start Instagram Scraping 🚀"}
+          {isProcessing ? "Creating Job..." : !csvData ? "Upload CSV to Start" : "Start Instagram Scraping 🚀"}
         </Button>
       </div>
     </Card>
