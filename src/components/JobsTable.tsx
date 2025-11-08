@@ -27,6 +27,9 @@ interface Job {
   estimated_cost_usd: number;
   created_at: string;
   conversation?: any[];
+  extraction_completed?: number;
+  extraction_pending?: number;
+  extraction_failed?: number;
 }
 
 const StatusBadge = ({ status }: { status: string }) => {
@@ -96,9 +99,32 @@ const JobsTable = () => {
 
       if (error) {
         console.error('Error fetching jobs:', error);
-      } else {
-        setJobs((data || []) as Job[]);
+        setIsLoading(false);
+        return;
       }
+
+      // Fetch extraction stats for each job
+      const jobsWithStats = await Promise.all(
+        (data || []).map(async (job) => {
+          const { data: stats } = await supabase
+            .from('scraped_rows')
+            .select('extraction_status')
+            .eq('job_id', job.id);
+
+          const extraction_completed = stats?.filter(r => r.extraction_status === 'completed').length || 0;
+          const extraction_pending = stats?.filter(r => r.extraction_status === 'pending').length || 0;
+          const extraction_failed = stats?.filter(r => r.extraction_status === 'failed').length || 0;
+
+          return {
+            ...job,
+            extraction_completed,
+            extraction_pending,
+            extraction_failed,
+          };
+        })
+      );
+
+      setJobs(jobsWithStats as Job[]);
       setIsLoading(false);
     };
 
@@ -233,11 +259,21 @@ const JobsTable = () => {
                           <Button
                             size="sm"
                             onClick={() => handleDownload(job.id, job.project_id)}
-                            disabled={downloadingJobId === job.id}
-                            className="gradient-primary hover:opacity-90 transition-smooth"
+                            disabled={downloadingJobId === job.id || (job.extraction_pending || 0) > 0}
+                            className="gradient-primary hover:opacity-90 transition-smooth disabled:opacity-50"
+                            title={
+                              (job.extraction_pending || 0) > 0
+                                ? `Extraction in progress: ${job.extraction_completed}/${job.total_rows} completed`
+                                : 'Download enriched CSV'
+                            }
                           >
                             {downloadingJobId === job.id ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (job.extraction_pending || 0) > 0 ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Extracting ({job.extraction_completed}/{job.total_rows})
+                              </>
                             ) : (
                               <>
                                 <Download className="h-4 w-4 mr-2" />
