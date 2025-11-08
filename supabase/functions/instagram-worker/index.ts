@@ -21,7 +21,7 @@ serve(async (req) => {
     // Find Instagram jobs (project_id starts with 'instagram_')
     const { data: instagramJobs } = await supabase
       .from('scraping_jobs')
-      .select('id')
+      .select('id, processed_rows, total_rows')
       .like('project_id', 'instagram_%')
       .in('status', ['pending', 'processing']);
 
@@ -33,7 +33,29 @@ serve(async (req) => {
       );
     }
 
-    const jobIds = instagramJobs.map(j => j.id);
+    // Filter out jobs that have already processed all rows
+    const activeJobs = instagramJobs.filter(job => job.processed_rows < job.total_rows);
+    
+    if (activeJobs.length === 0) {
+      console.log('All Instagram jobs are complete');
+      
+      // Mark any jobs that are processing but done as completed
+      for (const job of instagramJobs) {
+        if (job.processed_rows >= job.total_rows) {
+          await supabase
+            .from('scraping_jobs')
+            .update({ status: 'completed' })
+            .eq('id', job.id);
+        }
+      }
+      
+      return new Response(
+        JSON.stringify({ message: 'All jobs complete' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const jobIds = activeJobs.map(j => j.id);
 
     // Get ONE pending row from Instagram jobs
     const { data: pendingRows, error: queryError } = await supabase
