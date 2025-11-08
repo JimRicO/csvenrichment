@@ -178,26 +178,8 @@ serve(async (req) => {
           })
           .eq('id', scraped_row_id);
 
-        // Update job stats
-        if (jobId) {
-          const { data: currentJob } = await supabase
-            .from('scraping_jobs')
-            .select('processed_rows, total_rows')
-            .eq('id', jobId)
-            .single();
-
-          if (currentJob) {
-            // Prevent counter from exceeding total_rows
-            const newProcessedRows = Math.min(currentJob.processed_rows + 1, currentJob.total_rows);
-            await supabase
-              .from('scraping_jobs')
-              .update({
-                processed_rows: newProcessedRows,
-                status: newProcessedRows >= currentJob.total_rows ? 'completed' : 'processing'
-              })
-              .eq('id', jobId);
-          }
-        }
+        // DO NOT increment counter on failures - job will remain in processing
+        // The row is marked as failed but doesn't count toward processed_rows
       }
       
       return new Response(
