@@ -38,7 +38,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         url,
-        formats: ['screenshot@fullPage'],
+        formats: [{ type: 'screenshot', fullPage: true }],
         waitFor: 2000,
       }),
     });
@@ -64,16 +64,13 @@ serve(async (req) => {
     const data = await response.json();
     console.log('Firecrawl response:', JSON.stringify(data, null, 2));
 
-    const screenshots = data?.data?.actions?.screenshots || [];
-    console.log('Screenshots array:', screenshots);
-    
-    const screenshot = screenshots.find((s: any) => s.type === 'screenshot@fullPage');
-    console.log('Found screenshot:', screenshot);
+    const screenshotUrl = data?.data?.screenshot;
+    console.log('Screenshot URL:', screenshotUrl);
 
     return new Response(
       JSON.stringify({
         success: true,
-        screenshot: screenshot?.url || null,
+        screenshot: screenshotUrl || null,
         metadata: {
           url,
           timestamp: new Date().toISOString(),
