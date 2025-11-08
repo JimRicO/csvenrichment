@@ -243,6 +243,7 @@ serve(async (req) => {
               alt: post.alt,
               locationName: post.locationName
             })) : [],
+          raw_apify_data: profileData, // Store complete raw response
           scraped_at: new Date().toISOString()
         };
 
