@@ -5,6 +5,7 @@ import StatsCards from "@/components/StatsCards";
 import JobsTable from "@/components/JobsTable";
 import ActiveJobMonitor from "@/components/ActiveJobMonitor";
 import { ScreenshotTest } from "@/components/ScreenshotTest";
+import { InstagramScraper } from "@/components/InstagramScraper";
 
 const Index = () => {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
@@ -22,6 +23,8 @@ const Index = () => {
         <StatsCards />
         
         <ScreenshotTest />
+        
+        <InstagramScraper />
         
         <UploadSection onJobCreated={handleJobCreated} />
         

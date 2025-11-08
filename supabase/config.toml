@@ -30,3 +30,6 @@ verify_jwt = false
 
 [functions.screenshot-test]
 verify_jwt = false
+
+[functions.instagram-scraper]
+verify_jwt = false
