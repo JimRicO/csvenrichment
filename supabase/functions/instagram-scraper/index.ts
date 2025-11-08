@@ -120,6 +120,9 @@ serve(async (req) => {
 
     const results = await resultsResponse.json();
     console.log('Results fetched:', results.length, 'profiles');
+    if (results.length > 0) {
+      console.log('Profile data structure:', JSON.stringify(results[0], null, 2).substring(0, 500));
+    }
 
     return new Response(
       JSON.stringify({ data: results[0] || null }),
