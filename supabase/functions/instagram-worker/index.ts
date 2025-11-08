@@ -18,8 +18,8 @@ serve(async (req) => {
 
     console.log('Instagram worker checking for pending rows...');
     
-    // HARD BLOCK: Prevent processing of completed job
-    const BLOCKED_JOBS = ['IG1762585877028fqeh107'];
+    // HARD BLOCK: Prevent processing of completed jobs
+    const BLOCKED_JOBS = ['IG1762585877028fqeh107', 'IG1762588230856ldsxkt2'];
 
     // Find Instagram jobs (project_id starts with 'instagram_')
     const { data: instagramJobs } = await supabase
