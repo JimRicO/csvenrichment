@@ -53,6 +53,81 @@ export type Database = {
         }
         Relationships: []
       }
+      instagram_company_data: {
+        Row: {
+          biography: string | null
+          created_at: string | null
+          external_url: string | null
+          followers_count: number | null
+          full_name: string | null
+          id: string
+          instagram_url: string
+          is_business_account: boolean | null
+          job_id: string
+          latest_posts: Json | null
+          posts_count: number | null
+          related_profiles: Json | null
+          scraped_at: string | null
+          scraped_row_id: string
+          updated_at: string | null
+          username: string
+          verified: boolean | null
+        }
+        Insert: {
+          biography?: string | null
+          created_at?: string | null
+          external_url?: string | null
+          followers_count?: number | null
+          full_name?: string | null
+          id?: string
+          instagram_url: string
+          is_business_account?: boolean | null
+          job_id: string
+          latest_posts?: Json | null
+          posts_count?: number | null
+          related_profiles?: Json | null
+          scraped_at?: string | null
+          scraped_row_id: string
+          updated_at?: string | null
+          username: string
+          verified?: boolean | null
+        }
+        Update: {
+          biography?: string | null
+          created_at?: string | null
+          external_url?: string | null
+          followers_count?: number | null
+          full_name?: string | null
+          id?: string
+          instagram_url?: string
+          is_business_account?: boolean | null
+          job_id?: string
+          latest_posts?: Json | null
+          posts_count?: number | null
+          related_profiles?: Json | null
+          scraped_at?: string | null
+          scraped_row_id?: string
+          updated_at?: string | null
+          username?: string
+          verified?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instagram_company_data_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "scraping_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "instagram_company_data_scraped_row_id_fkey"
+            columns: ["scraped_row_id"]
+            isOneToOne: true
+            referencedRelation: "scraped_rows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       people: {
         Row: {
           created_at: string

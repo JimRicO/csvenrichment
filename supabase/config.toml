@@ -33,3 +33,12 @@ verify_jwt = false
 
 [functions.instagram-scraper]
 verify_jwt = false
+
+[functions.create-instagram-job]
+verify_jwt = false
+
+[functions.instagram-worker]
+verify_jwt = false
+
+[functions.download-instagram-csv]
+verify_jwt = false
