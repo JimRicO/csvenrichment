@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+
 import { toast } from "sonner";
 import Papa from "papaparse";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,8 +20,6 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
   const [csvData, setCsvData] = useState<any[] | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   
-  // Job type
-  const [jobType, setJobType] = useState<'new' | 'append'>('new');
   const [existingJobId, setExistingJobId] = useState("");
   
   // Data selection (all pre-selected)
@@ -113,11 +111,6 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
       return;
     }
 
-    if (jobType === 'append' && !existingJobId.trim()) {
-      toast.error("Please enter an existing Job ID");
-      return;
-    }
-
     if (!extractProfile && !extractRelated && !extractPosts) {
       toast.error("Please select at least one data type to extract");
       return;
@@ -130,7 +123,7 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
         csv_rows: csvData
       };
 
-      if (jobType === 'append') {
+      if (existingJobId.trim()) {
         requestBody.existing_job_id = existingJobId.trim();
       }
 
@@ -147,7 +140,7 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
       const estimatedCost = (rowsAdded * 0.0027).toFixed(4);
 
       toast.success(
-        `${jobType === 'append' ? 'Appended' : 'Created'} Instagram job! ${rowsAdded} profiles queued. ${duplicates > 0 ? `(${duplicates} duplicates skipped) ` : ''}Estimated cost: $${estimatedCost}`
+        `${existingJobId.trim() ? 'Appended to' : 'Created'} Instagram job! ${rowsAdded} profiles queued. ${duplicates > 0 ? `(${duplicates} duplicates skipped) ` : ''}Estimated cost: $${estimatedCost}`
       );
       
       onJobCreated(data.job_id, data.project_id);
@@ -158,7 +151,6 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
       // Reset form
       setFile(null);
       setCsvData(null);
-      setJobType('new');
       setExistingJobId("");
     } catch (error) {
       console.error('Error creating Instagram job:', error);
@@ -251,31 +243,17 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
 
         {csvData && (
           <>
-            <div className="space-y-4 p-4 rounded-lg bg-secondary/30 border border-border">
-              <Label className="text-sm font-medium">Job Type</Label>
-              <RadioGroup value={jobType} onValueChange={(value: 'new' | 'append') => setJobType(value)}>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="new" id="new-job" />
-                  <Label htmlFor="new-job" className="cursor-pointer">
-                    New Instagram Intelligence Job
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="append" id="append-job" />
-                  <Label htmlFor="append-job" className="cursor-pointer">
-                    Append to Existing Job
-                  </Label>
-                </div>
-              </RadioGroup>
-
-              {jobType === 'append' && (
-                <Input
-                  placeholder="Enter existing Job ID"
-                  value={existingJobId}
-                  onChange={(e) => setExistingJobId(e.target.value)}
-                  className="bg-background border-border"
-                />
-              )}
+            <div className="space-y-2">
+              <Label htmlFor="job-id" className="text-sm font-medium">
+                Job ID (optional - leave empty for new job)
+              </Label>
+              <Input
+                id="job-id"
+                placeholder="Enter Job ID to append profiles to existing job"
+                value={existingJobId}
+                onChange={(e) => setExistingJobId(e.target.value)}
+                className="bg-background border-border"
+              />
             </div>
 
             <div className="space-y-4">
