@@ -17,17 +17,13 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     console.log('Instagram worker checking for pending rows...');
-    
-    // HARD BLOCK: Prevent processing of completed jobs
-    const BLOCKED_JOBS = ['IG1762585877028fqeh107', 'IG1762588230856ldsxkt2'];
 
-    // Find Instagram jobs (project_id starts with 'instagram_')
+    // Find Instagram jobs (ID starts with 'IG')
     const { data: instagramJobs } = await supabase
       .from('scraping_jobs')
       .select('id, processed_rows, total_rows')
-      .like('project_id', 'instagram_%')
-      .in('status', ['pending', 'processing'])
-      .not('id', 'in', `(${BLOCKED_JOBS.map(id => `'${id}'`).join(',')})`);
+      .like('id', 'IG%')
+      .in('status', ['pending', 'processing']);
 
     if (!instagramJobs || instagramJobs.length === 0) {
       console.log('No active Instagram jobs found');

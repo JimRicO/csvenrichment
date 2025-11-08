@@ -26,11 +26,12 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Find and lock one pending row to scrape (prevents race conditions)
+    // Find and lock one pending row to scrape (EXCLUDE Instagram jobs - they use instagram-worker)
     const { data: rows, error: queryError } = await supabase
       .from('scraped_rows')
       .select('*')
       .eq('scrape_status', 'pending')
+      .not('job_id', 'like', 'IG%')
       .order('created_at', { ascending: true })
       .limit(1);
     
