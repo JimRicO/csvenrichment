@@ -178,8 +178,32 @@ serve(async (req) => {
           })
           .eq('id', scraped_row_id);
 
-        // DO NOT increment counter on failures - job will remain in processing
-        // The row is marked as failed but doesn't count toward processed_rows
+        // Count actual completed and failed rows (atomic, no race condition)
+        const { count: completedCount } = await supabase
+          .from('scraped_rows')
+          .select('*', { count: 'exact', head: true })
+          .eq('job_id', jobId)
+          .in('scrape_status', ['completed', 'failed']);
+
+        const { data: currentJob } = await supabase
+          .from('scraping_jobs')
+          .select('total_rows')
+          .eq('id', jobId)
+          .single();
+
+        if (currentJob && completedCount !== null) {
+          const actualProcessedRows = Math.min(completedCount, currentJob.total_rows);
+          
+          await supabase
+            .from('scraping_jobs')
+            .update({
+              processed_rows: actualProcessedRows,
+              status: actualProcessedRows >= currentJob.total_rows ? 'completed' : 'processing'
+            })
+            .eq('id', jobId);
+
+          console.log(`Job ${jobId}: Failed scrape, updated counter to ${actualProcessedRows}/${currentJob.total_rows}`);
+        }
       }
       
       return new Response(
@@ -255,29 +279,34 @@ serve(async (req) => {
           })
           .eq('id', scraped_row_id);
 
-        // Update job stats (add $0.0027 per request)
+        // Count actual completed and failed rows (atomic, no race condition)
+        const { count: completedCount } = await supabase
+          .from('scraped_rows')
+          .select('*', { count: 'exact', head: true })
+          .eq('job_id', jobId)
+          .in('scrape_status', ['completed', 'failed']);
+
         const { data: currentJob } = await supabase
           .from('scraping_jobs')
           .select('*')
           .eq('id', jobId)
           .single();
 
-        if (currentJob) {
-          // Prevent counter from exceeding total_rows
-          const newProcessedRows = Math.min(currentJob.processed_rows + 1, currentJob.total_rows);
+        if (currentJob && completedCount !== null) {
           const newCost = parseFloat(currentJob.estimated_cost_usd) + 0.0027;
+          const actualProcessedRows = Math.min(completedCount, currentJob.total_rows);
           
           await supabase
             .from('scraping_jobs')
             .update({
-              processed_rows: newProcessedRows,
+              processed_rows: actualProcessedRows,
               total_pages_scraped: currentJob.total_pages_scraped + 1,
               estimated_cost_usd: newCost,
-              status: newProcessedRows >= currentJob.total_rows ? 'completed' : 'processing'
+              status: actualProcessedRows >= currentJob.total_rows ? 'completed' : 'processing'
             })
             .eq('id', jobId);
 
-          console.log(`Job ${jobId}: ${newProcessedRows}/${currentJob.total_rows}, cost: $${newCost.toFixed(4)}`);
+          console.log(`Job ${jobId}: ${actualProcessedRows}/${currentJob.total_rows} (counted from DB), cost: $${newCost.toFixed(4)}`);
         }
 
       } catch (dbError) {
