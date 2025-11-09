@@ -67,15 +67,18 @@ const UploadSection = ({
   };
   const startWorkerOrchestration = async (jobId: string) => {
     let interval: NodeJS.Timeout;
-    
+
     // Call workers in parallel repeatedly until job is complete
     const checkAndRunWorkers = async () => {
       try {
         // First, check job status to see if we should continue
-        const { data: jobStatus } = await supabase.functions.invoke('get-job-status', {
-          body: { job_id: jobId }
+        const {
+          data: jobStatus
+        } = await supabase.functions.invoke('get-job-status', {
+          body: {
+            job_id: jobId
+          }
         });
-
         if (jobStatus && jobStatus.status === 'completed') {
           console.log('Job completed, stopping worker orchestration');
           if (interval) clearInterval(interval);
@@ -152,7 +155,7 @@ const UploadSection = ({
   return <Card className="p-8 gradient-card border-border/50">
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-foreground mb-2">Upload your CSV file</h2>
+          <h2 className="text-2xl font-bold text-foreground mb-2">CSV Enrichment with website URLs</h2>
           <p className="text-muted-foreground">
             CSV Enrichment with website URLs.
           </p>
