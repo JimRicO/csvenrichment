@@ -132,11 +132,18 @@ serve(async (req) => {
     for (const row of allRows) {
       const profile = dataMap.get(row.id); // Get scraped data if exists
       if (!profile) {
-        // Row failed or pending - include with empty data
+        // Row failed, pending, invalid, or duplicate - include with empty data
+        let statusMessage = row.scrape_status;
+        if (row.scrape_status === 'invalid') {
+          statusMessage = 'Invalid URL - not processed';
+        } else if (row.scrape_status === 'duplicate') {
+          statusMessage = 'Duplicate - skipped';
+        }
+        
         const emptyRow = [
           escapeCSV(job_id),
           escapeCSV(row.instagram_url),
-          escapeCSV(row.scrape_status),
+          escapeCSV(statusMessage),
           escapeCSV(row.scrape_error_message || ''),
           '', // username
           '', // full_name

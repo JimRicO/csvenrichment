@@ -112,25 +112,43 @@ serve(async (req) => {
       console.log(`Created new Instagram job: ${jobId}`);
     }
 
-    // Process CSV rows
+    // Process CSV rows - preserve ALL rows with appropriate status
     const rowsToInsert = [];
     let duplicateCount = 0;
+    let invalidCount = 0;
 
     for (const row of csv_rows) {
       const instagramUrl = normalizeInstagramUrl(row);
       
       if (!instagramUrl) {
-        console.warn('Row missing Instagram URL, skipping:', row);
+        // Preserve row but mark as invalid
+        invalidCount++;
+        rowsToInsert.push({
+          job_id: jobId,
+          instagram_url: 'invalid_url',
+          scrape_status: 'invalid',
+          scrape_error_message: 'No valid Instagram URL found in row',
+          original_row_data: row,
+        });
         continue;
       }
 
       // Check for duplicates
       if (existingUrls.has(instagramUrl)) {
         duplicateCount++;
-        console.log(`Duplicate URL skipped: ${instagramUrl}`);
+        // Preserve row but mark as duplicate
+        rowsToInsert.push({
+          job_id: jobId,
+          instagram_url: instagramUrl,
+          scrape_status: 'duplicate',
+          scrape_error_message: 'Duplicate URL - already in this job',
+          original_row_data: row,
+        });
         continue;
       }
 
+      // Valid row - will be processed
+      existingUrls.add(instagramUrl); // Track to catch duplicates within same upload
       rowsToInsert.push({
         job_id: jobId,
         instagram_url: instagramUrl,
@@ -142,12 +160,16 @@ serve(async (req) => {
     if (rowsToInsert.length === 0) {
       return new Response(
         JSON.stringify({ 
-          error: 'No valid Instagram URLs found in CSV',
-          duplicates: duplicateCount 
+          error: 'No rows to process',
+          duplicates: duplicateCount,
+          invalid: invalidCount
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Count valid rows that will actually be processed
+    const validRowsCount = rowsToInsert.filter(r => r.scrape_status === 'pending').length;
 
     // Insert rows
     const { error: rowsError } = await supabase
@@ -168,14 +190,14 @@ serve(async (req) => {
       );
     }
 
-    // Update job total_rows
+    // Update job total_rows (only count valid rows for processing)
     const { data: currentJob } = await supabase
       .from('instagram_jobs')
       .select('total_rows')
       .eq('id', jobId)
       .single();
 
-    const newTotalRows = (currentJob?.total_rows || 0) + rowsToInsert.length;
+    const newTotalRows = (currentJob?.total_rows || 0) + validRowsCount;
 
     await supabase
       .from('instagram_jobs')
@@ -185,7 +207,7 @@ serve(async (req) => {
       })
       .eq('id', jobId);
 
-    console.log(`Job ${jobId}: Added ${rowsToInsert.length} rows (${duplicateCount} duplicates skipped)`);
+    console.log(`Job ${jobId}: Added ${rowsToInsert.length} total rows (${validRowsCount} valid, ${duplicateCount} duplicates, ${invalidCount} invalid)`);
 
     return new Response(
       JSON.stringify({
@@ -193,7 +215,9 @@ serve(async (req) => {
         job_id: jobId,
         project_id: projectId,
         rows_added: rowsToInsert.length,
-        duplicates_skipped: duplicateCount,
+        valid_rows: validRowsCount,
+        duplicates: duplicateCount,
+        invalid: invalidCount,
         total_rows: newTotalRows,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
