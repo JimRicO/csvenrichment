@@ -159,9 +159,6 @@ const UploadSection = ({
           <p className="text-muted-foreground">
             CSV Enrichment with website URLs.
           </p>
-          <p className="text-muted-foreground">
-            System will search the website and extract the information of your choice.
-          </p>
           <p className="text-sm text-muted-foreground/80 mt-1">
             Make sure your table contains a WEBSITE field
           </p>
