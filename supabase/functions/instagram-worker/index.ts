@@ -18,16 +18,16 @@ serve(async (req) => {
 
     console.log('Instagram worker checking for pending rows...');
 
-    // First, handle stuck rows (processing for more than 2 minutes)
+    // First, handle stuck rows (processing for more than 2 minutes OR with NULL timestamp)
     const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
     const maxRetries = 3;
 
     const { data: stuckRows } = await supabase
       .from('instagram_rows')
-      .select('id, retry_count, instagram_url')
+      .select('id, retry_count, instagram_url, last_processing_at')
       .eq('scrape_status', 'processing')
-      .lt('last_processing_at', twoMinutesAgo)
-      .lt('retry_count', maxRetries);
+      .lt('retry_count', maxRetries)
+      .or(`last_processing_at.lt.${twoMinutesAgo},last_processing_at.is.null`);
 
     if (stuckRows && stuckRows.length > 0) {
       console.log(`Found ${stuckRows.length} stuck rows, resetting to pending...`);
