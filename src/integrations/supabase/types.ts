@@ -133,6 +133,7 @@ export type Database = {
       }
       instagram_jobs: {
         Row: {
+          column_order: Json | null
           created_at: string
           estimated_cost_usd: number
           id: string
@@ -143,6 +144,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          column_order?: Json | null
           created_at?: string
           estimated_cost_usd?: number
           id: string
@@ -153,6 +155,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          column_order?: Json | null
           created_at?: string
           estimated_cost_usd?: number
           id?: string
