@@ -20,8 +20,6 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
   const [csvData, setCsvData] = useState<any[] | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   
-  const [existingJobId, setExistingJobId] = useState("");
-  
   // Data selection (all pre-selected)
   const [extractProfile, setExtractProfile] = useState(true);
   const [extractRelated, setExtractRelated] = useState(true);
@@ -121,16 +119,8 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
     setIsProcessing(true);
 
     try {
-      const requestBody: any = {
-        csv_rows: csvData
-      };
-
-      if (existingJobId.trim()) {
-        requestBody.existing_job_id = existingJobId.trim();
-      }
-
       const { data, error } = await supabase.functions.invoke('create-instagram-job', {
-        body: requestBody
+        body: { csv_rows: csvData }
       });
 
       if (error) {
@@ -142,7 +132,7 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
       const estimatedCost = (rowsAdded * 0.0027).toFixed(4);
 
       toast.success(
-        `${existingJobId.trim() ? 'Appended to' : 'Created'} Instagram job! ${rowsAdded} profiles queued. ${duplicates > 0 ? `(${duplicates} duplicates skipped) ` : ''}Estimated cost: $${estimatedCost}`
+        `Instagram job created! ${rowsAdded} profiles queued. ${duplicates > 0 ? `(${duplicates} duplicates skipped) ` : ''}Estimated cost: $${estimatedCost}`
       );
       
       onJobCreated(data.job_id, data.project_id);
@@ -153,7 +143,6 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
       // Reset form
       setFile(null);
       setCsvData(null);
-      setExistingJobId("");
     } catch (error) {
       console.error('Error creating Instagram job:', error);
       toast.error(error instanceof Error ? error.message : "Failed to create job");
@@ -241,22 +230,6 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
               </label>
             </>
           )}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="job-id" className="text-sm font-medium">
-            Job ID (optional - leave empty for new job)
-          </Label>
-          <Input
-            id="job-id"
-            placeholder="e.g., IG1761947648897abc"
-            value={existingJobId}
-            onChange={(e) => setExistingJobId(e.target.value)}
-            className="bg-background border-border"
-          />
-          <p className="text-xs text-muted-foreground">
-            Enter an Instagram job ID (starting with "IG") to add more profiles to an existing job
-          </p>
         </div>
 
         {csvData && (
