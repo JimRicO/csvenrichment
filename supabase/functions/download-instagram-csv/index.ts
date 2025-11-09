@@ -30,7 +30,7 @@ serve(async (req) => {
     // Fetch ALL instagram_rows (to maintain row count with upload) 
     const { data: allRows, error: rowsError } = await supabase
       .from('instagram_rows')
-      .select('id, instagram_url, scrape_status, scrape_error_message, created_at')
+      .select('id, instagram_url, scrape_status, scrape_error_message, original_row_data, created_at')
       .eq('job_id', job_id)
       .order('created_at', { ascending: true });
 
@@ -102,8 +102,19 @@ serve(async (req) => {
       return sortedHashtags.join(', ');
     };
 
-    // Generate CSV header
-    const headers = [
+    // Extract all unique original CSV column names
+    const originalColumnsSet = new Set<string>();
+    allRows.forEach((row: any) => {
+      if (row.original_row_data && typeof row.original_row_data === 'object') {
+        Object.keys(row.original_row_data).forEach(key => originalColumnsSet.add(key));
+      }
+    });
+    const originalColumns = Array.from(originalColumnsSet);
+    
+    console.log(`Found ${originalColumns.length} original CSV columns:`, originalColumns);
+
+    // Generate CSV header - original columns FIRST, then enriched columns
+    const enrichedHeaders = [
       'job_id',
       'instagram_url',
       'scrape_status',
@@ -125,12 +136,20 @@ serve(async (req) => {
       'avg_video_views',
       'top_hashtags'
     ];
-
+    
+    const headers = [...originalColumns, ...enrichedHeaders];
     const csvRows = [headers.join(',')];
 
     // Generate CSV rows (iterate through ALL uploaded rows)
     for (const row of allRows) {
       const profile = dataMap.get(row.id); // Get scraped data if exists
+      
+      // Extract original CSV column values for this row
+      const originalValues = originalColumns.map(col => {
+        const value = row.original_row_data?.[col];
+        return escapeCSV(value);
+      });
+      
       if (!profile) {
         // Row failed, pending, invalid, or duplicate - include with empty data
         let statusMessage = row.scrape_status;
@@ -140,7 +159,7 @@ serve(async (req) => {
           statusMessage = 'Duplicate - skipped';
         }
         
-        const emptyRow = [
+        const enrichedValues = [
           escapeCSV(job_id),
           escapeCSV(row.instagram_url),
           escapeCSV(statusMessage),
@@ -162,7 +181,9 @@ serve(async (req) => {
           '', // avg_video_views
           ''  // top_hashtags
         ];
-        csvRows.push(emptyRow.join(','));
+        
+        // Original columns FIRST, then enriched columns
+        csvRows.push([...originalValues, ...enrichedValues].join(','));
         continue;
       }
 
@@ -217,7 +238,7 @@ serve(async (req) => {
       // Extract top hashtags
       const topHashtags = extractHashtags(latestPosts);
 
-      const successRow = [
+      const enrichedValues = [
         escapeCSV(job_id),
         escapeCSV(profile.instagram_url),
         escapeCSV('completed'),
@@ -240,7 +261,8 @@ serve(async (req) => {
         escapeCSV(topHashtags)
       ];
 
-      csvRows.push(successRow.join(','));
+      // Original columns FIRST, then enriched columns
+      csvRows.push([...originalValues, ...enrichedValues].join(','));
     }
 
     const csvContent = csvRows.join('\n');
