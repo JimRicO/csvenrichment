@@ -170,7 +170,9 @@ export type Database = {
           id: string
           instagram_url: string
           job_id: string
+          last_processing_at: string | null
           original_row_data: Json | null
+          retry_count: number | null
           scrape_error_message: string | null
           scrape_status: string
           scraped_at: string | null
@@ -181,7 +183,9 @@ export type Database = {
           id?: string
           instagram_url: string
           job_id: string
+          last_processing_at?: string | null
           original_row_data?: Json | null
+          retry_count?: number | null
           scrape_error_message?: string | null
           scrape_status?: string
           scraped_at?: string | null
@@ -192,7 +196,9 @@ export type Database = {
           id?: string
           instagram_url?: string
           job_id?: string
+          last_processing_at?: string | null
           original_row_data?: Json | null
+          retry_count?: number | null
           scrape_error_message?: string | null
           scrape_status?: string
           scraped_at?: string | null

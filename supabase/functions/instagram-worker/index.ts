@@ -18,6 +18,57 @@ serve(async (req) => {
 
     console.log('Instagram worker checking for pending rows...');
 
+    // First, handle stuck rows (processing for more than 5 minutes)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const maxRetries = 3;
+
+    const { data: stuckRows } = await supabase
+      .from('instagram_rows')
+      .select('id, retry_count, instagram_url')
+      .eq('scrape_status', 'processing')
+      .lt('last_processing_at', fiveMinutesAgo)
+      .lt('retry_count', maxRetries);
+
+    if (stuckRows && stuckRows.length > 0) {
+      console.log(`Found ${stuckRows.length} stuck rows, resetting to pending...`);
+      
+      for (const row of stuckRows) {
+        await supabase
+          .from('instagram_rows')
+          .update({ 
+            scrape_status: 'pending',
+            retry_count: row.retry_count + 1,
+            scrape_error_message: `Timeout after 5 minutes (retry ${row.retry_count + 1}/${maxRetries})`
+          })
+          .eq('id', row.id);
+        
+        console.log(`Reset stuck row ${row.id} (${row.instagram_url}) - retry ${row.retry_count + 1}`);
+      }
+    }
+
+    // Mark rows that exceeded max retries as failed
+    const { data: maxRetriedRows } = await supabase
+      .from('instagram_rows')
+      .select('id, instagram_url')
+      .eq('scrape_status', 'processing')
+      .gte('retry_count', maxRetries);
+
+    if (maxRetriedRows && maxRetriedRows.length > 0) {
+      console.log(`Found ${maxRetriedRows.length} rows that exceeded max retries, marking as failed...`);
+      
+      for (const row of maxRetriedRows) {
+        await supabase
+          .from('instagram_rows')
+          .update({ 
+            scrape_status: 'failed',
+            scrape_error_message: `Failed after ${maxRetries} retry attempts - exceeded timeout limit`
+          })
+          .eq('id', row.id);
+        
+        console.log(`Marked row ${row.id} (${row.instagram_url}) as failed after ${maxRetries} retries`);
+      }
+    }
+
     // Find Instagram jobs (new dedicated table)
     const { data: instagramJobs } = await supabase
       .from('instagram_jobs')
@@ -84,10 +135,13 @@ serve(async (req) => {
     const row = pendingRows[0];
     console.log('Processing Instagram row:', row.id, row.instagram_url);
 
-    // Lock the row by updating status to 'processing'
+    // Lock the row by updating status to 'processing' and set timestamp
     const { error: lockError, count: lockCount } = await supabase
       .from('instagram_rows')
-      .update({ scrape_status: 'processing' })
+      .update({ 
+        scrape_status: 'processing',
+        last_processing_at: new Date().toISOString()
+      })
       .eq('id', row.id)
       .eq('scrape_status', 'pending'); // Only update if still pending (avoid race condition)
 
