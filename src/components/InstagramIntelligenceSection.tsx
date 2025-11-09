@@ -91,18 +91,6 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
     
     const checkAndRunWorkers = async () => {
       try {
-        // First, check job status to see if we should continue
-        const { data: jobStatus } = await supabase.functions.invoke('get-job-status', {
-          body: { job_id: jobId }
-        });
-
-        if (jobStatus && jobStatus.status === 'completed') {
-          console.log('Job completed, stopping worker orchestration');
-          if (interval) clearInterval(interval);
-          return;
-        }
-
-        // Only invoke worker if job is still active
         await supabase.functions.invoke('instagram-worker');
       } catch (error) {
         console.error('Worker invocation error:', error);
