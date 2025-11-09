@@ -277,15 +277,21 @@ serve(async (req) => {
           estimated_cost_usd: number;
           status: string;
         }
-        const { data: updatedJob } = await supabase
+        
+        console.log('Calling increment_instagram_job_processed RPC...');
+        const { data: updatedJobData, error: rpcError } = await supabase
           .rpc('increment_instagram_job_processed', { 
             job_id_param: jobId,
             cost_increment: 0.0027
-          })
-          .single() as { data: JobUpdateWithCost | null };
+          });
 
-        if (updatedJob) {
+        if (rpcError) {
+          console.error('RPC increment_instagram_job_processed failed:', rpcError);
+        } else if (updatedJobData && Array.isArray(updatedJobData) && updatedJobData.length > 0) {
+          const updatedJob = updatedJobData[0] as JobUpdateWithCost;
           console.log(`Job ${jobId}: ${updatedJob.processed_rows}/${updatedJob.total_rows} rows processed, cost: $${updatedJob.estimated_cost_usd.toFixed(4)}`);
+        } else {
+          console.warn('RPC returned no data:', updatedJobData);
         }
 
       } catch (dbError) {
