@@ -102,14 +102,24 @@ serve(async (req) => {
       return sortedHashtags.join(', ');
     };
 
-    // Extract all unique original CSV column names
-    const originalColumnsSet = new Set<string>();
+    // Extract original CSV column names from first row to preserve order
+    let originalColumns: string[] = [];
+    if (allRows.length > 0 && allRows[0].original_row_data && typeof allRows[0].original_row_data === 'object') {
+      originalColumns = Object.keys(allRows[0].original_row_data);
+    }
+    
+    // Ensure all columns from all rows are included (in case of inconsistent data)
+    const additionalColumns = new Set<string>();
     allRows.forEach((row: any) => {
       if (row.original_row_data && typeof row.original_row_data === 'object') {
-        Object.keys(row.original_row_data).forEach(key => originalColumnsSet.add(key));
+        Object.keys(row.original_row_data).forEach(key => {
+          if (!originalColumns.includes(key)) {
+            additionalColumns.add(key);
+          }
+        });
       }
     });
-    const originalColumns = Array.from(originalColumnsSet);
+    originalColumns = [...originalColumns, ...Array.from(additionalColumns)];
     
     console.log(`Found ${originalColumns.length} original CSV columns:`, originalColumns);
 
