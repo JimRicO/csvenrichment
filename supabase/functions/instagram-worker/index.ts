@@ -18,15 +18,15 @@ serve(async (req) => {
 
     console.log('Instagram worker checking for pending rows...');
 
-    // First, handle stuck rows (processing for more than 5 minutes)
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    // First, handle stuck rows (processing for more than 2 minutes)
+    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
     const maxRetries = 3;
 
     const { data: stuckRows } = await supabase
       .from('instagram_rows')
       .select('id, retry_count, instagram_url')
       .eq('scrape_status', 'processing')
-      .lt('last_processing_at', fiveMinutesAgo)
+      .lt('last_processing_at', twoMinutesAgo)
       .lt('retry_count', maxRetries);
 
     if (stuckRows && stuckRows.length > 0) {
@@ -38,7 +38,7 @@ serve(async (req) => {
           .update({ 
             scrape_status: 'pending',
             retry_count: row.retry_count + 1,
-            scrape_error_message: `Timeout after 5 minutes (retry ${row.retry_count + 1}/${maxRetries})`
+            scrape_error_message: `Timeout after 2 minutes (retry ${row.retry_count + 1}/${maxRetries})`
           })
           .eq('id', row.id);
         
