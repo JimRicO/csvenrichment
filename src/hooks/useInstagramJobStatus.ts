@@ -29,12 +29,13 @@ export const useInstagramJobStatus = (jobId: string | null) => {
       try {
         setIsLoading(true);
         
-        // Fetch job details from instagram_jobs
+        // Fetch job details from instagram_jobs (with cache busting)
         const { data: jobData, error: jobError } = await supabase
           .from('instagram_jobs')
           .select('*')
           .eq('id', jobId)
-          .single();
+          .single()
+          .throwOnError();
 
         if (jobError) throw jobError;
 
