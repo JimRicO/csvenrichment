@@ -27,6 +27,21 @@ serve(async (req) => {
 
     console.log('Generating Instagram CSV for job:', job_id);
 
+    // Fetch job info to get stored column order
+    const { data: jobData, error: jobError } = await supabase
+      .from('instagram_jobs')
+      .select('column_order')
+      .eq('id', job_id)
+      .single();
+
+    if (jobError) {
+      console.error('Job fetch error:', jobError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch job info' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Fetch ALL instagram_rows (to maintain row count with upload) 
     const { data: allRows, error: rowsError } = await supabase
       .from('instagram_rows')
@@ -102,10 +117,13 @@ serve(async (req) => {
       return sortedHashtags.join(', ');
     };
 
-    // Extract original CSV column names from first row to preserve order
-    let originalColumns: string[] = [];
-    if (allRows.length > 0 && allRows[0].original_row_data && typeof allRows[0].original_row_data === 'object') {
+    // Use stored column order from job, or fallback to first row
+    let originalColumns: string[] = jobData?.column_order || [];
+    
+    if (originalColumns.length === 0 && allRows.length > 0 && allRows[0].original_row_data) {
+      // Fallback for older jobs without stored column order
       originalColumns = Object.keys(allRows[0].original_row_data);
+      console.warn('No stored column order found, using fallback from first row');
     }
     
     // Ensure all columns from all rows are included (in case of inconsistent data)

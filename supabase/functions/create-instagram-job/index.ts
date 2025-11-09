@@ -112,6 +112,9 @@ serve(async (req) => {
       console.log(`Created new Instagram job: ${jobId}`);
     }
 
+    // Extract and store column order from first row
+    const columnOrder = csv_rows.length > 0 ? Object.keys(csv_rows[0]) : [];
+    
     // Process CSV rows - preserve ALL rows with appropriate status
     const rowsToInsert = [];
     let duplicateCount = 0;
@@ -203,7 +206,8 @@ serve(async (req) => {
       .from('instagram_jobs')
       .update({ 
         total_rows: newTotalRows,
-        status: 'processing' 
+        status: 'processing',
+        column_order: columnOrder
       })
       .eq('id', jobId);
 
