@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Palette } from "lucide-react";
+import { Loader2, Palette, ImageOff, ExternalLink } from "lucide-react";
 
 interface BrandingData {
   colorScheme?: string;
@@ -64,6 +64,7 @@ export const WebsiteBrandingScraper = () => {
   const [url, setUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [branding, setBranding] = useState<BrandingData | null>(null);
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
 
   const handleExtract = async () => {
     if (!url) {
@@ -278,31 +279,76 @@ export const WebsiteBrandingScraper = () => {
                 {branding.images.logo && (
                   <div>
                     <p className="text-sm font-medium mb-2">Logo</p>
-                    <img
-                      src={branding.images.logo}
-                      alt="Logo"
-                      className="max-h-20 object-contain bg-muted/30 p-2 rounded"
-                    />
+                    {imageErrors['logo'] ? (
+                      <div className="h-20 flex flex-col items-center justify-center bg-muted/30 p-2 rounded text-muted-foreground">
+                        <ImageOff className="w-8 h-8 mb-1" />
+                        <a 
+                          href={branding.images.logo} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-xs hover:text-primary flex items-center gap-1"
+                        >
+                          View URL <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    ) : (
+                      <img
+                        src={branding.images.logo}
+                        alt="Logo"
+                        className="max-h-20 object-contain bg-muted/30 p-2 rounded"
+                        onError={() => setImageErrors(prev => ({ ...prev, logo: true }))}
+                      />
+                    )}
                   </div>
                 )}
                 {branding.images.favicon && (
                   <div>
                     <p className="text-sm font-medium mb-2">Favicon</p>
-                    <img
-                      src={branding.images.favicon}
-                      alt="Favicon"
-                      className="max-h-20 object-contain bg-muted/30 p-2 rounded"
-                    />
+                    {imageErrors['favicon'] ? (
+                      <div className="h-20 flex flex-col items-center justify-center bg-muted/30 p-2 rounded text-muted-foreground">
+                        <ImageOff className="w-8 h-8 mb-1" />
+                        <a 
+                          href={branding.images.favicon} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-xs hover:text-primary flex items-center gap-1"
+                        >
+                          View URL <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    ) : (
+                      <img
+                        src={branding.images.favicon}
+                        alt="Favicon"
+                        className="max-h-20 object-contain bg-muted/30 p-2 rounded"
+                        onError={() => setImageErrors(prev => ({ ...prev, favicon: true }))}
+                      />
+                    )}
                   </div>
                 )}
                 {branding.images.ogImage && (
                   <div>
                     <p className="text-sm font-medium mb-2">OG Image</p>
-                    <img
-                      src={branding.images.ogImage}
-                      alt="OG"
-                      className="max-h-20 object-contain bg-muted/30 p-2 rounded"
-                    />
+                    {imageErrors['ogImage'] ? (
+                      <div className="h-20 flex flex-col items-center justify-center bg-muted/30 p-2 rounded text-muted-foreground">
+                        <ImageOff className="w-8 h-8 mb-1" />
+                        <a 
+                          href={branding.images.ogImage} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-xs hover:text-primary flex items-center gap-1"
+                        >
+                          View URL <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    ) : (
+                      <img
+                        src={branding.images.ogImage}
+                        alt="OG Image"
+                        className="max-h-20 object-contain bg-muted/30 p-2 rounded"
+                        onError={() => setImageErrors(prev => ({ ...prev, ogImage: true }))}
+                      />
+                    )}
                   </div>
                 )}
               </div>
