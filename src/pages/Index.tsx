@@ -6,6 +6,7 @@ import JobsTable from "@/components/JobsTable";
 import ActiveJobMonitor from "@/components/ActiveJobMonitor";
 import { ScreenshotTest } from "@/components/ScreenshotTest";
 import { InstagramScraper } from "@/components/InstagramScraper";
+import { WebsiteBrandingScraper } from "@/components/WebsiteBrandingScraper";
 import InstagramIntelligenceSection from "@/components/InstagramIntelligenceSection";
 import InstagramJobsTable from "@/components/InstagramJobsTable";
 import ActiveInstagramJobMonitor from "@/components/ActiveInstagramJobMonitor";
@@ -31,6 +32,8 @@ const Index = () => {
         <StatsCards />
         
         <ScreenshotTest />
+        
+        <WebsiteBrandingScraper />
         
         <InstagramScraper />
         
