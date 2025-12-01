@@ -74,8 +74,30 @@ export const WebsiteBrandingScraper = () => {
 
     setIsLoading(true);
     setBranding(null);
+    setImageErrors({});
 
     try {
+      // First check if we already have this data in the database
+      const { data: existingData, error: queryError } = await supabase
+        .from('visual_identity')
+        .select('branding_data, updated_at')
+        .eq('url', url)
+        .maybeSingle();
+
+      if (queryError) {
+        console.error('Error querying database:', queryError);
+      }
+
+      if (existingData?.branding_data) {
+        console.log('Found existing branding data in database');
+        setBranding(existingData.branding_data as BrandingData);
+        toast.success("Brand identity loaded from database!");
+        setIsLoading(false);
+        return;
+      }
+
+      // If not in database, extract from website
+      console.log('No existing data, extracting from website');
       const { data, error } = await supabase.functions.invoke('extract-branding', {
         body: { url },
       });
@@ -89,7 +111,7 @@ export const WebsiteBrandingScraper = () => {
 
       if (data.branding) {
         setBranding(data.branding);
-        toast.success("Brand identity extracted successfully!");
+        toast.success(`Brand identity extracted! ${data.metadata?.imagesUploaded || 0} images saved.`);
       } else {
         toast.error("No branding data found");
       }
