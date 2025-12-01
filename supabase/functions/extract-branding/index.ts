@@ -90,12 +90,25 @@ serve(async (req) => {
           try {
             console.log(`[${key}] Attempting to download from:`, imageUrl);
             
-            // Fetch with relaxed SSL validation for development/scraping
-            const imageResponse = await fetch(imageUrl, {
-              headers: { 
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-              }
-            });
+            // Try HTTP if HTTPS fails (common for development sites)
+            let imageResponse;
+            try {
+              imageResponse = await fetch(imageUrl, {
+                headers: { 
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+              });
+            } catch (sslError) {
+              const errorMsg = sslError instanceof Error ? sslError.message : String(sslError);
+              console.log(`[${key}] HTTPS failed, trying HTTP:`, errorMsg);
+              // Try HTTP version if HTTPS fails
+              const httpUrl = imageUrl.replace('https://', 'http://');
+              imageResponse = await fetch(httpUrl, {
+                headers: { 
+                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+              });
+            }
             
             if (!imageResponse.ok) {
               console.error(`[${key}] Failed to download, status:`, imageResponse.status);
