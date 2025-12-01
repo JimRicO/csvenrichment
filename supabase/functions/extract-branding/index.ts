@@ -81,50 +81,75 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Download and upload images to storage
-    const uploadedImages: Record<string, string> = {};
+    const finalImages: Record<string, string> = {};
+    let uploadedCount = 0;
     
-    if (branding.images) {
+    if (branding.images && typeof branding.images === 'object') {
       for (const [key, imageUrl] of Object.entries(branding.images)) {
         if (imageUrl && typeof imageUrl === 'string') {
           try {
-            console.log(`Downloading ${key} from:`, imageUrl);
-            const imageResponse = await fetch(imageUrl);
-            if (imageResponse.ok) {
-              const imageBlob = await imageResponse.blob();
-              const fileExt = imageUrl.split('.').pop()?.split('?')[0] || 'png';
-              const fileName = `${new URL(url).hostname}-${key}-${Date.now()}.${fileExt}`;
-              
-              console.log(`Uploading ${key} as:`, fileName);
-              const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('brand-images')
-                .upload(fileName, imageBlob, {
-                  contentType: imageResponse.headers.get('content-type') || 'image/png',
-                  upsert: false
-                });
+            console.log(`[${key}] Attempting to download from:`, imageUrl);
+            
+            const imageResponse = await fetch(imageUrl, {
+              headers: { 'User-Agent': 'Mozilla/5.0' }
+            });
+            
+            if (!imageResponse.ok) {
+              console.error(`[${key}] Failed to download, status:`, imageResponse.status);
+              finalImages[key] = imageUrl; // Keep original URL as fallback
+              continue;
+            }
 
-              if (uploadError) {
-                console.error(`Error uploading ${key}:`, uploadError);
-              } else {
-                const { data: { publicUrl } } = supabase.storage
-                  .from('brand-images')
-                  .getPublicUrl(fileName);
-                uploadedImages[key] = publicUrl;
-                console.log(`Uploaded ${key} to:`, publicUrl);
-              }
+            const imageBlob = await imageResponse.blob();
+            console.log(`[${key}] Downloaded blob size:`, imageBlob.size, 'bytes');
+            
+            // Determine file extension
+            const contentType = imageResponse.headers.get('content-type') || 'image/png';
+            let fileExt = 'png';
+            if (contentType.includes('svg')) fileExt = 'svg';
+            else if (contentType.includes('jpeg') || contentType.includes('jpg')) fileExt = 'jpg';
+            else if (contentType.includes('png')) fileExt = 'png';
+            else if (contentType.includes('webp')) fileExt = 'webp';
+            else if (contentType.includes('gif')) fileExt = 'gif';
+            
+            const hostname = new URL(url).hostname.replace(/\./g, '-');
+            const fileName = `${hostname}/${key}-${Date.now()}.${fileExt}`;
+            
+            console.log(`[${key}] Uploading to storage as:`, fileName);
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('brand-images')
+              .upload(fileName, imageBlob, {
+                contentType,
+                upsert: true,
+                cacheControl: '3600'
+              });
+
+            if (uploadError) {
+              console.error(`[${key}] Storage upload error:`, uploadError);
+              finalImages[key] = imageUrl; // Keep original URL as fallback
             } else {
-              console.error(`Failed to download ${key}, status:`, imageResponse.status);
+              const { data: { publicUrl } } = supabase.storage
+                .from('brand-images')
+                .getPublicUrl(fileName);
+              
+              finalImages[key] = publicUrl;
+              uploadedCount++;
+              console.log(`[${key}] ✓ Successfully uploaded to:`, publicUrl);
             }
           } catch (err) {
-            console.error(`Error processing ${key}:`, err);
+            console.error(`[${key}] Error processing image:`, err);
+            finalImages[key] = imageUrl; // Keep original URL as fallback
           }
         }
       }
     }
 
-    // Replace image URLs with uploaded ones
+    console.log(`Successfully uploaded ${uploadedCount}/${Object.keys(finalImages).length} images`);
+
+    // Update branding with permanent image URLs
     const updatedBranding = {
       ...branding,
-      images: Object.keys(uploadedImages).length > 0 ? uploadedImages : branding.images
+      images: finalImages
     };
 
     // Save to database
@@ -151,7 +176,7 @@ serve(async (req) => {
         metadata: {
           url,
           timestamp: new Date().toISOString(),
-          imagesUploaded: Object.keys(uploadedImages).length
+          imagesUploaded: uploadedCount
         },
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
