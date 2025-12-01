@@ -423,6 +423,30 @@ export type Database = {
         }
         Relationships: []
       }
+      visual_identity: {
+        Row: {
+          branding_data: Json
+          created_at: string
+          id: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          branding_data?: Json
+          created_at?: string
+          id?: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          branding_data?: Json
+          created_at?: string
+          id?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
