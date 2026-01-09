@@ -40,6 +40,13 @@ interface WebsiteResultsDialogProps {
   onClose: () => void;
 }
 
+interface ClubLocation {
+  name: string | null;
+  address: string | null;
+  phone: string | null;
+  hours: string | null;
+}
+
 interface ScrapedRow {
   id: string;
   website_url: string;
@@ -54,6 +61,7 @@ interface ScrapedRow {
   number_of_clubs: number | null;
   number_of_courts: number | null;
   facilities_details: string | null;
+  club_locations: ClubLocation[] | null;
   scrape_status: string;
   extraction_status: string;
 }
@@ -89,7 +97,7 @@ export const WebsiteResultsDialog = ({ jobId, projectId, isOpen, onClose }: Webs
     const [rowsResult, peopleResult, jobResult] = await Promise.all([
       supabase
         .from('scraped_rows')
-        .select('id, website_url, business_description, team_members, social_media, whatsapp_contact, phone_number, email, address, opening_hours, number_of_clubs, number_of_courts, facilities_details, scrape_status, extraction_status')
+        .select('id, website_url, business_description, team_members, social_media, whatsapp_contact, phone_number, email, address, opening_hours, number_of_clubs, number_of_courts, facilities_details, club_locations, scrape_status, extraction_status')
         .eq('job_id', jobId)
         .order('created_at', { ascending: true }),
       supabase
@@ -109,7 +117,10 @@ export const WebsiteResultsDialog = ({ jobId, projectId, isOpen, onClose }: Webs
       return;
     }
 
-    const rowsData = rowsResult.data as ScrapedRow[];
+    const rowsData = (rowsResult.data || []).map(row => ({
+      ...row,
+      club_locations: (Array.isArray(row.club_locations) ? row.club_locations : []) as unknown as ClubLocation[]
+    })) as ScrapedRow[];
     setRows(rowsData);
 
     const extractedCount = rowsData.filter(r => r.extraction_status === 'completed').length;
@@ -360,13 +371,29 @@ export const WebsiteResultsDialog = ({ jobId, projectId, isOpen, onClose }: Webs
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <Badge variant="outline" className="cursor-help">
+                                    <Badge variant="outline" className="cursor-pointer">
                                       <Building2 className="h-3 w-3 mr-1" />
                                       {row.number_of_clubs}
                                     </Badge>
                                   </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p className="text-xs">{row.number_of_clubs} location{row.number_of_clubs > 1 ? 's' : ''}</p>
+                                  <TooltipContent className="max-w-md p-3">
+                                    <div className="space-y-2">
+                                      <p className="text-xs font-semibold">{row.number_of_clubs} Location{row.number_of_clubs > 1 ? 's' : ''}</p>
+                                      {row.club_locations && row.club_locations.length > 0 ? (
+                                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                                          {row.club_locations.map((loc, idx) => (
+                                            <div key={idx} className="text-xs border-l-2 border-primary/50 pl-2">
+                                              {loc.name && <p className="font-medium">{loc.name}</p>}
+                                              {loc.address && <p className="text-muted-foreground">{loc.address}</p>}
+                                              {loc.phone && <p className="text-muted-foreground">📞 {loc.phone}</p>}
+                                              {loc.hours && <p className="text-muted-foreground">🕐 {loc.hours}</p>}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <p className="text-xs text-muted-foreground">No detailed location info available</p>
+                                      )}
+                                    </div>
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>

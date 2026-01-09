@@ -171,6 +171,7 @@ serve(async (req) => {
           number_of_clubs: extractedData.number_of_clubs || null,
           number_of_courts: extractedData.number_of_courts || null,
           facilities_details: extractedData.facilities_details || null,
+          club_locations: extractedData.club_locations || [],
           custom_answer_1: extractedData.custom_answer_1 || null,
           custom_answer_2: extractedData.custom_answer_2 || null,
           input_tokens: inputTokens,

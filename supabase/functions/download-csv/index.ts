@@ -106,6 +106,15 @@ serve(async (req) => {
     }
     const originalColumns = Array.from(originalColumnSet);
 
+    // Find max number of locations for any website to determine column count
+    let maxLocations = 0;
+    for (const row of rows) {
+      const locs = row.club_locations || [];
+      if (Array.isArray(locs) && locs.length > maxLocations) {
+        maxLocations = locs.length;
+      }
+    }
+
     // Generate new extracted field headers
     const extractedHeaders = [
       'Business Description',
@@ -118,6 +127,17 @@ serve(async (req) => {
       'Number of Courts',
       'Facilities Details',
     ];
+
+    // Generate location headers dynamically
+    const locationHeaders = [];
+    for (let i = 1; i <= maxLocations; i++) {
+      locationHeaders.push(
+        `Location ${i} Name`,
+        `Location ${i} Address`,
+        `Location ${i} Phone`,
+        `Location ${i} Hours`
+      );
+    }
 
     const personHeaders = [];
     for (let i = 1; i <= maxPeople; i++) {
@@ -143,7 +163,7 @@ serve(async (req) => {
     ];
 
     // Combine: original columns first, then new extracted fields
-    const csvHeaders = [...originalColumns, ...extractedHeaders, ...personHeaders, ...metadataHeaders];
+    const csvHeaders = [...originalColumns, ...extractedHeaders, ...locationHeaders, ...personHeaders, ...metadataHeaders];
 
     const csvRows: string[] = [];
     
@@ -167,6 +187,22 @@ serve(async (req) => {
         escapeCSV(row.number_of_courts),
         escapeCSV(row.facilities_details)
       );
+
+      // Add location fields
+      const clubLocations = row.club_locations || [];
+      for (let i = 0; i < maxLocations; i++) {
+        if (Array.isArray(clubLocations) && i < clubLocations.length) {
+          const loc = clubLocations[i];
+          rowFields.push(
+            escapeCSV(loc?.name),
+            escapeCSV(loc?.address),
+            escapeCSV(loc?.phone),
+            escapeCSV(loc?.hours)
+          );
+        } else {
+          rowFields.push('', '', '', '');
+        }
+      }
       
       // Add person fields (fill with empty strings if fewer people than maxPeople)
       for (let i = 0; i < maxPeople; i++) {
