@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -69,20 +69,22 @@ export const InstagramScraper = () => {
   };
 
   const header = (
-    <CardHeader>
-      <CardTitle className="flex items-center gap-2">
-        <Instagram className="w-5 h-5" />
-        Instagram Profile Scraper
-      </CardTitle>
-      <CardDescription>
-        Enter a full Instagram profile URL to scrape profile data and recent posts
-      </CardDescription>
-    </CardHeader>
+    <div className="flex items-center gap-3 p-6">
+      <div className="p-2 rounded-lg bg-primary/10">
+        <Instagram className="h-5 w-5 text-primary" />
+      </div>
+      <div>
+        <h3 className="text-lg font-semibold text-foreground">Instagram Profile Scraper</h3>
+        <p className="text-sm text-muted-foreground">
+          Enter a full Instagram profile URL to scrape profile data and recent posts
+        </p>
+      </div>
+    </div>
   );
 
   return (
-    <CollapsibleCard header={header} defaultOpen={false}>
-      <CardContent className="space-y-4">
+    <CollapsibleCard header={header} defaultOpen={false} className="border-border/50">
+      <div className="p-6 pt-0 space-y-4">
         <div className="flex gap-2">
           <Input
             placeholder="https://www.instagram.com/padelx.us"
@@ -180,7 +182,7 @@ export const InstagramScraper = () => {
             )}
           </div>
         )}
-      </CardContent>
+      </div>
     </CollapsibleCard>
   );
 };

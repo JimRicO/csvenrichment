@@ -155,13 +155,13 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
   const estimatedCost = (profileCount * 0.0027).toFixed(4);
 
   const header = (
-    <div className="flex items-center gap-3 p-8 pb-0">
-      <div className="p-2 rounded-lg bg-primary/20 border border-primary/50">
-        <Instagram className="h-6 w-6 text-primary" />
+    <div className="flex items-center gap-3 p-6">
+      <div className="p-2 rounded-lg bg-primary/10">
+        <Instagram className="h-5 w-5 text-primary" />
       </div>
       <div>
-        <h2 className="text-2xl font-bold text-foreground">Instagram Intelligence Scraping</h2>
-        <p className="text-muted-foreground">
+        <h3 className="text-lg font-semibold text-foreground">Instagram Intelligence Scraping</h3>
+        <p className="text-sm text-muted-foreground">
           Extract profile data, competitive intelligence, and post performance metrics
         </p>
       </div>
@@ -169,8 +169,8 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
   );
 
   return (
-    <CollapsibleCard header={header} defaultOpen={false} className="gradient-card border-border/50">
-      <div className="p-8 pt-4 space-y-6">
+    <CollapsibleCard header={header} defaultOpen={false} className="border-border/50">
+      <div className="p-6 pt-0 space-y-6">
 
         <div
           onDragOver={handleDragOver}

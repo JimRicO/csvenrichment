@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Upload, FileText, AlertCircle } from "lucide-react";
+import { Upload, FileText, AlertCircle, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -153,20 +153,22 @@ const UploadSection = ({
     }
   };
   const header = (
-    <div className="p-8 pb-0">
-      <h2 className="text-2xl font-bold text-foreground mb-2">CSV Enrichment with website URLs</h2>
-      <p className="text-muted-foreground">
-        CSV Enrichment with website URLs.
-      </p>
-      <p className="text-sm text-muted-foreground/80 mt-1">
-        Make sure your table contains a WEBSITE field
-      </p>
+    <div className="flex items-center gap-3 p-6">
+      <div className="p-2 rounded-lg bg-primary/10">
+        <Globe className="h-5 w-5 text-primary" />
+      </div>
+      <div>
+        <h3 className="text-lg font-semibold text-foreground">CSV Enrichment with Website URLs</h3>
+        <p className="text-sm text-muted-foreground">
+          Upload a CSV with website URLs to extract business data. Requires a WEBSITE column.
+        </p>
+      </div>
     </div>
   );
 
   return (
-    <CollapsibleCard header={header} defaultOpen={false} className="gradient-card border-border/50">
-      <div className="p-8 pt-4 space-y-6">
+    <CollapsibleCard header={header} defaultOpen={false} className="border-border/50">
+      <div className="p-6 pt-0 space-y-6">
 
         <div onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} className={`border-2 border-dashed rounded-xl p-8 transition-smooth text-center ${isDragging ? "border-primary bg-primary/5 glow-primary" : "border-border hover:border-primary/50 hover:bg-secondary/30"}`}>
           {file ? <div className="space-y-4">
