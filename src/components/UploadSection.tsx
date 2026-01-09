@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Upload, FileText, AlertCircle, Globe, Loader2, ExternalLink, Building2, Users, Share2, MessageCircle } from "lucide-react";
+import { Upload, FileText, AlertCircle, Globe, Loader2, ExternalLink, Building2, Users, Share2, MessageCircle, Info, Database, Cpu, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import Papa from "papaparse";
 import { supabase } from "@/integrations/supabase/client";
@@ -261,12 +262,77 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
       <div className="p-2 rounded-lg bg-primary/10">
         <Globe className="h-5 w-5 text-primary" />
       </div>
-      <div>
+      <div className="flex-1">
         <h3 className="text-lg font-semibold text-foreground">Website Scraper</h3>
         <p className="text-sm text-muted-foreground">
           Scrape a single website or bulk process from CSV
         </p>
       </div>
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            onClick={(e) => e.stopPropagation()}
+            className="p-2 rounded-lg hover:bg-secondary/50 transition-colors"
+            aria-label="Module information"
+          >
+            <Info className="h-5 w-5 text-muted-foreground hover:text-primary transition-colors" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent 
+          className="w-80" 
+          align="end"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="space-y-4">
+            {/* Data Extracted Section */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Database className="h-4 w-4 text-primary" />
+                Data Extracted
+              </div>
+              <ul className="text-sm text-muted-foreground space-y-1 ml-6">
+                <li>• Business Description</li>
+                <li>• Team Members</li>
+                <li>• Social Media (Instagram, Facebook, LinkedIn, Twitter)</li>
+                <li>• WhatsApp Contact</li>
+                <li>• Custom Questions (up to 2)</li>
+              </ul>
+            </div>
+
+            <div className="border-t border-border" />
+
+            {/* Scraping Provider Section */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Cpu className="h-4 w-4 text-primary" />
+                Scraping Provider
+              </div>
+              <div className="ml-6 space-y-1">
+                <p className="text-sm font-medium text-foreground">Firecrawl</p>
+                <p className="text-xs text-muted-foreground">
+                  AI-powered web scraper that handles JavaScript-rendered pages. Captures both Markdown and HTML formats.
+                </p>
+              </div>
+            </div>
+
+            <div className="border-t border-border" />
+
+            {/* AI Model Section */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Sparkles className="h-4 w-4 text-primary" />
+                AI Extraction Model
+              </div>
+              <div className="ml-6 space-y-1">
+                <p className="text-sm font-medium text-foreground">Claude 3.5 Haiku</p>
+                <p className="text-xs text-muted-foreground">
+                  Anthropic's fast model optimized for structured data extraction with excellent cost efficiency.
+                </p>
+              </div>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 
