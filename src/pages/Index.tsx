@@ -5,7 +5,6 @@ import StatsCards from "@/components/StatsCards";
 import JobsTable from "@/components/JobsTable";
 import ActiveJobMonitor from "@/components/ActiveJobMonitor";
 import { ScreenshotTest } from "@/components/ScreenshotTest";
-import { InstagramScraper } from "@/components/InstagramScraper";
 import { WebsiteBrandingScraper } from "@/components/WebsiteBrandingScraper";
 import InstagramIntelligenceSection from "@/components/InstagramIntelligenceSection";
 import InstagramJobsTable from "@/components/InstagramJobsTable";
@@ -45,7 +44,6 @@ const Index = () => {
 
         {/* Instagram Intelligence Section */}
         <div className="pt-12 border-t-2 border-primary/20 space-y-8">
-          <InstagramScraper />
           
           <InstagramIntelligenceSection onJobCreated={handleInstagramJobCreated} />
           
