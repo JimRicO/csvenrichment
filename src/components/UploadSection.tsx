@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Upload, FileText, AlertCircle, Globe, Loader2, ExternalLink, Building2, Users, Share2, MessageCircle, Info, Database, Cpu, Sparkles, Phone, Mail, MapPin, Clock, LayoutGrid, List } from "lucide-react";
+import { Upload, FileText, AlertCircle, Globe, Loader2, ExternalLink, Building2, Users, Share2, MessageCircle, Info, Database, Cpu, Sparkles, Phone, Mail, MapPin, Clock, LayoutGrid, List, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -566,6 +566,96 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
                   <p className="text-sm">{scrapedResult.custom_answer_2}</p>
                 </div>
               )}
+
+              {/* Download Buttons */}
+              <div className="flex gap-2 pt-3 border-t border-border/50">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const headers = [
+                      'Website URL',
+                      'Business Description',
+                      'Team Members',
+                      'Phone',
+                      'Email',
+                      'Address',
+                      'Opening Hours',
+                      'WhatsApp',
+                      'Instagram',
+                      'Facebook',
+                      'LinkedIn',
+                      'Twitter',
+                      'Number of Clubs',
+                      'Number of Courts',
+                      'Facilities Details',
+                      'Custom Answer 1',
+                      'Custom Answer 2',
+                      ...(scrapedResult.club_locations || []).flatMap((_, i) => [
+                        `Location ${i + 1} Name`,
+                        `Location ${i + 1} Address`,
+                        `Location ${i + 1} Phone`,
+                        `Location ${i + 1} Hours`
+                      ])
+                    ];
+                    const values = [
+                      scrapedResult.website_url,
+                      scrapedResult.business_description || '',
+                      scrapedResult.team_members || '',
+                      scrapedResult.phone_number || '',
+                      scrapedResult.email || '',
+                      scrapedResult.address || '',
+                      scrapedResult.opening_hours || '',
+                      scrapedResult.whatsapp_contact || '',
+                      scrapedResult.social_media?.instagram || '',
+                      scrapedResult.social_media?.facebook || '',
+                      scrapedResult.social_media?.linkedin || '',
+                      scrapedResult.social_media?.twitter || '',
+                      scrapedResult.number_of_clubs?.toString() || '',
+                      scrapedResult.number_of_courts?.toString() || '',
+                      scrapedResult.facilities_details || '',
+                      scrapedResult.custom_answer_1 || '',
+                      scrapedResult.custom_answer_2 || '',
+                      ...(scrapedResult.club_locations || []).flatMap((loc) => [
+                        loc.name || '',
+                        loc.address || '',
+                        loc.phone || '',
+                        loc.hours || ''
+                      ])
+                    ];
+                    const csvContent = [headers.join(','), values.map(v => `"${(v || '').replace(/"/g, '""')}"`).join(',')].join('\n');
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `scraped-${new URL(scrapedResult.website_url).hostname}.csv`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    toast.success('CSV downloaded');
+                  }}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download CSV
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const jsonContent = JSON.stringify(scrapedResult, null, 2);
+                    const blob = new Blob([jsonContent], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `scraped-${new URL(scrapedResult.website_url).hostname}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    toast.success('JSON downloaded');
+                  }}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download JSON
+                </Button>
+              </div>
             </div>
           )}
         </div>
