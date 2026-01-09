@@ -14,6 +14,13 @@ interface UploadSectionProps {
   onJobCreated: (jobId: string, projectId: string) => void;
 }
 
+interface ClubLocation {
+  name: string | null;
+  address: string | null;
+  phone: string | null;
+  hours: string | null;
+}
+
 interface ScrapedResult {
   website_url: string;
   business_description?: string;
@@ -32,6 +39,7 @@ interface ScrapedResult {
   number_of_clubs?: number;
   number_of_courts?: number;
   facilities_details?: string;
+  club_locations?: ClubLocation[];
   custom_answer_1?: string;
   custom_answer_2?: string;
 }
@@ -131,6 +139,7 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
                 number_of_clubs: row.number_of_clubs,
                 number_of_courts: row.number_of_courts,
                 facilities_details: row.facilities_details,
+                club_locations: (Array.isArray(row.club_locations) ? row.club_locations : []) as unknown as ClubLocation[],
                 custom_answer_1: row.custom_answer_1,
                 custom_answer_2: row.custom_answer_2
               };
@@ -508,6 +517,37 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
                     <div className="flex items-start gap-2">
                       <List className="h-4 w-4 text-muted-foreground mt-0.5" />
                       <p className="text-sm">{scrapedResult.facilities_details}</p>
+                    </div>
+                  )}
+                  {/* Club/Location Details */}
+                  {scrapedResult.club_locations && scrapedResult.club_locations.length > 0 && (
+                    <div className="space-y-2 pt-2">
+                      <div className="text-sm font-medium text-muted-foreground">Location Details</div>
+                      <div className="grid gap-2">
+                        {scrapedResult.club_locations.map((loc, idx) => (
+                          <div key={idx} className="p-2 rounded-md bg-secondary/30 border border-border/50 text-sm">
+                            {loc.name && <p className="font-medium">{loc.name}</p>}
+                            {loc.address && (
+                              <div className="flex items-start gap-1.5 text-muted-foreground">
+                                <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                                <span>{loc.address}</span>
+                              </div>
+                            )}
+                            {loc.phone && (
+                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                <Phone className="h-3.5 w-3.5 shrink-0" />
+                                <span>{loc.phone}</span>
+                              </div>
+                            )}
+                            {loc.hours && (
+                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                <Clock className="h-3.5 w-3.5 shrink-0" />
+                                <span>{loc.hours}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
