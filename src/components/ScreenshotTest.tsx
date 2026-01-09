@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, Camera } from "lucide-react";
 
 export const ScreenshotTest = () => {
   const [url, setUrl] = useState("");
@@ -67,11 +68,17 @@ export const ScreenshotTest = () => {
     }
   };
 
+  const header = (
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2">
+        <Camera className="w-5 h-5" />
+        Screenshot Test
+      </CardTitle>
+    </CardHeader>
+  );
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Screenshot Test</CardTitle>
-      </CardHeader>
+    <CollapsibleCard header={header} defaultOpen={true}>
       <CardContent className="space-y-4">
         <div className="flex gap-2">
           <Input
@@ -105,6 +112,6 @@ export const ScreenshotTest = () => {
           </div>
         )}
       </CardContent>
-    </Card>
+    </CollapsibleCard>
   );
 };

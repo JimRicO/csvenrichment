@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Upload, FileText, AlertCircle, Instagram } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -154,20 +154,23 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
   const profileCount = csvData?.length || 0;
   const estimatedCost = (profileCount * 0.0027).toFixed(4);
 
+  const header = (
+    <div className="flex items-center gap-3 p-8 pb-0">
+      <div className="p-2 rounded-lg bg-primary/20 border border-primary/50">
+        <Instagram className="h-6 w-6 text-primary" />
+      </div>
+      <div>
+        <h2 className="text-2xl font-bold text-foreground">Instagram Intelligence Scraping</h2>
+        <p className="text-muted-foreground">
+          Extract profile data, competitive intelligence, and post performance metrics
+        </p>
+      </div>
+    </div>
+  );
+
   return (
-    <Card className="p-8 gradient-card border-border/50">
-      <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/20 border border-primary/50">
-            <Instagram className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-foreground">Instagram Intelligence Scraping</h2>
-            <p className="text-muted-foreground">
-              Extract profile data, competitive intelligence, and post performance metrics
-            </p>
-          </div>
-        </div>
+    <CollapsibleCard header={header} defaultOpen={true} className="gradient-card border-border/50">
+      <div className="p-8 pt-4 space-y-6">
 
         <div
           onDragOver={handleDragOver}
@@ -293,7 +296,7 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
           {isProcessing ? "Creating Job..." : !csvData ? "Upload CSV to Start" : "Start Instagram Scraping 🚀"}
         </Button>
       </div>
-    </Card>
+    </CollapsibleCard>
   );
 };
 
