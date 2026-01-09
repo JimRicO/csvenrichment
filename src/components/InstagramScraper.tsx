@@ -103,7 +103,7 @@ export const InstagramScraper = () => {
             {/* Profile Header */}
             <div className="flex items-start gap-4">
               <img
-                src={(profile as any).profilePicUrlHD || profile.profilePicUrl}
+                src={(profile as any).profilePicStorageUrl || (profile as any).profilePicUrlHD || profile.profilePicUrl}
                 alt={`@${profile.username} profile picture`}
                 loading="lazy"
                 referrerPolicy="no-referrer"
