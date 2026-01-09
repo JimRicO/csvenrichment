@@ -35,8 +35,6 @@ const Index = () => {
         
         <WebsiteBrandingScraper />
         
-        <InstagramScraper />
-        
         <UploadSection onJobCreated={handleJobCreated} />
         
         {activeJobId && activeProjectId && (
@@ -44,6 +42,8 @@ const Index = () => {
         )}
         
         <JobsTable />
+
+        <InstagramScraper />
 
         {/* Instagram Intelligence Section */}
         <div className="pt-12 border-t-2 border-primary/20">
