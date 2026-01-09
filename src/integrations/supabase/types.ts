@@ -271,6 +271,7 @@ export type Database = {
         Row: {
           address: string | null
           business_description: string | null
+          club_locations: Json | null
           created_at: string
           custom_answer_1: string | null
           custom_answer_2: string | null
@@ -308,6 +309,7 @@ export type Database = {
         Insert: {
           address?: string | null
           business_description?: string | null
+          club_locations?: Json | null
           created_at?: string
           custom_answer_1?: string | null
           custom_answer_2?: string | null
@@ -345,6 +347,7 @@ export type Database = {
         Update: {
           address?: string | null
           business_description?: string | null
+          club_locations?: Json | null
           created_at?: string
           custom_answer_1?: string | null
           custom_answer_2?: string | null
