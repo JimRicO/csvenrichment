@@ -43,21 +43,17 @@ const Index = () => {
         
         <JobsTable />
 
-        <InstagramScraper />
-
         {/* Instagram Intelligence Section */}
-        <div className="pt-12 border-t-2 border-primary/20">
+        <div className="pt-12 border-t-2 border-primary/20 space-y-8">
+          <InstagramScraper />
+          
           <InstagramIntelligenceSection onJobCreated={handleInstagramJobCreated} />
           
           {activeInstagramJobId && (
-            <div className="mt-8">
-              <ActiveInstagramJobMonitor jobId={activeInstagramJobId} />
-            </div>
+            <ActiveInstagramJobMonitor jobId={activeInstagramJobId} />
           )}
           
-          <div className="mt-8">
-            <InstagramJobsTable />
-          </div>
+          <InstagramJobsTable />
         </div>
       </main>
     </div>
