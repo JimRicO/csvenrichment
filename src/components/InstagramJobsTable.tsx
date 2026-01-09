@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Clock, CheckCircle2, AlertCircle, Loader2, Download, Instagram, PlusCircle } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -175,21 +175,23 @@ const InstagramJobsTable = () => {
     };
   }, []);
 
+  const header = (
+    <div className="p-6 border-b border-border">
+      <div className="flex items-center gap-3">
+        <div className="p-2 rounded-lg bg-primary/20 border border-primary/50">
+          <Instagram className="h-6 w-6 text-primary" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-foreground">Instagram Intelligence Jobs</h2>
+          <p className="text-muted-foreground mt-1">Track your Instagram scraping progress</p>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <>
-      <Card className="gradient-card border-border/50 overflow-hidden">
-        <div className="p-6 border-b border-border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/20 border border-primary/50">
-              <Instagram className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-foreground">Instagram Intelligence Jobs</h2>
-              <p className="text-muted-foreground mt-1">Track your Instagram scraping progress</p>
-            </div>
-          </div>
-        </div>
-        
+      <CollapsibleCard header={header} defaultOpen={true} className="gradient-card border-border/50 overflow-hidden">
         <div className="overflow-x-auto">
           {isLoading ? (
             <div className="flex items-center justify-center p-12">
@@ -292,7 +294,7 @@ const InstagramJobsTable = () => {
             </Table>
           )}
         </div>
-      </Card>
+      </CollapsibleCard>
 
       {selectedJob && (
         <InstagramResultsDialog

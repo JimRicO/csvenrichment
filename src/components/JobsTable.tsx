@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Clock, CheckCircle2, AlertCircle, Loader2, Download, MessageCircle, Users, Combine } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { Clock, CheckCircle2, AlertCircle, Loader2, Download, MessageCircle, Users, Combine, ClipboardList } from "lucide-react";
+import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -165,12 +165,20 @@ const JobsTable = () => {
     };
   }, []);
 
-  return (
-    <Card className="gradient-card border-border/50 overflow-hidden">
-      <div className="p-6 border-b border-border">
-        <h2 className="text-2xl font-bold text-foreground">Recent Jobs</h2>
-        <p className="text-muted-foreground mt-1">Track your scraping and extraction progress</p>
+  const header = (
+    <div className="p-6 border-b border-border">
+      <div className="flex items-center gap-3">
+        <ClipboardList className="w-6 h-6 text-primary" />
+        <div>
+          <h2 className="text-2xl font-bold text-foreground">Recent Jobs</h2>
+          <p className="text-muted-foreground mt-1">Track your scraping and extraction progress</p>
+        </div>
       </div>
+    </div>
+  );
+
+  return (
+    <CollapsibleCard header={header} defaultOpen={true} className="gradient-card border-border/50 overflow-hidden">
       
       <div className="overflow-x-auto">
         {isLoading ? (
@@ -339,7 +347,7 @@ const JobsTable = () => {
           />
         </>
       )}
-    </Card>
+    </CollapsibleCard>
   );
 };
 

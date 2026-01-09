@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Upload, FileText, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -152,17 +152,21 @@ const UploadSection = ({
       setIsProcessing(false);
     }
   };
-  return <Card className="p-8 gradient-card border-border/50">
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground mb-2">CSV Enrichment with website URLs</h2>
-          <p className="text-muted-foreground">
-            CSV Enrichment with website URLs.
-          </p>
-          <p className="text-sm text-muted-foreground/80 mt-1">
-            Make sure your table contains a WEBSITE field
-          </p>
-        </div>
+  const header = (
+    <div className="p-8 pb-0">
+      <h2 className="text-2xl font-bold text-foreground mb-2">CSV Enrichment with website URLs</h2>
+      <p className="text-muted-foreground">
+        CSV Enrichment with website URLs.
+      </p>
+      <p className="text-sm text-muted-foreground/80 mt-1">
+        Make sure your table contains a WEBSITE field
+      </p>
+    </div>
+  );
+
+  return (
+    <CollapsibleCard header={header} defaultOpen={true} className="gradient-card border-border/50">
+      <div className="p-8 pt-4 space-y-6">
 
         <div onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} className={`border-2 border-dashed rounded-xl p-8 transition-smooth text-center ${isDragging ? "border-primary bg-primary/5 glow-primary" : "border-border hover:border-primary/50 hover:bg-secondary/30"}`}>
           {file ? <div className="space-y-4">
@@ -268,6 +272,7 @@ const UploadSection = ({
           {isProcessing ? "Creating Job..." : "Let's Go! 🚀"}
         </Button>
       </div>
-    </Card>;
+    </CollapsibleCard>
+  );
 };
 export default UploadSection;

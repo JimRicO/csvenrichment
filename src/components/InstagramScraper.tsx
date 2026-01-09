@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Instagram, ExternalLink, CheckCircle2 } from "lucide-react";
@@ -67,17 +68,20 @@ export const InstagramScraper = () => {
     return num.toString();
   };
 
+  const header = (
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2">
+        <Instagram className="w-5 h-5" />
+        Instagram Profile Scraper
+      </CardTitle>
+      <CardDescription>
+        Enter a full Instagram profile URL to scrape profile data and recent posts
+      </CardDescription>
+    </CardHeader>
+  );
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Instagram className="w-5 h-5" />
-          Instagram Profile Scraper
-        </CardTitle>
-        <CardDescription>
-          Enter a full Instagram profile URL to scrape profile data and recent posts
-        </CardDescription>
-      </CardHeader>
+    <CollapsibleCard header={header} defaultOpen={true}>
       <CardContent className="space-y-4">
         <div className="flex gap-2">
           <Input
@@ -109,7 +113,6 @@ export const InstagramScraper = () => {
                 referrerPolicy="no-referrer"
                 className="w-20 h-20 rounded-full object-cover"
                 onError={(e) => {
-                  // Instagram CDN can reject hotlinks depending on referrer; fall back to placeholder
                   e.currentTarget.onerror = null;
                   e.currentTarget.src = "/placeholder.svg";
                 }}
@@ -178,6 +181,6 @@ export const InstagramScraper = () => {
           </div>
         )}
       </CardContent>
-    </Card>
+    </CollapsibleCard>
   );
 };

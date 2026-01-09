@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Palette, ImageOff, ExternalLink } from "lucide-react";
@@ -123,40 +123,43 @@ export const WebsiteBrandingScraper = () => {
     }
   };
 
-  return (
-    <Card className="p-6 bg-gradient-card border-border/50">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 rounded-lg bg-primary/10">
-          <Palette className="w-6 h-6 text-primary" />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold">Website Visual Identity Scraper</h2>
-          <p className="text-sm text-muted-foreground">
-            Extract comprehensive brand identity from any website
-          </p>
-        </div>
+  const header = (
+    <div className="flex items-center gap-3 p-6 pb-0">
+      <div className="p-2 rounded-lg bg-primary/10">
+        <Palette className="w-6 h-6 text-primary" />
       </div>
+      <div>
+        <h2 className="text-2xl font-bold">Website Visual Identity Scraper</h2>
+        <p className="text-sm text-muted-foreground">
+          Extract comprehensive brand identity from any website
+        </p>
+      </div>
+    </div>
+  );
 
-      <div className="flex gap-3 mb-6">
-        <Input
-          type="url"
-          placeholder="https://example.com"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          className="flex-1"
-          disabled={isLoading}
-        />
-        <Button onClick={handleExtract} disabled={isLoading}>
-          {isLoading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Extracting...
-            </>
-          ) : (
-            "Extract Identity"
-          )}
-        </Button>
-      </div>
+  return (
+    <CollapsibleCard header={header} defaultOpen={true} className="bg-gradient-card border-border/50">
+      <div className="p-6 pt-4 space-y-6">
+        <div className="flex gap-3">
+          <Input
+            type="url"
+            placeholder="https://example.com"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            className="flex-1"
+            disabled={isLoading}
+          />
+          <Button onClick={handleExtract} disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Extracting...
+              </>
+            ) : (
+              "Extract Identity"
+            )}
+          </Button>
+        </div>
 
       {branding && (
         <div className="space-y-6 animate-fade-in">
@@ -392,6 +395,7 @@ export const WebsiteBrandingScraper = () => {
           )}
         </div>
       )}
-    </Card>
+      </div>
+    </CollapsibleCard>
   );
 };
