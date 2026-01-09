@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Clock, CheckCircle2, AlertCircle, Loader2, Download, MessageCircle, Users, Combine, ClipboardList } from "lucide-react";
+import { Clock, CheckCircle2, AlertCircle, Loader2, Download, MessageCircle, Users, Combine, ClipboardList, Eye } from "lucide-react";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import ProjectQADialog from "./ProjectQADialog";
 import ScrapedRowsDialog from "./ScrapedRowsDialog";
 import { MergeCsvDialog } from "./MergeCsvDialog";
+import { WebsiteResultsDialog } from "./WebsiteResultsDialog";
 
 interface Job {
   id: string;
@@ -58,6 +59,7 @@ const JobsTable = () => {
   const [qaDialogOpen, setQaDialogOpen] = useState(false);
   const [rowsDialogOpen, setRowsDialogOpen] = useState(false);
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  const [resultsDialogOpen, setResultsDialogOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
 
   const handleDownload = async (jobId: string, projectId: string) => {
@@ -247,6 +249,18 @@ const JobsTable = () => {
                             variant="outline"
                             onClick={() => {
                               setSelectedJob(job);
+                              setResultsDialogOpen(true);
+                            }}
+                            className="hover:bg-primary/10 transition-smooth"
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Results
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedJob(job);
                               setRowsDialogOpen(true);
                             }}
                             className="hover:bg-primary/10 transition-smooth"
@@ -345,6 +359,16 @@ const JobsTable = () => {
             onOpenChange={(open) => {
               setMergeDialogOpen(open);
               if (!open) setSelectedJob(null);
+            }}
+          />
+          
+          <WebsiteResultsDialog
+            jobId={selectedJob.id}
+            projectId={selectedJob.project_id}
+            isOpen={resultsDialogOpen}
+            onClose={() => {
+              setResultsDialogOpen(false);
+              setSelectedJob(null);
             }}
           />
         </>
