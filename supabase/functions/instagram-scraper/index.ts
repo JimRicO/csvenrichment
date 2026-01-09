@@ -212,6 +212,58 @@ serve(async (req) => {
       const supabase = createClient(supabaseUrl, supabaseKey);
 
       try {
+        // Download and store profile picture
+        let profilePicStorageUrl: string | null = null;
+        const profilePicUrl = profileData.profilePicUrlHD || profileData.profilePicUrl;
+        
+        if (profilePicUrl) {
+          try {
+            console.log('Downloading profile picture from:', profilePicUrl);
+            
+            // Download the image
+            const imageResponse = await fetch(profilePicUrl, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+              }
+            });
+            
+            if (imageResponse.ok) {
+              const imageBuffer = await imageResponse.arrayBuffer();
+              const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+              const extension = contentType.includes('png') ? 'png' : 'jpg';
+              const timestamp = Date.now();
+              const fileName = `${profileData.username}_${timestamp}.${extension}`;
+              
+              console.log('Uploading profile picture to storage:', fileName);
+              
+              // Upload to storage bucket
+              const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('instagram-profile-pics')
+                .upload(fileName, imageBuffer, {
+                  contentType,
+                  upsert: true
+                });
+              
+              if (uploadError) {
+                console.error('Failed to upload profile picture:', uploadError);
+              } else {
+                // Get the public URL
+                const { data: publicUrlData } = supabase.storage
+                  .from('instagram-profile-pics')
+                  .getPublicUrl(fileName);
+                
+                profilePicStorageUrl = publicUrlData.publicUrl;
+                console.log('Profile picture stored at:', profilePicStorageUrl);
+              }
+            } else {
+              console.error('Failed to download profile picture, status:', imageResponse.status);
+            }
+          } catch (picError) {
+            console.error('Error downloading/uploading profile picture:', picError);
+            // Continue without profile picture - not critical
+          }
+        }
+
         // Extract profile header fields (8 fields)
         const instagramCompanyData = {
           job_id: jobId,
@@ -225,6 +277,7 @@ serve(async (req) => {
           posts_count: profileData.postsCount || 0,
           is_business_account: profileData.isBusinessAccount || false,
           verified: profileData.verified || false,
+          profile_pic_storage_url: profilePicStorageUrl,
           related_profiles: profileData.relatedProfiles ? 
             profileData.relatedProfiles.map((p: any) => ({
               username: p.username,

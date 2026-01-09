@@ -66,6 +66,7 @@ export type Database = {
           job_id: string
           latest_posts: Json | null
           posts_count: number | null
+          profile_pic_storage_url: string | null
           raw_apify_data: Json | null
           related_profiles: Json | null
           scraped_at: string | null
@@ -86,6 +87,7 @@ export type Database = {
           job_id: string
           latest_posts?: Json | null
           posts_count?: number | null
+          profile_pic_storage_url?: string | null
           raw_apify_data?: Json | null
           related_profiles?: Json | null
           scraped_at?: string | null
@@ -106,6 +108,7 @@ export type Database = {
           job_id?: string
           latest_posts?: Json | null
           posts_count?: number | null
+          profile_pic_storage_url?: string | null
           raw_apify_data?: Json | null
           related_profiles?: Json | null
           scraped_at?: string | null
