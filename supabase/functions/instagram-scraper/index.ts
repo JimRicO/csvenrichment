@@ -206,65 +206,72 @@ serve(async (req) => {
     const profileData = results[0];
     console.log('Profile data received:', profileData.username);
 
+    // Download and persist profile picture (for both worker mode and direct mode)
+    let profilePicStorageUrl: string | null = null;
+    const profilePicUrl = profileData.profilePicUrlHD || profileData.profilePicUrl;
+    
+    if (profilePicUrl) {
+      try {
+        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        console.log('Downloading profile picture from:', profilePicUrl);
+        
+        // Download the image with relaxed SSL and proper headers
+        const imageResponse = await fetch(profilePicUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+            'Referer': 'https://www.instagram.com/'
+          }
+        });
+        
+        if (imageResponse.ok) {
+          const imageBuffer = await imageResponse.arrayBuffer();
+          const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+          const extension = contentType.includes('png') ? 'png' : 'jpg';
+          const timestamp = Date.now();
+          const fileName = `${profileData.username}_${timestamp}.${extension}`;
+          
+          console.log('Uploading profile picture to storage:', fileName, 'Size:', imageBuffer.byteLength);
+          
+          // Upload to storage bucket
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('instagram-profile-pics')
+            .upload(fileName, imageBuffer, {
+              contentType,
+              upsert: true
+            });
+          
+          if (uploadError) {
+            console.error('Failed to upload profile picture:', uploadError);
+          } else {
+            // Get the public URL
+            const { data: publicUrlData } = supabase.storage
+              .from('instagram-profile-pics')
+              .getPublicUrl(fileName);
+            
+            profilePicStorageUrl = publicUrlData.publicUrl;
+            console.log('Profile picture stored at:', profilePicStorageUrl);
+          }
+        } else {
+          console.error('Failed to download profile picture, status:', imageResponse.status);
+        }
+      } catch (picError) {
+        console.error('Error downloading/uploading profile picture:', picError);
+        // Continue without profile picture - not critical
+      }
+    }
+
     // If in worker mode, store data in instagram_company_data table
     if (scraped_row_id && jobId) {
       const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
       const supabase = createClient(supabaseUrl, supabaseKey);
 
       try {
-        // Download and store profile picture
-        let profilePicStorageUrl: string | null = null;
-        const profilePicUrl = profileData.profilePicUrlHD || profileData.profilePicUrl;
-        
-        if (profilePicUrl) {
-          try {
-            console.log('Downloading profile picture from:', profilePicUrl);
-            
-            // Download the image
-            const imageResponse = await fetch(profilePicUrl, {
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-              }
-            });
-            
-            if (imageResponse.ok) {
-              const imageBuffer = await imageResponse.arrayBuffer();
-              const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
-              const extension = contentType.includes('png') ? 'png' : 'jpg';
-              const timestamp = Date.now();
-              const fileName = `${profileData.username}_${timestamp}.${extension}`;
-              
-              console.log('Uploading profile picture to storage:', fileName);
-              
-              // Upload to storage bucket
-              const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('instagram-profile-pics')
-                .upload(fileName, imageBuffer, {
-                  contentType,
-                  upsert: true
-                });
-              
-              if (uploadError) {
-                console.error('Failed to upload profile picture:', uploadError);
-              } else {
-                // Get the public URL
-                const { data: publicUrlData } = supabase.storage
-                  .from('instagram-profile-pics')
-                  .getPublicUrl(fileName);
-                
-                profilePicStorageUrl = publicUrlData.publicUrl;
-                console.log('Profile picture stored at:', profilePicStorageUrl);
-              }
-            } else {
-              console.error('Failed to download profile picture, status:', imageResponse.status);
-            }
-          } catch (picError) {
-            console.error('Error downloading/uploading profile picture:', picError);
-            // Continue without profile picture - not critical
-          }
-        }
+        // profilePicStorageUrl already downloaded above
 
-        // Extract profile header fields (8 fields)
+        // Extract profile header fields
         const instagramCompanyData = {
           job_id: jobId,
           scraped_row_id: scraped_row_id,
@@ -367,11 +374,14 @@ serve(async (req) => {
       }
     }
 
-    // Return success response
+    // Return success response with storage URL if available
     return new Response(
       JSON.stringify({ 
         success: true,
-        data: profileData 
+        data: {
+          ...profileData,
+          profilePicStorageUrl: profilePicStorageUrl // Add persisted URL
+        }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
