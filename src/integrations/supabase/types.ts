@@ -269,23 +269,30 @@ export type Database = {
       }
       scraped_rows: {
         Row: {
+          address: string | null
           business_description: string | null
           created_at: string
           custom_answer_1: string | null
           custom_answer_2: string | null
           detailed_team_members: string | null
+          email: string | null
           extracted_at: string | null
           extraction_error_message: string | null
           extraction_status: string
+          facilities_details: string | null
           id: string
           input_tokens: number | null
           job_id: string
           model_id: string | null
+          number_of_clubs: number | null
+          number_of_courts: number | null
+          opening_hours: string | null
           original_row_data: Json | null
           output_tokens: number | null
           people_search_error: string | null
           people_search_status: string | null
           people_searched_at: string | null
+          phone_number: string | null
           project_id: string
           scrape_error_message: string | null
           scrape_status: string
@@ -299,23 +306,30 @@ export type Database = {
           whatsapp_contact: string | null
         }
         Insert: {
+          address?: string | null
           business_description?: string | null
           created_at?: string
           custom_answer_1?: string | null
           custom_answer_2?: string | null
           detailed_team_members?: string | null
+          email?: string | null
           extracted_at?: string | null
           extraction_error_message?: string | null
           extraction_status?: string
+          facilities_details?: string | null
           id?: string
           input_tokens?: number | null
           job_id: string
           model_id?: string | null
+          number_of_clubs?: number | null
+          number_of_courts?: number | null
+          opening_hours?: string | null
           original_row_data?: Json | null
           output_tokens?: number | null
           people_search_error?: string | null
           people_search_status?: string | null
           people_searched_at?: string | null
+          phone_number?: string | null
           project_id: string
           scrape_error_message?: string | null
           scrape_status?: string
@@ -329,23 +343,30 @@ export type Database = {
           whatsapp_contact?: string | null
         }
         Update: {
+          address?: string | null
           business_description?: string | null
           created_at?: string
           custom_answer_1?: string | null
           custom_answer_2?: string | null
           detailed_team_members?: string | null
+          email?: string | null
           extracted_at?: string | null
           extraction_error_message?: string | null
           extraction_status?: string
+          facilities_details?: string | null
           id?: string
           input_tokens?: number | null
           job_id?: string
           model_id?: string | null
+          number_of_clubs?: number | null
+          number_of_courts?: number | null
+          opening_hours?: string | null
           original_row_data?: Json | null
           output_tokens?: number | null
           people_search_error?: string | null
           people_search_status?: string | null
           people_searched_at?: string | null
+          phone_number?: string | null
           project_id?: string
           scrape_error_message?: string | null
           scrape_status?: string
