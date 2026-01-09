@@ -36,6 +36,7 @@ interface InstagramProfile {
   verified: boolean;
   related_profiles: any[];
   latest_posts: any[];
+  profile_pic_storage_url: string | null;
 }
 
 export const InstagramResultsDialog = ({ jobId, projectId, isOpen, onClose }: InstagramResultsDialogProps) => {
@@ -160,6 +161,7 @@ export const InstagramResultsDialog = ({ jobId, projectId, isOpen, onClose }: In
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Avatar</TableHead>
                       <TableHead>Profile</TableHead>
                       <TableHead>Username</TableHead>
                       <TableHead>Followers</TableHead>
@@ -174,6 +176,19 @@ export const InstagramResultsDialog = ({ jobId, projectId, isOpen, onClose }: In
                   <TableBody>
                     {profiles.map((profile) => (
                       <TableRow key={profile.id}>
+                        <TableCell>
+                          {profile.profile_pic_storage_url ? (
+                            <img 
+                              src={profile.profile_pic_storage_url} 
+                              alt={profile.username}
+                              className="w-10 h-10 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                              <Instagram className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                          )}
+                        </TableCell>
                         <TableCell className="font-medium">
                           {profile.full_name || profile.username}
                         </TableCell>
