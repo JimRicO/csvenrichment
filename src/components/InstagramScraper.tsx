@@ -103,15 +103,22 @@ export const InstagramScraper = () => {
             {/* Profile Header */}
             <div className="flex items-start gap-4">
               <img
-                src={profile.profilePicUrl}
-                alt={profile.username}
+                src={(profile as any).profilePicUrlHD || profile.profilePicUrl}
+                alt={`@${profile.username} profile picture`}
+                loading="lazy"
+                referrerPolicy="no-referrer"
                 className="w-20 h-20 rounded-full object-cover"
+                onError={(e) => {
+                  // Instagram CDN can reject hotlinks depending on referrer; fall back to placeholder
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/placeholder.svg";
+                }}
               />
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <h3 className="text-lg font-semibold">@{profile.username}</h3>
                   {profile.verified && (
-                    <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                    <CheckCircle2 className="w-4 h-4 text-primary" />
                   )}
                 </div>
                 <p className="text-sm text-muted-foreground">{profile.fullName}</p>
