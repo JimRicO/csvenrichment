@@ -81,7 +81,7 @@ export const InstagramScraper = () => {
   );
 
   return (
-    <CollapsibleCard header={header} defaultOpen={true}>
+    <CollapsibleCard header={header} defaultOpen={false}>
       <CardContent className="space-y-4">
         <div className="flex gap-2">
           <Input

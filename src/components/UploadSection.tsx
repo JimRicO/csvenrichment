@@ -165,7 +165,7 @@ const UploadSection = ({
   );
 
   return (
-    <CollapsibleCard header={header} defaultOpen={true} className="gradient-card border-border/50">
+    <CollapsibleCard header={header} defaultOpen={false} className="gradient-card border-border/50">
       <div className="p-8 pt-4 space-y-6">
 
         <div onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} className={`border-2 border-dashed rounded-xl p-8 transition-smooth text-center ${isDragging ? "border-primary bg-primary/5 glow-primary" : "border-border hover:border-primary/50 hover:bg-secondary/30"}`}>
