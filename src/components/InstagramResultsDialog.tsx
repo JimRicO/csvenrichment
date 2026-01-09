@@ -37,6 +37,8 @@ interface InstagramProfile {
   related_profiles: any[];
   latest_posts: any[];
   profile_pic_storage_url: string | null;
+  /** Raw actor payload (used as a fallback for legacy rows without persisted images) */
+  raw_apify_data?: any;
 }
 
 export const InstagramResultsDialog = ({ jobId, projectId, isOpen, onClose }: InstagramResultsDialogProps) => {
@@ -177,17 +179,27 @@ export const InstagramResultsDialog = ({ jobId, projectId, isOpen, onClose }: In
                     {profiles.map((profile) => (
                       <TableRow key={profile.id}>
                         <TableCell>
-                          {profile.profile_pic_storage_url ? (
-                            <img 
-                              src={profile.profile_pic_storage_url} 
-                              alt={profile.username}
-                              className="w-10 h-10 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                              <Instagram className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                          )}
+                          {(() => {
+                            const avatarUrl =
+                              profile.profile_pic_storage_url ??
+                              profile.raw_apify_data?.profilePicUrlHD ??
+                              profile.raw_apify_data?.profilePicUrl ??
+                              null;
+
+                            return avatarUrl ? (
+                              <img
+                                src={avatarUrl}
+                                alt={`@${profile.username} profile picture`}
+                                loading="lazy"
+                                referrerPolicy="no-referrer"
+                                className="w-10 h-10 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                                <Instagram className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell className="font-medium">
                           {profile.full_name || profile.username}
