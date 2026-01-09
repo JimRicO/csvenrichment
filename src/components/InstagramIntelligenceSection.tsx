@@ -169,7 +169,7 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
   );
 
   return (
-    <CollapsibleCard header={header} defaultOpen={true} className="gradient-card border-border/50">
+    <CollapsibleCard header={header} defaultOpen={false} className="gradient-card border-border/50">
       <div className="p-8 pt-4 space-y-6">
 
         <div

@@ -178,7 +178,7 @@ const JobsTable = () => {
   );
 
   return (
-    <CollapsibleCard header={header} defaultOpen={true} className="gradient-card border-border/50 overflow-hidden">
+    <CollapsibleCard header={header} defaultOpen={false} className="gradient-card border-border/50 overflow-hidden">
       
       <div className="overflow-x-auto">
         {isLoading ? (

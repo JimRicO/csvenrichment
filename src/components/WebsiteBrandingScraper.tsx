@@ -138,7 +138,7 @@ export const WebsiteBrandingScraper = () => {
   );
 
   return (
-    <CollapsibleCard header={header} defaultOpen={true} className="bg-gradient-card border-border/50">
+    <CollapsibleCard header={header} defaultOpen={false} className="bg-gradient-card border-border/50">
       <div className="p-6 pt-4 space-y-6">
         <div className="flex gap-3">
           <Input
