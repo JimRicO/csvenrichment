@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Upload, FileText, AlertCircle, Globe, Loader2, ExternalLink, Building2, Users, Share2, MessageCircle, Info, Database, Cpu, Sparkles } from "lucide-react";
+import { Upload, FileText, AlertCircle, Globe, Loader2, ExternalLink, Building2, Users, Share2, MessageCircle, Info, Database, Cpu, Sparkles, Phone, Mail, MapPin, Clock, LayoutGrid, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -25,6 +25,13 @@ interface ScrapedResult {
     twitter?: string;
   };
   whatsapp_contact?: string;
+  phone_number?: string;
+  email?: string;
+  address?: string;
+  opening_hours?: string;
+  number_of_clubs?: number;
+  number_of_courts?: number;
+  facilities_details?: string;
   custom_answer_1?: string;
   custom_answer_2?: string;
 }
@@ -117,6 +124,13 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
                 team_members: row.team_members,
                 social_media: row.social_media as ScrapedResult['social_media'],
                 whatsapp_contact: row.whatsapp_contact,
+                phone_number: row.phone_number,
+                email: row.email,
+                address: row.address,
+                opening_hours: row.opening_hours,
+                number_of_clubs: row.number_of_clubs,
+                number_of_courts: row.number_of_courts,
+                facilities_details: row.facilities_details,
                 custom_answer_1: row.custom_answer_1,
                 custom_answer_2: row.custom_answer_2
               };
@@ -293,8 +307,12 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
               <ul className="text-sm text-muted-foreground space-y-1 ml-6">
                 <li>• Business Description</li>
                 <li>• Team Members</li>
+                <li>• Phone Number, Email, Address</li>
+                <li>• Opening Hours</li>
                 <li>• Social Media (Instagram, Facebook, LinkedIn, Twitter)</li>
                 <li>• WhatsApp Contact</li>
+                <li>• Number of Clubs/Locations, Courts</li>
+                <li>• Facilities Details</li>
                 <li>• Custom Questions (up to 2)</li>
               </ul>
             </div>
@@ -428,6 +446,70 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
                     WhatsApp
                   </div>
                   <p className="text-sm">{scrapedResult.whatsapp_contact}</p>
+                </div>
+              )}
+
+              {/* Contact Information */}
+              {(scrapedResult.phone_number || scrapedResult.email || scrapedResult.address || scrapedResult.opening_hours) && (
+                <div className="space-y-2 pt-2 border-t border-border/50">
+                  <div className="text-sm font-medium text-muted-foreground">Contact Information</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {scrapedResult.phone_number && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-primary" />
+                        <a href={`tel:${scrapedResult.phone_number}`} className="text-sm text-primary hover:underline">
+                          {scrapedResult.phone_number}
+                        </a>
+                      </div>
+                    )}
+                    {scrapedResult.email && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-primary" />
+                        <a href={`mailto:${scrapedResult.email}`} className="text-sm text-primary hover:underline">
+                          {scrapedResult.email}
+                        </a>
+                      </div>
+                    )}
+                    {scrapedResult.address && (
+                      <div className="flex items-start gap-2 col-span-full">
+                        <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+                        <p className="text-sm">{scrapedResult.address}</p>
+                      </div>
+                    )}
+                    {scrapedResult.opening_hours && (
+                      <div className="flex items-start gap-2 col-span-full">
+                        <Clock className="h-4 w-4 text-muted-foreground mt-0.5" />
+                        <p className="text-sm">{scrapedResult.opening_hours}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Facility Information */}
+              {(scrapedResult.number_of_clubs || scrapedResult.number_of_courts || scrapedResult.facilities_details) && (
+                <div className="space-y-2 pt-2 border-t border-border/50">
+                  <div className="text-sm font-medium text-muted-foreground">Facility Information</div>
+                  <div className="flex flex-wrap gap-3">
+                    {scrapedResult.number_of_clubs && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10">
+                        <Building2 className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium">{scrapedResult.number_of_clubs} Location{scrapedResult.number_of_clubs > 1 ? 's' : ''}</span>
+                      </div>
+                    )}
+                    {scrapedResult.number_of_courts && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10">
+                        <LayoutGrid className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium">{scrapedResult.number_of_courts} Court{scrapedResult.number_of_courts > 1 ? 's' : ''}</span>
+                      </div>
+                    )}
+                  </div>
+                  {scrapedResult.facilities_details && (
+                    <div className="flex items-start gap-2">
+                      <List className="h-4 w-4 text-muted-foreground mt-0.5" />
+                      <p className="text-sm">{scrapedResult.facilities_details}</p>
+                    </div>
+                  )}
                 </div>
               )}
 

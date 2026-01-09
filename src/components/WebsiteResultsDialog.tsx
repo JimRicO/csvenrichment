@@ -14,7 +14,13 @@ import {
   XCircle, 
   Loader2,
   Building2,
-  MessageCircle
+  MessageCircle,
+  Phone,
+  Mail,
+  MapPin,
+  Clock,
+  LayoutGrid,
+  List
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -41,6 +47,13 @@ interface ScrapedRow {
   team_members: string | null;
   social_media: Record<string, string> | null;
   whatsapp_contact: string | null;
+  phone_number: string | null;
+  email: string | null;
+  address: string | null;
+  opening_hours: string | null;
+  number_of_clubs: number | null;
+  number_of_courts: number | null;
+  facilities_details: string | null;
   scrape_status: string;
   extraction_status: string;
 }
@@ -76,7 +89,7 @@ export const WebsiteResultsDialog = ({ jobId, projectId, isOpen, onClose }: Webs
     const [rowsResult, peopleResult, jobResult] = await Promise.all([
       supabase
         .from('scraped_rows')
-        .select('id, website_url, business_description, team_members, social_media, whatsapp_contact, scrape_status, extraction_status')
+        .select('id, website_url, business_description, team_members, social_media, whatsapp_contact, phone_number, email, address, opening_hours, number_of_clubs, number_of_courts, facilities_details, scrape_status, extraction_status')
         .eq('job_id', jobId)
         .order('created_at', { ascending: true }),
       supabase
@@ -215,9 +228,9 @@ export const WebsiteResultsDialog = ({ jobId, projectId, isOpen, onClose }: Webs
                     <TableRow>
                       <TableHead>Website</TableHead>
                       <TableHead className="min-w-[200px]">Description</TableHead>
-                      <TableHead>Team Members</TableHead>
+                      <TableHead>Contact</TableHead>
+                      <TableHead>Facilities</TableHead>
                       <TableHead>Social Media</TableHead>
-                      <TableHead>WhatsApp</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
@@ -253,41 +266,148 @@ export const WebsiteResultsDialog = ({ jobId, projectId, isOpen, onClose }: Webs
                             <span className="text-muted-foreground text-sm">-</span>
                           )}
                         </TableCell>
-                        <TableCell className="max-w-[150px]">
-                          {row.team_members ? (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Badge variant="outline" className="cursor-help">
-                                    <Users className="h-3 w-3 mr-1" />
-                                    View
-                                  </Badge>
-                                </TooltipTrigger>
-                                <TooltipContent className="max-w-md">
-                                  <p className="text-sm whitespace-pre-wrap">{row.team_members}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">-</span>
-                          )}
+                        <TableCell>
+                          <div className="flex gap-1">
+                            {row.phone_number && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <a
+                                      href={`tel:${row.phone_number}`}
+                                      className="p-1.5 rounded bg-primary/10 hover:bg-primary/20 transition-colors"
+                                    >
+                                      <Phone className="h-4 w-4 text-primary" />
+                                    </a>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="text-xs">{row.phone_number}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                            {row.email && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <a
+                                      href={`mailto:${row.email}`}
+                                      className="p-1.5 rounded bg-primary/10 hover:bg-primary/20 transition-colors"
+                                    >
+                                      <Mail className="h-4 w-4 text-primary" />
+                                    </a>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="text-xs">{row.email}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                            {row.whatsapp_contact && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <a
+                                      href={`https://wa.me/${row.whatsapp_contact.replace(/\D/g, '')}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="p-1.5 rounded bg-success/10 hover:bg-success/20 transition-colors"
+                                    >
+                                      <FaWhatsapp className="h-4 w-4 text-success" />
+                                    </a>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="text-xs">{row.whatsapp_contact}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                            {row.address && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="p-1.5 rounded bg-muted/50 cursor-help">
+                                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p className="text-xs">{row.address}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                            {row.opening_hours && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="p-1.5 rounded bg-muted/50 cursor-help">
+                                      <Clock className="h-4 w-4 text-muted-foreground" />
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p className="text-xs">{row.opening_hours}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                            {!row.phone_number && !row.email && !row.whatsapp_contact && !row.address && !row.opening_hours && (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1 items-center">
+                            {row.number_of_clubs && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge variant="outline" className="cursor-help">
+                                      <Building2 className="h-3 w-3 mr-1" />
+                                      {row.number_of_clubs}
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="text-xs">{row.number_of_clubs} location{row.number_of_clubs > 1 ? 's' : ''}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                            {row.number_of_courts && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge variant="outline" className="cursor-help">
+                                      <LayoutGrid className="h-3 w-3 mr-1" />
+                                      {row.number_of_courts}
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="text-xs">{row.number_of_courts} court{row.number_of_courts > 1 ? 's' : ''}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                            {row.facilities_details && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge variant="outline" className="cursor-help">
+                                      <List className="h-3 w-3 mr-1" />
+                                      View
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p className="text-xs">{row.facilities_details}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                            {!row.number_of_clubs && !row.number_of_courts && !row.facilities_details && (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           {renderSocialMedia(row.social_media)}
-                        </TableCell>
-                        <TableCell>
-                          {row.whatsapp_contact ? (
-                            <a
-                              href={`https://wa.me/${row.whatsapp_contact.replace(/\D/g, '')}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-1.5 rounded bg-success/10 hover:bg-success/20 transition-colors inline-flex"
-                            >
-                              <FaWhatsapp className="h-4 w-4 text-success" />
-                            </a>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">-</span>
-                          )}
                         </TableCell>
                         <TableCell>
                           <StatusBadge status={row.extraction_status} />

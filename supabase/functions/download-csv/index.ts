@@ -110,6 +110,13 @@ serve(async (req) => {
     const extractedHeaders = [
       'Business Description',
       'Team Members (Basic)',
+      'Phone Number',
+      'Email',
+      'Address',
+      'Opening Hours',
+      'Number of Clubs',
+      'Number of Courts',
+      'Facilities Details',
     ];
 
     const personHeaders = [];
@@ -151,7 +158,14 @@ serve(async (req) => {
       // Add extracted fields
       rowFields.push(
         escapeCSV(row.business_description),
-        escapeCSV(row.team_members)
+        escapeCSV(row.team_members),
+        escapeCSV(row.phone_number),
+        escapeCSV(row.email),
+        escapeCSV(row.address),
+        escapeCSV(row.opening_hours),
+        escapeCSV(row.number_of_clubs),
+        escapeCSV(row.number_of_courts),
+        escapeCSV(row.facilities_details)
       );
       
       // Add person fields (fill with empty strings if fewer people than maxPeople)
