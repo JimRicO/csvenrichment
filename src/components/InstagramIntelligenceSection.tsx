@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Upload, FileText, AlertCircle, Instagram } from "lucide-react";
+import { Upload, FileText, AlertCircle, Instagram, Loader2, ExternalLink, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,7 +14,33 @@ interface InstagramIntelligenceSectionProps {
   onJobCreated: (jobId: string, projectId: string) => void;
 }
 
+interface InstagramProfile {
+  username: string;
+  fullName: string;
+  biography: string;
+  followersCount: number;
+  followsCount: number;
+  postsCount: number;
+  profilePicUrl: string;
+  verified: boolean;
+  url: string;
+  externalUrl?: string;
+  latestPosts?: Array<{
+    url: string;
+    caption: string;
+    likesCount: number;
+    commentsCount: number;
+    displayUrl: string;
+  }>;
+}
+
 const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSectionProps) => {
+  // Single URL scraping state
+  const [singleUrl, setSingleUrl] = useState("");
+  const [singleLoading, setSingleLoading] = useState(false);
+  const [profile, setProfile] = useState<InstagramProfile | null>(null);
+
+  // CSV bulk processing state
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [csvData, setCsvData] = useState<any[] | null>(null);
@@ -25,6 +51,44 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
   const [extractRelated, setExtractRelated] = useState(true);
   const [extractPosts, setExtractPosts] = useState(true);
 
+  // Single URL scraping
+  const handleSingleScrape = async () => {
+    if (!singleUrl.trim()) {
+      toast.error("Please enter an Instagram URL");
+      return;
+    }
+
+    setSingleLoading(true);
+    setProfile(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('instagram-scraper', {
+        body: { url: singleUrl.trim() }
+      });
+
+      if (error) throw error;
+
+      if (data?.data) {
+        setProfile(data.data);
+        toast.success("Profile scraped successfully!");
+      } else {
+        toast.error("No profile data returned");
+      }
+    } catch (error: any) {
+      console.error('Scraping error:', error);
+      toast.error(error.message || "Failed to scrape profile");
+    } finally {
+      setSingleLoading(false);
+    }
+  };
+
+  const formatNumber = (num: number) => {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toString();
+  };
+
+  // CSV handling
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -59,7 +123,6 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
     Papa.parse(uploadedFile, {
       header: true,
       complete: (results) => {
-        // Check if CSV has Instagram URL column
         const firstRow = results.data[0] as any;
         const hasInstagramColumn = firstRow && (
           'instagram_url' in firstRow || 
@@ -95,10 +158,7 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
       }
     };
 
-    // Run immediately
     checkAndRunWorkers();
-
-    // Then run every 5 seconds for up to 10 minutes
     interval = setInterval(checkAndRunWorkers, 5000);
     setTimeout(() => clearInterval(interval), 600000);
 
@@ -136,11 +196,8 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
       );
       
       onJobCreated(data.job_id, data.project_id);
-
-      // Start worker orchestration
       startWorkerOrchestration(data.job_id);
 
-      // Reset form
       setFile(null);
       setCsvData(null);
     } catch (error) {
@@ -160,9 +217,9 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
         <Instagram className="h-5 w-5 text-primary" />
       </div>
       <div>
-        <h3 className="text-lg font-semibold text-foreground">Instagram Intelligence Scraping</h3>
+        <h3 className="text-lg font-semibold text-foreground">Instagram Scraper</h3>
         <p className="text-sm text-muted-foreground">
-          Extract profile data, competitive intelligence, and post performance metrics
+          Scrape a single profile or bulk process from CSV
         </p>
       </div>
     </div>
@@ -171,7 +228,116 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
   return (
     <CollapsibleCard header={header} defaultOpen={false} className="border-border/50">
       <div className="p-6 pt-0 space-y-6">
+        
+        {/* Single URL Scraping */}
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              placeholder="https://www.instagram.com/username"
+              value={singleUrl}
+              onChange={(e) => setSingleUrl(e.target.value)}
+              disabled={singleLoading}
+            />
+            <Button onClick={handleSingleScrape} disabled={singleLoading}>
+              {singleLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Scraping...
+                </>
+              ) : (
+                "Scrape"
+              )}
+            </Button>
+          </div>
 
+          {/* Single Profile Result */}
+          {profile && (
+            <div className="space-y-4 p-4 rounded-lg border border-border/50 bg-secondary/20">
+              <div className="flex items-start gap-4">
+                <img
+                  src={(profile as any).profilePicStorageUrl || (profile as any).profilePicUrlHD || profile.profilePicUrl}
+                  alt={`@${profile.username} profile picture`}
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                  className="w-20 h-20 rounded-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "/placeholder.svg";
+                  }}
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold">@{profile.username}</h3>
+                    {profile.verified && (
+                      <CheckCircle2 className="w-4 h-4 text-primary" />
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">{profile.fullName}</p>
+                  <div className="flex gap-4 mt-2 text-sm">
+                    <span><strong>{formatNumber(profile.postsCount)}</strong> posts</span>
+                    <span><strong>{formatNumber(profile.followersCount)}</strong> followers</span>
+                    <span><strong>{formatNumber(profile.followsCount)}</strong> following</span>
+                  </div>
+                </div>
+              </div>
+
+              {profile.biography && (
+                <p className="text-sm whitespace-pre-wrap">{profile.biography}</p>
+              )}
+
+              {profile.externalUrl && (
+                <a
+                  href={profile.externalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-sm text-primary hover:underline"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  {profile.externalUrl}
+                </a>
+              )}
+
+              {profile.latestPosts && profile.latestPosts.length > 0 && (
+                <div>
+                  <h4 className="font-semibold mb-3">Recent Posts</h4>
+                  <div className="grid grid-cols-3 gap-2">
+                    {profile.latestPosts.map((post, idx) => (
+                      <a
+                        key={idx}
+                        href={post.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="relative aspect-square overflow-hidden rounded-lg group"
+                      >
+                        <img
+                          src={post.displayUrl}
+                          alt={post.caption?.substring(0, 50) || 'Post'}
+                          className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 text-white text-sm">
+                          <span>❤️ {formatNumber(post.likesCount)}</span>
+                          <span>💬 {formatNumber(post.commentsCount)}</span>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-border/50" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-2 text-muted-foreground">or bulk process</span>
+          </div>
+        </div>
+
+        {/* CSV Upload Zone */}
         <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -293,7 +459,7 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
           className="w-full gradient-primary hover:opacity-90 transition-smooth disabled:opacity-50 glow-primary"
           size="lg"
         >
-          {isProcessing ? "Creating Job..." : !csvData ? "Upload CSV to Start" : "Start Instagram Scraping 🚀"}
+          {isProcessing ? "Creating Job..." : !csvData ? "Upload CSV to Start Bulk Processing" : "Start Instagram Scraping 🚀"}
         </Button>
       </div>
     </CollapsibleCard>
