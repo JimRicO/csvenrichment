@@ -166,19 +166,21 @@ const JobsTable = () => {
   }, []);
 
   const header = (
-    <div className="p-6 border-b border-border">
-      <div className="flex items-center gap-3">
-        <ClipboardList className="w-6 h-6 text-primary" />
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Recent Jobs</h2>
-          <p className="text-muted-foreground mt-1">Track your scraping and extraction progress</p>
-        </div>
+    <div className="flex items-center gap-3 p-6">
+      <div className="p-2 rounded-lg bg-primary/10">
+        <ClipboardList className="h-5 w-5 text-primary" />
+      </div>
+      <div>
+        <h3 className="text-lg font-semibold text-foreground">Recent Jobs</h3>
+        <p className="text-sm text-muted-foreground">
+          Track your scraping and extraction progress
+        </p>
       </div>
     </div>
   );
 
   return (
-    <CollapsibleCard header={header} defaultOpen={false} className="gradient-card border-border/50 overflow-hidden">
+    <CollapsibleCard header={header} defaultOpen={false} className="border-border/50 overflow-hidden">
       
       <div className="overflow-x-auto">
         {isLoading ? (

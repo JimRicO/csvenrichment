@@ -124,12 +124,12 @@ export const WebsiteBrandingScraper = () => {
   };
 
   const header = (
-    <div className="flex items-center gap-3 p-6 pb-0">
+    <div className="flex items-center gap-3 p-6">
       <div className="p-2 rounded-lg bg-primary/10">
-        <Palette className="w-6 h-6 text-primary" />
+        <Palette className="h-5 w-5 text-primary" />
       </div>
       <div>
-        <h2 className="text-2xl font-bold">Website Visual Identity Scraper</h2>
+        <h3 className="text-lg font-semibold text-foreground">Website Visual Identity Scraper</h3>
         <p className="text-sm text-muted-foreground">
           Extract comprehensive brand identity from any website
         </p>
@@ -138,8 +138,8 @@ export const WebsiteBrandingScraper = () => {
   );
 
   return (
-    <CollapsibleCard header={header} defaultOpen={false} className="bg-gradient-card border-border/50">
-      <div className="p-6 pt-4 space-y-6">
+    <CollapsibleCard header={header} defaultOpen={false} className="border-border/50">
+      <div className="p-6 pt-0 space-y-6">
         <div className="flex gap-3">
           <Input
             type="url"

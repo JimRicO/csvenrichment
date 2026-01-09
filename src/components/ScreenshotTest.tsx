@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -69,17 +69,22 @@ export const ScreenshotTest = () => {
   };
 
   const header = (
-    <CardHeader>
-      <CardTitle className="flex items-center gap-2">
-        <Camera className="w-5 h-5" />
-        Screenshot Test
-      </CardTitle>
-    </CardHeader>
+    <div className="flex items-center gap-3 p-6">
+      <div className="p-2 rounded-lg bg-primary/10">
+        <Camera className="h-5 w-5 text-primary" />
+      </div>
+      <div>
+        <h3 className="text-lg font-semibold text-foreground">Screenshot Test</h3>
+        <p className="text-sm text-muted-foreground">
+          Capture full-page screenshots from any website URL
+        </p>
+      </div>
+    </div>
   );
 
   return (
-    <CollapsibleCard header={header} defaultOpen={false}>
-      <CardContent className="space-y-4">
+    <CollapsibleCard header={header} defaultOpen={false} className="border-border/50">
+      <div className="p-6 pt-0 space-y-4">
         <div className="flex gap-2">
           <Input
             type="url"
@@ -111,7 +116,7 @@ export const ScreenshotTest = () => {
             />
           </div>
         )}
-      </CardContent>
+      </div>
     </CollapsibleCard>
   );
 };
