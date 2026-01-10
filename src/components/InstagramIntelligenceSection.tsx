@@ -71,6 +71,11 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
       if (data?.data) {
         setProfile(data.data);
         toast.success("Profile scraped successfully!");
+        
+        // If job was created, notify parent to show in jobs table
+        if (data.job_id) {
+          onJobCreated(data.job_id, data.project_id || `single_${Date.now()}`);
+        }
       } else {
         toast.error("No profile data returned");
       }
