@@ -250,7 +250,7 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
                 <li>• Verified & Business Account Status</li>
                 <li>• External URL (if listed)</li>
                 <li>• Related Profiles</li>
-                <li>• Latest 12 Posts with Engagement</li>
+                <li>• Latest 6 Posts with Engagement</li>
               </ul>
             </div>
 
@@ -382,7 +382,7 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
                 <div>
                   <h4 className="font-semibold mb-3">Recent Posts</h4>
                   <div className="grid grid-cols-3 gap-2">
-                    {profile.latestPosts.map((post, idx) => (
+                    {profile.latestPosts.slice(0, 6).map((post, idx) => (
                       <a
                         key={idx}
                         href={post.url}
@@ -394,6 +394,12 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
                           src={post.displayUrl}
                           alt={post.caption?.substring(0, 50) || 'Post'}
                           className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                          referrerPolicy="no-referrer"
+                          loading="lazy"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = '/placeholder.svg';
+                          }}
                         />
                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 text-white text-sm">
                           <span>❤️ {formatNumber(post.likesCount)}</span>

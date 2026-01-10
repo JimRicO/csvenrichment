@@ -206,15 +206,15 @@ serve(async (req) => {
     const profileData = results[0];
     console.log('Profile data received:', profileData.username);
 
+    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
     // Download and persist profile picture (for both worker mode and direct mode)
     let profilePicStorageUrl: string | null = null;
     const profilePicUrl = profileData.profilePicUrlHD || profileData.profilePicUrl;
     
     if (profilePicUrl) {
       try {
-        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-        const supabase = createClient(supabaseUrl, supabaseKey);
-        
         console.log('Downloading profile picture from:', profilePicUrl);
         
         // Download the image with relaxed SSL and proper headers
@@ -263,10 +263,68 @@ serve(async (req) => {
       }
     }
 
+    // Download and persist latest post images (limit to 6 posts)
+    const postsToProcess = (profileData.latestPosts || []).slice(0, 6);
+    const processedPosts: any[] = [];
+    
+    for (const post of postsToProcess) {
+      const processedPost = { ...post };
+      
+      if (post.displayUrl) {
+        try {
+          console.log('Downloading post image:', post.shortCode || post.id);
+          
+          const postImageResponse = await fetch(post.displayUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+              'Referer': 'https://www.instagram.com/'
+            }
+          });
+          
+          if (postImageResponse.ok) {
+            const postImageBuffer = await postImageResponse.arrayBuffer();
+            const postContentType = postImageResponse.headers.get('content-type') || 'image/jpeg';
+            const postExtension = postContentType.includes('png') ? 'png' : 'jpg';
+            const postFileName = `${profileData.username}/${post.shortCode || post.id}.${postExtension}`;
+            
+            const { error: postUploadError } = await supabase.storage
+              .from('instagram-post-images')
+              .upload(postFileName, postImageBuffer, {
+                contentType: postContentType,
+                upsert: true
+              });
+            
+            if (postUploadError) {
+              console.error('Failed to upload post image:', postUploadError);
+            } else {
+              const { data: postPublicUrlData } = supabase.storage
+                .from('instagram-post-images')
+                .getPublicUrl(postFileName);
+              
+              // Replace displayUrl with storage URL
+              processedPost.displayUrl = postPublicUrlData.publicUrl;
+              processedPost.originalDisplayUrl = post.displayUrl; // Keep original for debugging
+              console.log('Post image stored:', postFileName);
+            }
+          } else {
+            console.error('Failed to download post image, status:', postImageResponse.status);
+          }
+        } catch (postError) {
+          console.error('Error downloading/uploading post image:', postError);
+          // Keep original displayUrl if persistence fails
+        }
+      }
+      
+      processedPosts.push(processedPost);
+    }
+    
+    // Replace latestPosts with processed posts (persisted URLs)
+    profileData.latestPosts = processedPosts;
+    console.log(`Processed ${processedPosts.length} post images for ${profileData.username}`);
+
     // If in worker mode, store data in instagram_company_data table
     if (scraped_row_id && jobId) {
-      const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-      const supabase = createClient(supabaseUrl, supabaseKey);
 
       try {
         // profilePicStorageUrl already downloaded above
