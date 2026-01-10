@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Upload, FileText, AlertCircle, Instagram, Loader2, ExternalLink, CheckCircle2 } from "lucide-react";
+import { Upload, FileText, AlertCircle, Instagram, Loader2, ExternalLink, CheckCircle2, Info, Database, Cpu, Image } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import Papa from "papaparse";
 import { supabase } from "@/integrations/supabase/client";
@@ -216,12 +216,92 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
       <div className="p-2 rounded-lg bg-primary/10">
         <Instagram className="h-5 w-5 text-primary" />
       </div>
-      <div>
+      <div className="flex-1">
         <h3 className="text-lg font-semibold text-foreground">Instagram Scraper</h3>
         <p className="text-sm text-muted-foreground">
           Scrape a single profile or bulk process from CSV
         </p>
       </div>
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            onClick={(e) => e.stopPropagation()}
+            className="p-2 rounded-lg hover:bg-secondary/50 transition-colors"
+            aria-label="Module information"
+          >
+            <Info className="h-5 w-5 text-muted-foreground hover:text-primary transition-colors" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent 
+          className="w-80" 
+          align="end"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="space-y-4">
+            {/* Data Extracted Section */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Database className="h-4 w-4 text-primary" />
+                Data Extracted
+              </div>
+              <ul className="text-xs text-muted-foreground space-y-0.5 ml-6">
+                <li>• Username, Full Name, Biography</li>
+                <li>• Followers, Following, Posts Count</li>
+                <li>• Verified Status & External URL</li>
+                <li>• Related Profiles (competitors)</li>
+                <li>• Latest Posts with Engagement</li>
+              </ul>
+            </div>
+
+            <div className="border-t border-border" />
+
+            {/* Profile Pictures Section */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Image className="h-4 w-4 text-primary" />
+                Profile Picture Persistence
+              </div>
+              <div className="ml-6 space-y-1">
+                <p className="text-xs text-muted-foreground">
+                  Profile pictures are downloaded and stored permanently to prevent broken images from Instagram's expiring CDN links.
+                </p>
+              </div>
+            </div>
+
+            <div className="border-t border-border" />
+
+            {/* Scraping Provider Section */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Cpu className="h-4 w-4 text-primary" />
+                Scraping Provider
+              </div>
+              <div className="ml-6 space-y-1">
+                <p className="text-sm font-medium text-foreground">Apify</p>
+                <p className="text-xs text-muted-foreground">
+                  Instagram Profile Scraper actor with reliable data extraction and rate limit handling.
+                </p>
+              </div>
+            </div>
+
+            <div className="border-t border-border" />
+
+            {/* Cost Section */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <AlertCircle className="h-4 w-4 text-primary" />
+                Pricing
+              </div>
+              <div className="ml-6 space-y-1">
+                <p className="text-sm font-medium text-foreground">$0.0027 / profile</p>
+                <p className="text-xs text-muted-foreground">
+                  Includes full profile data, related accounts, and latest posts with engagement metrics.
+                </p>
+              </div>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 
