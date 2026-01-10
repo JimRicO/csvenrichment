@@ -25,15 +25,16 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     
+    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
     let instagramUrl = url;
-    let jobId = null;
-    let rowId = scraped_row_id;
+    let jobId: string | null = null;
+    let rowId: string | null = scraped_row_id || null;
+    let isDirectMode = false;
 
-    // If using scraped_row_id, fetch the row data
+    // If using scraped_row_id, fetch the row data (worker mode)
     if (scraped_row_id) {
-      const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-      const supabase = createClient(supabaseUrl, supabaseKey);
-
       const { data: rowData, error: rowError } = await supabase
         .from('instagram_rows')
         .select('instagram_url, job_id')
@@ -51,6 +52,51 @@ serve(async (req) => {
       instagramUrl = rowData.instagram_url;
       jobId = rowData.job_id;
       console.log('Processing row:', scraped_row_id, 'URL:', instagramUrl, 'Job:', jobId);
+    } else if (url) {
+      // Direct mode: create a job and row for tracking
+      isDirectMode = true;
+      const newJobId = `ig_single_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const projectId = `single_${Date.now()}`;
+      
+      console.log('Direct mode: creating job and row for single URL scrape');
+      
+      // Create a job for this single scrape
+      const { error: jobError } = await supabase
+        .from('instagram_jobs')
+        .insert({
+          id: newJobId,
+          project_id: projectId,
+          total_rows: 1,
+          processed_rows: 0,
+          status: 'processing',
+          estimated_cost_usd: 0
+        });
+      
+      if (jobError) {
+        console.error('Failed to create job:', jobError);
+        // Continue without job tracking - not critical for single scrapes
+      } else {
+        jobId = newJobId;
+        
+        // Create an instagram_row for this single scrape
+        const { data: rowData, error: rowError } = await supabase
+          .from('instagram_rows')
+          .insert({
+            job_id: newJobId,
+            instagram_url: url,
+            scrape_status: 'processing',
+            original_row_data: { source: 'single_url_scrape' }
+          })
+          .select('id')
+          .single();
+        
+        if (rowError) {
+          console.error('Failed to create row:', rowError);
+        } else {
+          rowId = rowData.id;
+          console.log('Created job:', newJobId, 'row:', rowId);
+        }
+      }
     }
     
     if (!instagramUrl) {
@@ -206,9 +252,6 @@ serve(async (req) => {
     const profileData = results[0];
     console.log('Profile data received:', profileData.username);
 
-    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
     // Download and persist profile picture (for both worker mode and direct mode)
     let profilePicStorageUrl: string | null = null;
     const profilePicUrl = profileData.profilePicUrlHD || profileData.profilePicUrl;
@@ -323,16 +366,13 @@ serve(async (req) => {
     profileData.latestPosts = processedPosts;
     console.log(`Processed ${processedPosts.length} post images for ${profileData.username}`);
 
-    // If in worker mode, store data in instagram_company_data table
-    if (scraped_row_id && jobId) {
-
+    // Store data in instagram_company_data table (for both worker and direct mode)
+    if (rowId && jobId) {
       try {
-        // profilePicStorageUrl already downloaded above
-
         // Extract profile header fields
         const instagramCompanyData = {
           job_id: jobId,
-          scraped_row_id: scraped_row_id,
+          scraped_row_id: rowId,
           instagram_url: instagramUrl,
           username: profileData.username || '',
           full_name: profileData.fullName || null,
@@ -348,19 +388,19 @@ serve(async (req) => {
               username: p.username,
               full_name: p.fullName
             })) : [],
-          latest_posts: profileData.latestPosts ?
-            profileData.latestPosts.map((post: any) => ({
-              id: post.id,
-              type: post.type,
-              timestamp: post.timestamp,
-              caption: post.caption,
-              likesCount: post.likesCount,
-              commentsCount: post.commentsCount,
-              videoViewCount: post.videoViewCount,
-              alt: post.alt,
-              locationName: post.locationName
-            })) : [],
-          raw_apify_data: profileData, // Store complete raw response
+          latest_posts: processedPosts.map((post: any) => ({
+            id: post.id,
+            type: post.type,
+            timestamp: post.timestamp,
+            caption: post.caption,
+            likesCount: post.likesCount,
+            commentsCount: post.commentsCount,
+            videoViewCount: post.videoViewCount,
+            displayUrl: post.displayUrl, // Include persisted storage URL
+            alt: post.alt,
+            locationName: post.locationName
+          })),
+          raw_apify_data: profileData,
           scraped_at: new Date().toISOString()
         };
 
@@ -386,9 +426,9 @@ serve(async (req) => {
             scrape_status: 'completed',
             scraped_at: new Date().toISOString()
           })
-          .eq('id', scraped_row_id);
+          .eq('id', rowId);
 
-        // Use new Instagram-specific RPC function
+        // Use Instagram-specific RPC function to update job progress
         interface JobUpdateWithCost {
           processed_rows: number;
           total_rows: number;
@@ -416,14 +456,16 @@ serve(async (req) => {
         console.error('Database operation failed:', dbError);
         
         // Mark row as failed
-        await supabase
-          .from('instagram_rows')
-          .update({
-            scrape_status: 'failed',
-            scrape_error_message: dbError instanceof Error ? dbError.message : 'Database error',
-            scraped_at: new Date().toISOString()
-          })
-          .eq('id', scraped_row_id);
+        if (rowId) {
+          await supabase
+            .from('instagram_rows')
+            .update({
+              scrape_status: 'failed',
+              scrape_error_message: dbError instanceof Error ? dbError.message : 'Database error',
+              scraped_at: new Date().toISOString()
+            })
+            .eq('id', rowId);
+        }
 
         return new Response(
           JSON.stringify({ error: 'Failed to store data', details: dbError }),
@@ -432,13 +474,15 @@ serve(async (req) => {
       }
     }
 
-    // Return success response with storage URL if available
+    // Return success response with job info and storage URLs
     return new Response(
       JSON.stringify({ 
         success: true,
+        job_id: jobId,
+        project_id: jobId ? `single_${Date.now()}` : null,
         data: {
           ...profileData,
-          profilePicStorageUrl: profilePicStorageUrl // Add persisted URL
+          profilePicStorageUrl: profilePicStorageUrl
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
