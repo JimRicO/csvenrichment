@@ -181,7 +181,7 @@ const InstagramJobsTable = () => {
         <Instagram className="h-5 w-5 text-primary" />
       </div>
       <div>
-        <h3 className="text-lg font-semibold text-foreground">Instagram Intelligence Jobs</h3>
+        <h3 className="text-lg font-semibold text-foreground">IG Recent Jobs</h3>
         <p className="text-sm text-muted-foreground">
           Track your Instagram scraping progress
         </p>
