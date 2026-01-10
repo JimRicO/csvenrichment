@@ -307,21 +307,38 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
           onClick={(e) => e.stopPropagation()}
         >
           <div className="space-y-4">
+            {/* Multi-Page Crawling Section */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <Globe className="h-4 w-4 text-primary" />
+                Intelligent Multi-Page Crawling
+              </div>
+              <div className="ml-6 space-y-1">
+                <p className="text-xs text-muted-foreground">
+                  Automatically discovers and scrapes up to <span className="font-medium text-foreground">8 relevant subpages</span> per website:
+                </p>
+                <ul className="text-xs text-muted-foreground space-y-0.5 mt-1">
+                  <li>• Contact & About pages</li>
+                  <li>• Locations & Facilities</li>
+                  <li>• Team & Staff pages</li>
+                  <li>• Membership & Pricing</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="border-t border-border" />
+
             {/* Data Extracted Section */}
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                 <Database className="h-4 w-4 text-primary" />
                 Data Extracted
               </div>
-              <ul className="text-sm text-muted-foreground space-y-1 ml-6">
-                <li>• Business Description</li>
-                <li>• Team Members</li>
-                <li>• Phone Number, Email, Address</li>
-                <li>• Opening Hours</li>
+              <ul className="text-xs text-muted-foreground space-y-0.5 ml-6">
+                <li>• Business Description & Team Members</li>
+                <li>• Phone, Email, Address, Hours</li>
                 <li>• Social Media (Instagram, Facebook, LinkedIn, Twitter)</li>
-                <li>• WhatsApp Contact</li>
-                <li>• Number of Clubs/Locations, Courts</li>
-                <li>• Facilities Details</li>
+                <li>• WhatsApp, Locations, Facilities</li>
                 <li>• Custom Questions (up to 2)</li>
               </ul>
             </div>
@@ -337,7 +354,7 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
               <div className="ml-6 space-y-1">
                 <p className="text-sm font-medium text-foreground">Firecrawl</p>
                 <p className="text-xs text-muted-foreground">
-                  AI-powered web scraper that handles JavaScript-rendered pages. Captures both Markdown and HTML formats.
+                  Uses <span className="font-medium">/map</span> endpoint for URL discovery + multi-page scraping with Markdown & links extraction.
                 </p>
               </div>
             </div>
@@ -353,7 +370,7 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
               <div className="ml-6 space-y-1">
                 <p className="text-sm font-medium text-foreground">Claude 3.5 Haiku</p>
                 <p className="text-xs text-muted-foreground">
-                  Anthropic's fast model optimized for structured data extraction with excellent cost efficiency.
+                  Fast structured data extraction with page-marked content for accurate multi-source analysis.
                 </p>
               </div>
             </div>
