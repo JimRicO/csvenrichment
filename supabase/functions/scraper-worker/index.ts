@@ -1,11 +1,72 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import FirecrawlApp from "https://esm.sh/@mendable/firecrawl-js@1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Patterns to identify relevant subpages for comprehensive scraping
+const RELEVANT_PAGE_PATTERNS = [
+  // Contact pages
+  /\/(contact|kontakt|contacto|get-in-touch|reach-us|enquiry|enquiries)/i,
+  // Location pages  
+  /\/(locations?|find-a-club|clubs?|branches|stores|find-us|venues?|facilities|centers?|centres?)/i,
+  // About pages
+  /\/(about|about-us|who-we-are|our-story|company|info)/i,
+  // Team pages
+  /\/(team|our-team|staff|people|leadership|meet-the-team|coaches?|instructors?)/i,
+  // Membership/pricing pages (often have contact info)
+  /\/(membership|pricing|prices|rates|join|join-us)/i,
+];
+
+// Filter discovered URLs for relevant subpages
+function filterRelevantUrls(urls: string[], baseUrl: string): string[] {
+  try {
+    const base = new URL(baseUrl);
+    const relevantUrls: string[] = [];
+    
+    for (const url of urls) {
+      try {
+        const u = new URL(url);
+        // Same domain only
+        if (u.hostname !== base.hostname) continue;
+        // Skip homepage (we scrape it separately)
+        if (u.pathname === '/' || u.pathname === '') continue;
+        // Skip file downloads
+        if (/\.(pdf|doc|docx|xls|xlsx|zip|png|jpg|jpeg|gif|svg)$/i.test(u.pathname)) continue;
+        // Match patterns
+        if (RELEVANT_PAGE_PATTERNS.some(p => p.test(u.pathname))) {
+          relevantUrls.push(url);
+        }
+      } catch { 
+        continue; 
+      }
+    }
+    
+    // Deduplicate and limit to 8 subpages
+    return [...new Set(relevantUrls)].slice(0, 8);
+  } catch {
+    return [];
+  }
+}
+
+// Extract social media links from discovered links
+function extractSocialLinks(links: string[]): string[] {
+  const socialPatterns = [
+    /instagram\.com/i,
+    /facebook\.com/i,
+    /linkedin\.com/i,
+    /twitter\.com|x\.com/i,
+    /youtube\.com/i,
+    /tiktok\.com/i,
+    /whatsapp\.com|wa\.me/i,
+  ];
+  
+  return links.filter(link => 
+    socialPatterns.some(pattern => pattern.test(link))
+  );
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -68,33 +129,101 @@ serve(async (req) => {
       );
     }
 
+    console.log(`Starting multi-page scrape for row ${row.id} - ${row.website_url}`);
 
-    console.log(`Scraping row ${row.id} - ${row.website_url}`);
-
-    // Scrape the website using Firecrawl
-    const firecrawl = new FirecrawlApp({ apiKey: firecrawlApiKey });
-    
     try {
-      const scrapeResult = await firecrawl.scrapeUrl(row.website_url, {
-        formats: ['markdown', 'html'],
-        onlyMainContent: false,
-      });
-
-      if (!scrapeResult.success) {
-        throw new Error(scrapeResult.error || 'Scraping failed');
+      // Format URL
+      let formattedUrl = row.website_url.trim();
+      if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
+        formattedUrl = `https://${formattedUrl}`;
       }
 
-      // Store scraped content
-      const content = scrapeResult.markdown || scrapeResult.html || '';
-      const characterCount = content.length;
+      // STEP 1: Map the website to discover all URLs
+      console.log(`Mapping website: ${formattedUrl}`);
+      const mapResponse = await fetch('https://api.firecrawl.dev/v1/map', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${firecrawlApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: formattedUrl,
+          limit: 100, // Get up to 100 URLs for filtering
+          includeSubdomains: false,
+        }),
+      });
+
+      let discoveredUrls: string[] = [];
+      let relevantSubpages: string[] = [];
+
+      if (mapResponse.ok) {
+        const mapData = await mapResponse.json();
+        discoveredUrls = mapData.links || [];
+        console.log(`Discovered ${discoveredUrls.length} URLs from map`);
+        
+        // STEP 2: Filter for relevant subpages
+        relevantSubpages = filterRelevantUrls(discoveredUrls, formattedUrl);
+        console.log(`Selected ${relevantSubpages.length} relevant subpages: ${relevantSubpages.join(', ')}`);
+      } else {
+        console.warn(`Map failed (${mapResponse.status}), proceeding with homepage only`);
+      }
+
+      // STEP 3: Scrape homepage + relevant subpages
+      const pagesToScrape = [formattedUrl, ...relevantSubpages];
+      const allContent: string[] = [];
+      const allLinks: string[] = [];
+      let totalCharacters = 0;
+
+      for (const pageUrl of pagesToScrape) {
+        console.log(`Scraping: ${pageUrl}`);
+        
+        const scrapeResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${firecrawlApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            url: pageUrl,
+            formats: ['markdown', 'links'],
+            onlyMainContent: false, // Get full page to capture footer links
+          }),
+        });
+
+        if (scrapeResponse.ok) {
+          const scrapeData = await scrapeResponse.json();
+          const pageContent = scrapeData.data?.markdown || scrapeData.markdown || '';
+          const pageLinks = scrapeData.data?.links || scrapeData.links || [];
+          
+          // Add page marker and content
+          const pagePath = new URL(pageUrl).pathname || '/';
+          allContent.push(`\n\n## PAGE: ${pagePath} (${pageUrl})\n\n${pageContent}`);
+          allLinks.push(...pageLinks);
+          totalCharacters += pageContent.length;
+          
+          console.log(`Scraped ${pageUrl}: ${pageContent.length} chars, ${pageLinks.length} links`);
+        } else {
+          console.warn(`Failed to scrape ${pageUrl}: ${scrapeResponse.status}`);
+        }
+      }
+
+      // STEP 4: Combine all content
+      const combinedContent = allContent.join('\n\n---\n');
+      const uniqueLinks = [...new Set(allLinks)];
+      const socialLinks = extractSocialLinks(uniqueLinks);
+
+      console.log(`Total content: ${combinedContent.length} chars from ${pagesToScrape.length} pages`);
+      console.log(`Found ${socialLinks.length} social media links`);
 
       // Update row with scraped content
       const { error: updateError } = await supabase
         .from('scraped_rows')
         .update({
-          scraped_content: content,
+          scraped_content: combinedContent,
           scrape_status: 'completed',
           scraped_at: new Date().toISOString(),
+          pages_scraped: pagesToScrape.length,
+          discovered_links: uniqueLinks,
         })
         .eq('id', row.id);
 
@@ -114,20 +243,22 @@ serve(async (req) => {
         await supabase
           .from('scraping_jobs')
           .update({
-            total_pages_scraped: currentJob.total_pages_scraped + 1,
-            total_characters_scraped: currentJob.total_characters_scraped + characterCount,
+            total_pages_scraped: currentJob.total_pages_scraped + pagesToScrape.length,
+            total_characters_scraped: currentJob.total_characters_scraped + totalCharacters,
           })
           .eq('id', row.job_id);
       }
 
-      console.log(`Successfully scraped ${row.website_url} (${characterCount} chars)`);
+      console.log(`Successfully completed multi-page scrape for ${row.website_url}`);
 
       return new Response(
         JSON.stringify({
           success: true,
           row_id: row.id,
           url: row.website_url,
-          characters_scraped: characterCount,
+          pages_scraped: pagesToScrape.length,
+          characters_scraped: totalCharacters,
+          social_links_found: socialLinks.length,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

@@ -115,6 +115,35 @@ serve(async (req) => {
       dynamicPrompt += `\n\n### CUSTOM QUESTIONS TO ANSWER:\n${customQuestions.join('\n')}`;
     }
 
+    // Build enhanced context with discovered links
+    let contentContext = row.scraped_content || '';
+    
+    // Add discovered social media links as a hint to the AI
+    if (row.discovered_links && Array.isArray(row.discovered_links) && row.discovered_links.length > 0) {
+      const socialPatterns = [
+        /instagram\.com/i,
+        /facebook\.com/i,
+        /linkedin\.com/i,
+        /twitter\.com|x\.com/i,
+        /youtube\.com/i,
+        /tiktok\.com/i,
+        /whatsapp\.com|wa\.me/i,
+      ];
+      
+      const socialLinks = row.discovered_links.filter((link: string) => 
+        socialPatterns.some(pattern => pattern.test(link))
+      );
+      
+      if (socialLinks.length > 0) {
+        contentContext += `\n\n## DISCOVERED SOCIAL MEDIA LINKS (from page footers/headers):\n${socialLinks.join('\n')}`;
+      }
+    }
+    
+    // Add note about multi-page content
+    if (row.pages_scraped && row.pages_scraped > 1) {
+      console.log(`Processing multi-page content from ${row.pages_scraped} pages`);
+    }
+
     // Call Claude API using model configuration from database
     const anthropic = new Anthropic({ apiKey: anthropicApiKey });
 
@@ -124,7 +153,7 @@ serve(async (req) => {
         max_tokens: 2048,
         messages: [{
           role: 'user',
-          content: `${dynamicPrompt}\n\nWebsite Content:\n${row.scraped_content}`,
+          content: `${dynamicPrompt}\n\nWebsite Content (scraped from ${row.pages_scraped || 1} page(s)):\n${contentContext}`,
         }],
       });
 

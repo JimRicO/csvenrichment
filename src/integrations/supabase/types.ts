@@ -276,6 +276,7 @@ export type Database = {
           custom_answer_1: string | null
           custom_answer_2: string | null
           detailed_team_members: string | null
+          discovered_links: Json | null
           email: string | null
           extracted_at: string | null
           extraction_error_message: string | null
@@ -290,6 +291,7 @@ export type Database = {
           opening_hours: string | null
           original_row_data: Json | null
           output_tokens: number | null
+          pages_scraped: number | null
           people_search_error: string | null
           people_search_status: string | null
           people_searched_at: string | null
@@ -314,6 +316,7 @@ export type Database = {
           custom_answer_1?: string | null
           custom_answer_2?: string | null
           detailed_team_members?: string | null
+          discovered_links?: Json | null
           email?: string | null
           extracted_at?: string | null
           extraction_error_message?: string | null
@@ -328,6 +331,7 @@ export type Database = {
           opening_hours?: string | null
           original_row_data?: Json | null
           output_tokens?: number | null
+          pages_scraped?: number | null
           people_search_error?: string | null
           people_search_status?: string | null
           people_searched_at?: string | null
@@ -352,6 +356,7 @@ export type Database = {
           custom_answer_1?: string | null
           custom_answer_2?: string | null
           detailed_team_members?: string | null
+          discovered_links?: Json | null
           email?: string | null
           extracted_at?: string | null
           extraction_error_message?: string | null
@@ -366,6 +371,7 @@ export type Database = {
           opening_hours?: string | null
           original_row_data?: Json | null
           output_tokens?: number | null
+          pages_scraped?: number | null
           people_search_error?: string | null
           people_search_status?: string | null
           people_searched_at?: string | null
