@@ -246,10 +246,11 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
               </div>
               <ul className="text-xs text-muted-foreground space-y-0.5 ml-6">
                 <li>• Username, Full Name, Biography</li>
-                <li>• Followers, Following, Posts Count</li>
-                <li>• Verified Status & External URL</li>
-                <li>• Related Profiles (competitors)</li>
-                <li>• Latest Posts with Engagement</li>
+                <li>• Followers & Posts Count</li>
+                <li>• Verified & Business Account Status</li>
+                <li>• External URL (if listed)</li>
+                <li>• Related Profiles</li>
+                <li>• Latest 12 Posts with Engagement</li>
               </ul>
             </div>
 
