@@ -104,16 +104,16 @@ const StatsCards = () => {
         return (
           <Card
             key={stat.title}
-            className="p-4 gradient-card border-border/50 hover:border-primary/30 transition-smooth group"
+            className="p-5 hover:neu-raised transition-all duration-300 group"
           >
             <div className="mb-3">
-              <div className={`p-2.5 rounded-lg ${stat.bgColor} border border-current/20 group-hover:glow-primary transition-smooth inline-flex`}>
-                <Icon className={`h-4 w-4 ${stat.color}`} />
+              <div className={`p-2.5 rounded-xl ${stat.bgColor} group-hover:glow-primary transition-smooth inline-flex`}>
+                <Icon className={`h-5 w-5 ${stat.color}`} />
               </div>
             </div>
             <div className="min-w-0">
-              <p className="text-xl md:text-2xl font-bold text-foreground mb-1 break-all">{stat.value}</p>
-              <p className="text-xs text-muted-foreground">{stat.title}</p>
+              <p className="text-2xl md:text-3xl font-bold text-foreground mb-1 break-all">{stat.value}</p>
+              <p className="text-sm text-muted-foreground">{stat.title}</p>
             </div>
           </Card>
         );
