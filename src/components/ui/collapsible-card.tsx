@@ -24,12 +24,12 @@ export const CollapsibleCard = ({
   const [isOpen, setIsOpen] = React.useState(defaultOpen);
 
   return (
-    <Card className={cn("overflow-hidden", className)}>
+    <Card className={cn("overflow-hidden border-0", className)}>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CollapsibleTrigger asChild>
           <div
             className={cn(
-              "cursor-pointer select-none transition-colors hover:bg-secondary/30",
+              "cursor-pointer select-none transition-all duration-200 hover:bg-muted/30 rounded-t-2xl",
               headerClassName
             )}
           >
