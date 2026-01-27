@@ -53,6 +53,173 @@ export type Database = {
         }
         Relationships: []
       }
+      enriched_clubs: {
+        Row: {
+          address: string | null
+          aesthetics: string | null
+          attitude: string | null
+          club_name: string
+          color_palette: Json | null
+          created_at: string
+          description: string | null
+          email: string | null
+          enrichment_row_id: string
+          fonts: Json | null
+          id: string
+          instagram_bio: string | null
+          instagram_followers: number | null
+          instagram_handle: string | null
+          instagram_profile_pic_url: string | null
+          job_id: string
+          logo_storage_url: string | null
+          phone: string | null
+          raw_branding_data: Json | null
+          raw_instagram_data: Json | null
+          scraped_content: string | null
+          updated_at: string
+          website_url: string | null
+        }
+        Insert: {
+          address?: string | null
+          aesthetics?: string | null
+          attitude?: string | null
+          club_name: string
+          color_palette?: Json | null
+          created_at?: string
+          description?: string | null
+          email?: string | null
+          enrichment_row_id: string
+          fonts?: Json | null
+          id?: string
+          instagram_bio?: string | null
+          instagram_followers?: number | null
+          instagram_handle?: string | null
+          instagram_profile_pic_url?: string | null
+          job_id: string
+          logo_storage_url?: string | null
+          phone?: string | null
+          raw_branding_data?: Json | null
+          raw_instagram_data?: Json | null
+          scraped_content?: string | null
+          updated_at?: string
+          website_url?: string | null
+        }
+        Update: {
+          address?: string | null
+          aesthetics?: string | null
+          attitude?: string | null
+          club_name?: string
+          color_palette?: Json | null
+          created_at?: string
+          description?: string | null
+          email?: string | null
+          enrichment_row_id?: string
+          fonts?: Json | null
+          id?: string
+          instagram_bio?: string | null
+          instagram_followers?: number | null
+          instagram_handle?: string | null
+          instagram_profile_pic_url?: string | null
+          job_id?: string
+          logo_storage_url?: string | null
+          phone?: string | null
+          raw_branding_data?: Json | null
+          raw_instagram_data?: Json | null
+          scraped_content?: string | null
+          updated_at?: string
+          website_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enriched_clubs_enrichment_row_id_fkey"
+            columns: ["enrichment_row_id"]
+            isOneToOne: false
+            referencedRelation: "enrichment_rows"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enriched_clubs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "enrichment_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      enrichment_jobs: {
+        Row: {
+          created_at: string
+          estimated_cost_usd: number
+          id: string
+          processed_rows: number
+          project_id: string
+          status: string
+          total_rows: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          estimated_cost_usd?: number
+          id: string
+          processed_rows?: number
+          project_id: string
+          status?: string
+          total_rows?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          estimated_cost_usd?: number
+          id?: string
+          processed_rows?: number
+          project_id?: string
+          status?: string
+          total_rows?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      enrichment_rows: {
+        Row: {
+          club_name: string
+          created_at: string
+          error_message: string | null
+          id: string
+          instagram_handle: string | null
+          job_id: string
+          status: string
+          website_url: string
+        }
+        Insert: {
+          club_name: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          instagram_handle?: string | null
+          job_id: string
+          status?: string
+          website_url: string
+        }
+        Update: {
+          club_name?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          instagram_handle?: string | null
+          job_id?: string
+          status?: string
+          website_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrichment_rows_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "enrichment_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       instagram_company_data: {
         Row: {
           biography: string | null
@@ -485,6 +652,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      increment_enrichment_job_processed: {
+        Args: { cost_increment: number; job_id_param: string }
+        Returns: {
+          estimated_cost_usd: number
+          processed_rows: number
+          status: string
+          total_rows: number
+        }[]
+      }
       increment_instagram_job_processed: {
         Args: { cost_increment: number; job_id_param: string }
         Returns: {

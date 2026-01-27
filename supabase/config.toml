@@ -42,3 +42,18 @@ verify_jwt = false
 
 [functions.download-instagram-csv]
 verify_jwt = false
+
+[functions.extract-branding]
+verify_jwt = false
+
+[functions.create-enrichment-job]
+verify_jwt = false
+
+[functions.enrichment-worker]
+verify_jwt = false
+
+[functions.get-enrichment-status]
+verify_jwt = false
+
+[functions.download-enrichment-csv]
+verify_jwt = false
