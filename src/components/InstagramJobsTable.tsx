@@ -26,6 +26,7 @@ interface InstagramJob {
   profiles_scraped?: number;
   total_posts?: number;
   total_related?: number;
+  instagram_handles?: string[];
 }
 
 const StatusBadge = ({ status }: { status: string }) => {
@@ -114,16 +115,20 @@ const InstagramJobsTable = () => {
       // For each job, get counts from instagram_company_data
       const jobsWithCounts = await Promise.all(
         (jobsData || []).map(async (job) => {
-          const { data: statsData } = await supabase
+        const { data: statsData } = await supabase
             .from('instagram_company_data')
-            .select('latest_posts, related_profiles')
+            .select('username, latest_posts, related_profiles')
             .eq('job_id', job.id);
 
           let totalPosts = 0;
           let totalRelated = 0;
           const profilesScraped = statsData?.length || 0;
+          const instagramHandles: string[] = [];
 
           statsData?.forEach((profile: any) => {
+            if (profile.username) {
+              instagramHandles.push(profile.username);
+            }
             totalPosts += (profile.latest_posts?.length || 0);
             totalRelated += (profile.related_profiles?.length || 0);
           });
@@ -133,6 +138,7 @@ const InstagramJobsTable = () => {
             profiles_scraped: profilesScraped,
             total_posts: totalPosts,
             total_related: totalRelated,
+            instagram_handles: instagramHandles,
           };
         })
       );
@@ -207,6 +213,7 @@ const InstagramJobsTable = () => {
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="text-muted-foreground">Job ID</TableHead>
+                  <TableHead className="text-muted-foreground">Handle</TableHead>
                   <TableHead className="text-muted-foreground">Status</TableHead>
                   <TableHead className="text-muted-foreground">Progress</TableHead>
                   <TableHead className="text-muted-foreground">Profiles</TableHead>
@@ -223,8 +230,26 @@ const InstagramJobsTable = () => {
                     key={job.id}
                     className="border-border hover:bg-secondary/50 transition-smooth"
                   >
-                    <TableCell className="font-medium text-foreground max-w-[150px]">
+                    <TableCell className="font-medium text-foreground max-w-[120px]">
                       <div className="truncate text-xs">{job.project_id}</div>
+                    </TableCell>
+                    <TableCell className="max-w-[150px]">
+                      {job.instagram_handles && job.instagram_handles.length > 0 ? (
+                        <div className="flex flex-col gap-0.5">
+                          {job.instagram_handles.slice(0, 2).map((handle, idx) => (
+                            <span key={idx} className="text-xs text-primary font-medium truncate">
+                              @{handle}
+                            </span>
+                          ))}
+                          {job.instagram_handles.length > 2 && (
+                            <span className="text-xs text-muted-foreground">
+                              +{job.instagram_handles.length - 2} more
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={job.status} />
