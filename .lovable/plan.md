@@ -1,132 +1,112 @@
 
 
-# Add Logo Extraction to Website Scraper Module
+# Add Missing Fields to Website Scraper UI
 
 ## Overview
 
-Enhance the **Website Scraper** module ("Scrape a single website or bulk process from CSV" in `UploadSection.tsx`) to extract and persist club logos using Firecrawl's branding format.
+Update the "Select Data to Extract" section in `UploadSection.tsx` to show all fields that will be extracted, giving users complete visibility into what data they'll receive.
 
 ---
 
-## Current State
+## Current vs. Proposed UI
 
-| Component | Function | Logo Support |
-|-----------|----------|--------------|
-| `scraper-worker` | Scrapes pages with `formats: ['markdown', 'links']` | None |
-| `extractor-worker` | AI extraction of business data | None |
-| `scraped_rows` table | Stores scraped/extracted data | No logo columns |
-| `WebsiteResultsDialog` | Displays results table | No logo display |
-| `download-csv` | Exports enriched CSV | No logo columns |
+### Current Checkboxes (6 items)
+| Field | Displayed |
+|-------|-----------|
+| Business Description | Yes |
+| Team Members | Yes |
+| Social Media | Yes |
+| WhatsApp Contact | Yes |
+| Custom Question 1 | Yes |
+| Custom Question 2 | Yes |
 
----
-
-## Changes Required
-
-### 1. Database Migration
-
-Add two new columns to the `scraped_rows` table:
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `logo_url` | text | Original logo URL from Firecrawl branding response |
-| `logo_storage_url` | text | Persisted logo URL in Supabase Storage (brand-images bucket) |
-
----
-
-### 2. Edge Function: scraper-worker
-
-Modify to add a **branding extraction step** after content scraping:
-
-**Current Flow:**
-1. Map website URLs
-2. Scrape homepage + subpages with `formats: ['markdown', 'links']`
-3. Save content to database
-
-**New Flow:**
-1. Map website URLs
-2. Scrape homepage + subpages with `formats: ['markdown', 'links']`
-3. **NEW: Call Firecrawl with `formats: ['branding']` on homepage**
-4. **NEW: Extract logo URL from `branding.images.logo`**
-5. **NEW: Download and persist logo to `brand-images` storage bucket**
-6. Save content + logo URLs to database
-
-**Logo Download Pattern** (from existing `enrichment-worker`):
-- Fetch logo with User-Agent header
-- Handle HTTPS failures with HTTP fallback (SSL certificate issues)
-- Detect content type and file extension
-- Upload to storage: `{hostname}/logo-{timestamp}.{ext}`
-- Get public URL
+### Missing Fields to Add (7 items)
+| Field | Icon | Note |
+|-------|------|------|
+| Logo | Image icon | NEW - just implemented |
+| Phone Number | Phone icon | |
+| Email | Mail icon | |
+| Address | MapPin icon | |
+| Opening Hours | Clock icon | |
+| Facilities | LayoutGrid icon | Clubs, Courts, Details |
+| Club Locations | Building2 icon | Individual branch data |
 
 ---
 
-### 3. Frontend: UploadSection.tsx
+## Design Approach
 
-Update the single-scrape result display to show the logo:
+Since the backend extracts **all fields by default** regardless of checkbox state, we have two options:
 
-- Add logo thumbnail above or beside website URL
-- Handle broken images with fallback icon
-- Show "No logo found" placeholder if none extracted
+**Option A: Display-only indicators (Recommended)**
+- Show all fields as checked/enabled indicators (not interactive checkboxes)
+- Makes it clear what data will be extracted
+- No confusing toggles that don't actually do anything
 
----
+**Option B: Keep checkboxes but add all fields**
+- Add the missing fields as checkboxes
+- They would all be checked by default
+- Still misleading since backend ignores the config
 
-### 4. Frontend: WebsiteResultsDialog.tsx
-
-Update the results table to include a Logo column:
-
-- Add "Logo" column to table header
-- Display logo thumbnail (40x40px) with tooltip for full preview
-- Use `ImageOff` icon as fallback for missing logos
-- Make logo clickable to open full size in new tab
+**Recommendation**: Use Option A - Replace the checkbox section with a clean "Data Extracted" info section that shows all fields with icons, similar to the popover info panel already in the header.
 
 ---
 
-### 5. Edge Function: download-csv
+## Implementation Details
 
-Update CSV export to include logo URLs:
+### Modified File
+- `src/components/UploadSection.tsx`
 
-- Add `Logo URL` column (original source URL)
-- Add `Logo Storage URL` column (persisted URL)
+### Changes to Lines 791-850
+
+Replace the current checkbox-based "Select Data to Extract" section with a reorganized layout:
+
+1. **Data Fields Section** (display-only with icons)
+   - Grouped into categories for clarity:
+     - **Basic Info**: Logo, Business Description, Team Members
+     - **Contact**: Phone, Email, Address, Opening Hours, WhatsApp
+     - **Social Media**: Instagram, Facebook, LinkedIn, Twitter
+     - **Facilities**: Number of Clubs/Courts, Facilities Details, Club Locations
+
+2. **Custom Questions Section** (keep interactive)
+   - Keep the two custom question input fields
+   - These are the only truly customizable extraction options
+
+### Visual Layout
+
+```text
++--------------------------------------------------+
+| Data to Extract:                                  |
+|                                                   |
+| [Check] Logo & Business Info                      |
+|         Logo, Description, Team Members           |
+|                                                   |
+| [Check] Contact Details                           |
+|         Phone, Email, Address, Hours, WhatsApp    |
+|                                                   |
+| [Check] Social Media                              |
+|         Instagram, Facebook, LinkedIn, Twitter    |
+|                                                   |
+| [Check] Facilities                                |
+|         Clubs, Courts, Details, Locations         |
+|                                                   |
+| Custom Question 1 (optional)                      |
+| [________________________]                        |
+|                                                   |
+| Custom Question 2 (optional)                      |
+| [________________________]                        |
++--------------------------------------------------+
+```
+
+All checkboxes will be checked and disabled (greyed out) to indicate these are always extracted, while the custom questions remain editable.
 
 ---
 
-## Technical Details
+## Summary
 
-### Modified Files
-
-1. **Database Migration**
-   - Add `logo_url` and `logo_storage_url` columns to `scraped_rows`
-
-2. **supabase/functions/scraper-worker/index.ts**
-   - Add Firecrawl branding call after content scrape
-   - Add logo download and storage persistence
-   - Update database row with logo URLs
-
-3. **src/components/UploadSection.tsx**
-   - Add logo display to single-scrape results (lines ~410-430)
-   - Add `logo_url` and `logo_storage_url` to `ScrapedResult` interface
-
-4. **src/components/WebsiteResultsDialog.tsx**
-   - Add Logo column to table header and rows
-   - Update `ScrapedRow` interface with logo fields
-   - Add logo thumbnail with fallback
-
-5. **supabase/functions/download-csv/index.ts**
-   - Add logo URLs to CSV headers and row data
-
----
-
-## Cost Impact
-
-- Additional Firecrawl credit (~$0.001) per website for branding extraction
-- Total cost per website increases from ~$0.002 to ~$0.003
-
----
-
-## Implementation Sequence
-
-1. Create database migration to add logo columns
-2. Update `scraper-worker` with branding extraction + storage
-3. Update `UploadSection.tsx` single-scrape result display
-4. Update `WebsiteResultsDialog.tsx` with Logo column
-5. Update `download-csv` to include logo URLs
+| What Changes | Description |
+|--------------|-------------|
+| Add missing fields | Logo, Phone, Email, Address, Hours, Facilities, Locations |
+| Reorganize layout | Group related fields into categories |
+| Disable checkboxes | Show as always-on since backend extracts all |
+| Keep custom questions | Only truly customizable options remain interactive |
 
