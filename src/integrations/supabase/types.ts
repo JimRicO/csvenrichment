@@ -65,6 +65,8 @@ export type Database = {
           email: string | null
           enrichment_row_id: string
           fonts: Json | null
+          founder_info: string | null
+          founding_year: string | null
           id: string
           instagram_bio: string | null
           instagram_followers: number | null
@@ -72,9 +74,12 @@ export type Database = {
           instagram_profile_pic_url: string | null
           job_id: string
           logo_storage_url: string | null
+          perplexity_citations: Json | null
+          perplexity_description: string | null
           phone: string | null
           raw_branding_data: Json | null
           raw_instagram_data: Json | null
+          recent_activities: Json | null
           scraped_content: string | null
           updated_at: string
           website_url: string | null
@@ -90,6 +95,8 @@ export type Database = {
           email?: string | null
           enrichment_row_id: string
           fonts?: Json | null
+          founder_info?: string | null
+          founding_year?: string | null
           id?: string
           instagram_bio?: string | null
           instagram_followers?: number | null
@@ -97,9 +104,12 @@ export type Database = {
           instagram_profile_pic_url?: string | null
           job_id: string
           logo_storage_url?: string | null
+          perplexity_citations?: Json | null
+          perplexity_description?: string | null
           phone?: string | null
           raw_branding_data?: Json | null
           raw_instagram_data?: Json | null
+          recent_activities?: Json | null
           scraped_content?: string | null
           updated_at?: string
           website_url?: string | null
@@ -115,6 +125,8 @@ export type Database = {
           email?: string | null
           enrichment_row_id?: string
           fonts?: Json | null
+          founder_info?: string | null
+          founding_year?: string | null
           id?: string
           instagram_bio?: string | null
           instagram_followers?: number | null
@@ -122,9 +134,12 @@ export type Database = {
           instagram_profile_pic_url?: string | null
           job_id?: string
           logo_storage_url?: string | null
+          perplexity_citations?: Json | null
+          perplexity_description?: string | null
           phone?: string | null
           raw_branding_data?: Json | null
           raw_instagram_data?: Json | null
+          recent_activities?: Json | null
           scraped_content?: string | null
           updated_at?: string
           website_url?: string | null
