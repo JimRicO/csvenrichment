@@ -1,98 +1,97 @@
 
-# Implementation: Add Perplexity Searches to Enrichment Pipeline
+# Fix Perplexity Research Placement and Card Overflow
 
-## Problem Identified
+## Issues Identified
 
-The database migration added the new columns, but two key pieces are missing:
-1. The `enrichment-worker` edge function doesn't call Perplexity API
-2. The `EnrichedClubsDialog` UI doesn't display the new fields
+Based on the screenshot:
+1. **Wrong Order**: Perplexity description, founder info, and recent activities appear before the AI analysis sections
+2. **Overflow Bug**: Long citation URLs in the Sources section are overflowing outside the card boundary
 
----
+## Solution
 
-## Implementation Steps
+### 1. Reorder Content Sections
 
-### Step 1: Update enrichment-worker Edge Function
+Move all Perplexity research content to appear AFTER the Aesthetics field:
 
-**File:** `supabase/functions/enrichment-worker/index.ts`
-
-Add a new Step 4 (Perplexity Search) between Instagram scrape and Claude AI analysis:
-
-| Search | Query | Purpose |
-|--------|-------|---------|
-| 1 | `{clubName}` | Simple club description |
-| 2 | `{clubName} founder history background` | Founder info |
-| 3 | `{clubName} recent news events 2025` | Recent activities |
-
-```text
-// After Step 3 (Instagram), before Step 4 (Claude):
-// ========== STEP 4: Perplexity Web Search ==========
-
-1. Check if PERPLEXITY_API_KEY is configured
-2. Run 3 parallel searches using Promise.all()
-3. Parse responses and extract citations
-4. Pass results to Claude prompt
-5. Track cost (~$0.015-0.03 for 3 searches)
+**Current Order:**
+```
+Header -> Perplexity Description -> Founder Info -> Recent Activities -> Instagram -> Contact -> Colors -> Fonts -> Description -> Attitude -> Aesthetics -> Sources
 ```
 
-Update the Claude prompt to include Perplexity data and generate additional fields:
-- `founder_info`
-- `founding_year`
-- `recent_activities` (array)
+**New Order:**
+```
+Header -> Instagram -> Contact -> Colors -> Fonts -> Description -> Attitude -> Aesthetics -> Perplexity Description -> Founder Info -> Recent Activities -> Sources
+```
 
-Update the database insert to include:
-- `perplexity_description`
-- `founder_info`
-- `founding_year`
-- `recent_activities`
-- `perplexity_citations`
+### 2. Fix Citation Overflow
 
----
+The overflow issue is caused by long URLs not being contained properly. Apply these CSS fixes:
 
-### Step 2: Update EnrichedClubsDialog UI
+| Property | Purpose |
+|----------|---------|
+| `overflow-hidden` | Prevent content from spilling out |
+| `break-all` | Allow breaking long URLs at any character |
+| `max-w-full` | Constrain width to parent container |
+
+## File Changes
 
 **File:** `src/components/EnrichedClubsDialog.tsx`
 
-1. Update `EnrichedClub` interface to include new fields:
-```typescript
-interface EnrichedClub {
-  // ... existing fields ...
-  perplexity_description: string | null;
-  founder_info: string | null;
-  founding_year: string | null;
-  recent_activities: { title: string; date?: string; source?: string }[];
-  perplexity_citations: string[];
-}
+### Changes:
+1. Move lines 213-252 (Perplexity Description, Founder Info, Recent Activities) to after line 371 (after Aesthetics section)
+2. Add `overflow-hidden` to the Sources collapsible container
+3. Add `break-all` class to citation links to handle long URLs
+4. Wrap citations in a container with proper width constraints
+
+### Code Structure After Fix:
+
+```text
+<div className="space-y-6">
+  {/* Header with logo */}
+  
+  {/* Instagram section */}
+  
+  {/* Contact info */}
+  
+  {/* Color palette */}
+  
+  {/* Fonts */}
+  
+  {/* AI Analysis: Description, Attitude, Aesthetics */}
+  
+  {/* === PERPLEXITY RESEARCH (moved here) === */}
+  {/* Perplexity Description */}
+  {/* Founder Info */}
+  {/* Recent Activities */}
+  {/* Sources/Citations */}
+</div>
 ```
 
-2. Add new UI sections:
-   - **Perplexity Description** - displayed prominently near the top
-   - **Founder Information** - with founding year badge
-   - **Recent Activities** - list with clickable source links
-   - **Sources** - collapsible section showing all Perplexity citations
+### CSS Fix for Overflow:
 
----
+```tsx
+<CollapsibleContent className="mt-2 overflow-hidden">
+  <div className="space-y-1 p-3 rounded-xl neu-pressed max-w-full overflow-hidden">
+    {selectedClub.perplexity_citations.map((citation, idx) => (
+      <a
+        key={idx}
+        href={citation}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block text-xs text-primary hover:underline break-all"
+      >
+        {citation}
+      </a>
+    ))}
+  </div>
+</CollapsibleContent>
+```
 
-## Files to Modify
+## Technical Summary
 
-| File | Changes |
-|------|---------|
-| `supabase/functions/enrichment-worker/index.ts` | Add Perplexity search step, update Claude prompt, store new fields |
-| `src/components/EnrichedClubsDialog.tsx` | Update interface, add UI sections for new fields |
-
----
-
-## Cost Impact
-
-| Item | Cost |
-|------|------|
-| Perplexity (3 searches) | ~$0.015-0.03 |
-| Total per club (with existing) | ~$0.024-0.039 |
-
----
-
-## Considerations
-
-- Perplexity step is optional - skips gracefully if API key not configured
-- All 3 Perplexity searches run in parallel for speed
-- Rate limit handling with exponential backoff for 429 errors
-- Citations stored for transparency and source verification
+| Change | Lines Affected |
+|--------|----------------|
+| Move Perplexity Description section | 213-218 to after 371 |
+| Move Founder Info section | 220-229 to after 371 |
+| Move Recent Activities section | 231-252 to after 371 |
+| Fix citation overflow | 385-399 |
