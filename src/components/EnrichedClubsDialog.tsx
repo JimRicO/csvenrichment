@@ -210,47 +210,6 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
                   </div>
                 </div>
 
-                {/* Perplexity Description - prominent placement */}
-                {selectedClub.perplexity_description && (
-                  <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
-                    <p className="text-sm leading-relaxed">{selectedClub.perplexity_description}</p>
-                  </div>
-                )}
-
-                {/* Founder Info */}
-                {selectedClub.founder_info && (
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium flex items-center gap-2">
-                      <User className="h-4 w-4 text-primary" />
-                      Founder & Background
-                    </h3>
-                    <p className="text-sm p-4 rounded-xl neu-pressed">{selectedClub.founder_info}</p>
-                  </div>
-                )}
-
-                {/* Recent Activities */}
-                {selectedClub.recent_activities && selectedClub.recent_activities.length > 0 && (
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium flex items-center gap-2">
-                      <Activity className="h-4 w-4 text-primary" />
-                      Recent Activities
-                    </h3>
-                    <div className="space-y-2">
-                      {selectedClub.recent_activities.map((activity, idx) => (
-                        <div key={idx} className="flex items-start gap-3 p-3 rounded-lg neu-subtle">
-                          <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0" />
-                          <div className="flex-1">
-                            <p className="text-sm">{activity.title}</p>
-                            {activity.date && (
-                              <p className="text-xs text-muted-foreground mt-0.5">{activity.date}</p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 {/* Instagram section */}
                 {selectedClub.instagram_handle && (
                   <div className="p-4 rounded-xl neu-pressed">
@@ -371,6 +330,48 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
                   )}
                 </div>
 
+                {/* === PERPLEXITY RESEARCH === */}
+                {/* Perplexity Description */}
+                {selectedClub.perplexity_description && (
+                  <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
+                    <p className="text-sm leading-relaxed">{selectedClub.perplexity_description}</p>
+                  </div>
+                )}
+
+                {/* Founder Info */}
+                {selectedClub.founder_info && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium flex items-center gap-2">
+                      <User className="h-4 w-4 text-primary" />
+                      Founder & Background
+                    </h3>
+                    <p className="text-sm p-4 rounded-xl neu-pressed">{selectedClub.founder_info}</p>
+                  </div>
+                )}
+
+                {/* Recent Activities */}
+                {selectedClub.recent_activities && selectedClub.recent_activities.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium flex items-center gap-2">
+                      <Activity className="h-4 w-4 text-primary" />
+                      Recent Activities
+                    </h3>
+                    <div className="space-y-2">
+                      {selectedClub.recent_activities.map((activity, idx) => (
+                        <div key={idx} className="flex items-start gap-3 p-3 rounded-lg neu-subtle">
+                          <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm">{activity.title}</p>
+                            {activity.date && (
+                              <p className="text-xs text-muted-foreground mt-0.5">{activity.date}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Citations - Collapsible */}
                 {selectedClub.perplexity_citations && selectedClub.perplexity_citations.length > 0 && (
                   <Collapsible open={citationsOpen} onOpenChange={setCitationsOpen}>
@@ -382,15 +383,15 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
                         citationsOpen && "rotate-180"
                       )} />
                     </CollapsibleTrigger>
-                    <CollapsibleContent className="mt-2">
-                      <div className="space-y-1 p-3 rounded-xl neu-pressed">
+                    <CollapsibleContent className="mt-2 overflow-hidden">
+                      <div className="space-y-1 p-3 rounded-xl neu-pressed max-w-full overflow-hidden">
                         {selectedClub.perplexity_citations.map((citation, idx) => (
                           <a
                             key={idx}
                             href={citation}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="block text-xs text-primary hover:underline truncate"
+                            className="block text-xs text-primary hover:underline break-all"
                           >
                             {citation}
                           </a>
