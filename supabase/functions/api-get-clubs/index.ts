@@ -30,8 +30,9 @@ serve(async (req) => {
     const needsEnrichment = url.searchParams.get('needs_enrichment') === 'true';
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 200);
     const offset = parseInt(url.searchParams.get('offset') || '0');
+    const jobId = url.searchParams.get('job_id');
 
-    console.log(`api-get-clubs: needs_enrichment=${needsEnrichment}, limit=${limit}, offset=${offset}`);
+    console.log(`api-get-clubs: needs_enrichment=${needsEnrichment}, limit=${limit}, offset=${offset}, job_id=${jobId}`);
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -65,6 +66,11 @@ serve(async (req) => {
         created_at,
         updated_at
       `);
+
+    // Filter by job_id if provided
+    if (jobId) {
+      query = query.eq('job_id', jobId);
+    }
 
     // Filter for clubs needing enrichment
     if (needsEnrichment) {
