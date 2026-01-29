@@ -1,112 +1,94 @@
 
 
-# Add Missing Fields to Website Scraper UI
+# Improve CSV Validation Feedback
 
 ## Overview
 
-Update the "Select Data to Extract" section in `UploadSection.tsx` to show all fields that will be extracted, giving users complete visibility into what data they'll receive.
+Add immediate validation after CSV parsing to inform users right away if their file is missing a required `website` or `url` column, rather than waiting until they click "Start Scraping Job".
 
 ---
 
-## Current vs. Proposed UI
+## Current Flow
 
-### Current Checkboxes (6 items)
-| Field | Displayed |
-|-------|-----------|
-| Business Description | Yes |
-| Team Members | Yes |
-| Social Media | Yes |
-| WhatsApp Contact | Yes |
-| Custom Question 1 | Yes |
-| Custom Question 2 | Yes |
+1. User uploads CSV file
+2. File is parsed successfully
+3. User sees: "File uploaded successfully - X rows found"
+4. User clicks "Start Scraping Job"
+5. **Only then** they get error: "CSV must contain a 'website' or 'url' column"
 
-### Missing Fields to Add (7 items)
-| Field | Icon | Note |
-|-------|------|------|
-| Logo | Image icon | NEW - just implemented |
-| Phone Number | Phone icon | |
-| Email | Mail icon | |
-| Address | MapPin icon | |
-| Opening Hours | Clock icon | |
-| Facilities | LayoutGrid icon | Clubs, Courts, Details |
-| Club Locations | Building2 icon | Individual branch data |
+## Improved Flow
 
----
-
-## Design Approach
-
-Since the backend extracts **all fields by default** regardless of checkbox state, we have two options:
-
-**Option A: Display-only indicators (Recommended)**
-- Show all fields as checked/enabled indicators (not interactive checkboxes)
-- Makes it clear what data will be extracted
-- No confusing toggles that don't actually do anything
-
-**Option B: Keep checkboxes but add all fields**
-- Add the missing fields as checkboxes
-- They would all be checked by default
-- Still misleading since backend ignores the config
-
-**Recommendation**: Use Option A - Replace the checkbox section with a clean "Data Extracted" info section that shows all fields with icons, similar to the popover info panel already in the header.
+1. User uploads CSV file
+2. File is parsed successfully
+3. System immediately checks for `website`/`url` column
+4. If missing: Show warning toast + visual indicator on the file
+5. "Start Scraping Job" button remains disabled until valid CSV uploaded
 
 ---
 
 ## Implementation Details
 
-### Modified File
+### File to Modify
 - `src/components/UploadSection.tsx`
 
-### Changes to Lines 791-850
+### Changes
 
-Replace the current checkbox-based "Select Data to Extract" section with a reorganized layout:
-
-1. **Data Fields Section** (display-only with icons)
-   - Grouped into categories for clarity:
-     - **Basic Info**: Logo, Business Description, Team Members
-     - **Contact**: Phone, Email, Address, Opening Hours, WhatsApp
-     - **Social Media**: Instagram, Facebook, LinkedIn, Twitter
-     - **Facilities**: Number of Clubs/Courts, Facilities Details, Club Locations
-
-2. **Custom Questions Section** (keep interactive)
-   - Keep the two custom question input fields
-   - These are the only truly customizable extraction options
-
-### Visual Layout
-
-```text
-+--------------------------------------------------+
-| Data to Extract:                                  |
-|                                                   |
-| [Check] Logo & Business Info                      |
-|         Logo, Description, Team Members           |
-|                                                   |
-| [Check] Contact Details                           |
-|         Phone, Email, Address, Hours, WhatsApp    |
-|                                                   |
-| [Check] Social Media                              |
-|         Instagram, Facebook, LinkedIn, Twitter    |
-|                                                   |
-| [Check] Facilities                                |
-|         Clubs, Courts, Details, Locations         |
-|                                                   |
-| Custom Question 1 (optional)                      |
-| [________________________]                        |
-|                                                   |
-| Custom Question 2 (optional)                      |
-| [________________________]                        |
-+--------------------------------------------------+
+**1. Add validation state variable (around line 58)**
+```typescript
+const [csvValidationError, setCsvValidationError] = useState<string | null>(null);
 ```
 
-All checkboxes will be checked and disabled (greyed out) to indicate these are always extracted, while the custom questions remain editable.
+**2. Update CSV parsing completion handler (lines 198-207)**
+Add immediate column validation after parsing:
+- Check if any row has a `website`, `Website`, `url`, or `URL` key
+- If missing, set validation error and show warning toast
+- If valid, clear any previous validation error
+
+**3. Update UI to show validation status (in the file display area)**
+- Show a warning badge/icon next to the file name if validation failed
+- Display the specific error message (e.g., "Missing 'website' column")
+
+**4. Disable "Start Scraping Job" button when CSV is invalid**
+- Add `csvValidationError` to the button's disabled condition
+- This prevents users from even trying to start a job with invalid data
+
+**5. Keep existing validation in `handleCreateJob` as backup**
+- The server-side validation remains as a safety net
+- But users will rarely see it since client-side catches errors first
+
+---
+
+## Visual Changes
+
+When CSV is invalid:
+```text
++--------------------------------------------------+
+| 📄 clubs.csv                              ⚠️ Error |
+| 150 rows                                          |
+| ⚠️ CSV must contain a 'website' or 'url' column  |
++--------------------------------------------------+
+
+[Start Scraping Job] <-- disabled, greyed out
+```
+
+When CSV is valid:
+```text
++--------------------------------------------------+
+| 📄 clubs.csv                              ✓ Valid |
+| 150 rows                                          |
++--------------------------------------------------+
+
+[Start Scraping Job] <-- enabled
+```
 
 ---
 
 ## Summary
 
-| What Changes | Description |
-|--------------|-------------|
-| Add missing fields | Logo, Phone, Email, Address, Hours, Facilities, Locations |
-| Reorganize layout | Group related fields into categories |
-| Disable checkboxes | Show as always-on since backend extracts all |
-| Keep custom questions | Only truly customizable options remain interactive |
+| Change | Purpose |
+|--------|---------|
+| Add validation immediately after parsing | Inform user right away |
+| Show visual error indicator on file | Clear feedback on what's wrong |
+| Disable submit button when invalid | Prevent futile submission attempts |
+| Keep existing server validation | Safety net for edge cases |
 
