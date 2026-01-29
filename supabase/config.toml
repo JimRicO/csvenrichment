@@ -57,3 +57,9 @@ verify_jwt = false
 
 [functions.download-enrichment-csv]
 verify_jwt = false
+
+[functions.api-get-clubs]
+verify_jwt = false
+
+[functions.api-update-clubs]
+verify_jwt = false
