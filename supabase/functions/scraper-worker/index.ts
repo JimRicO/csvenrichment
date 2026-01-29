@@ -68,6 +68,86 @@ function extractSocialLinks(links: string[]): string[] {
   );
 }
 
+// Download and persist logo to storage
+async function downloadAndPersistLogo(
+  logoUrl: string,
+  websiteUrl: string,
+  supabase: any
+): Promise<string | null> {
+  try {
+    console.log(`Downloading logo from: ${logoUrl}`);
+    
+    // Try HTTPS first, fallback to HTTP for SSL issues
+    let response: Response | null = null;
+    let finalUrl = logoUrl;
+    
+    try {
+      response = await fetch(logoUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'image/*,*/*;q=0.8',
+        },
+      });
+    } catch (httpsError) {
+      console.log(`HTTPS failed for logo, trying HTTP: ${httpsError}`);
+      if (logoUrl.startsWith('https://')) {
+        finalUrl = logoUrl.replace('https://', 'http://');
+        response = await fetch(finalUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'image/*,*/*;q=0.8',
+          },
+        });
+      }
+    }
+    
+    if (!response || !response.ok) {
+      console.log(`Failed to download logo: ${response?.status || 'no response'}`);
+      return null;
+    }
+    
+    const contentType = response.headers.get('content-type') || 'image/png';
+    const imageData = await response.arrayBuffer();
+    
+    // Determine file extension
+    let ext = 'png';
+    if (contentType.includes('jpeg') || contentType.includes('jpg')) ext = 'jpg';
+    else if (contentType.includes('svg')) ext = 'svg';
+    else if (contentType.includes('webp')) ext = 'webp';
+    else if (contentType.includes('gif')) ext = 'gif';
+    else if (contentType.includes('ico')) ext = 'ico';
+    
+    // Create storage path
+    const hostname = new URL(websiteUrl).hostname.replace(/^www\./, '');
+    const timestamp = Date.now();
+    const storagePath = `${hostname}/logo-${timestamp}.${ext}`;
+    
+    // Upload to storage
+    const { error: uploadError } = await supabase.storage
+      .from('brand-images')
+      .upload(storagePath, imageData, {
+        contentType,
+        upsert: true,
+      });
+    
+    if (uploadError) {
+      console.error('Failed to upload logo to storage:', uploadError);
+      return null;
+    }
+    
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('brand-images')
+      .getPublicUrl(storagePath);
+    
+    console.log(`Logo persisted to: ${urlData.publicUrl}`);
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('Error persisting logo:', error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -215,7 +295,46 @@ serve(async (req) => {
       console.log(`Total content: ${combinedContent.length} chars from ${pagesToScrape.length} pages`);
       console.log(`Found ${socialLinks.length} social media links`);
 
-      // Update row with scraped content
+      // STEP 5: Extract branding (logo) from homepage
+      let logoUrl: string | null = null;
+      let logoStorageUrl: string | null = null;
+
+      try {
+        console.log(`Extracting branding from: ${formattedUrl}`);
+        const brandingResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${firecrawlApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            url: formattedUrl,
+            formats: ['branding'],
+          }),
+        });
+
+        if (brandingResponse.ok) {
+          const brandingData = await brandingResponse.json();
+          const branding = brandingData.data?.branding || brandingData.branding || {};
+          
+          // Extract logo URL from branding response
+          logoUrl = branding.images?.logo || branding.logo || null;
+          
+          console.log(`Branding extracted, logo URL: ${logoUrl || 'not found'}`);
+          
+          // Persist logo to storage if found
+          if (logoUrl) {
+            logoStorageUrl = await downloadAndPersistLogo(logoUrl, formattedUrl, supabase);
+          }
+        } else {
+          console.warn(`Branding extraction failed: ${brandingResponse.status}`);
+        }
+      } catch (brandingError) {
+        console.error('Branding extraction error:', brandingError);
+        // Continue without logo - non-critical failure
+      }
+
+      // Update row with scraped content and logo
       const { error: updateError } = await supabase
         .from('scraped_rows')
         .update({
@@ -224,6 +343,8 @@ serve(async (req) => {
           scraped_at: new Date().toISOString(),
           pages_scraped: pagesToScrape.length,
           discovered_links: uniqueLinks,
+          logo_url: logoUrl,
+          logo_storage_url: logoStorageUrl,
         })
         .eq('id', row.id);
 

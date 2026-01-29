@@ -117,6 +117,8 @@ serve(async (req) => {
 
     // Generate new extracted field headers
     const extractedHeaders = [
+      'Logo URL',
+      'Logo Storage URL',
       'Business Description',
       'Team Members (Basic)',
       'Phone Number',
@@ -177,6 +179,8 @@ serve(async (req) => {
       
       // Add extracted fields
       rowFields.push(
+        escapeCSV(row.logo_url),
+        escapeCSV(row.logo_storage_url),
         escapeCSV(row.business_description),
         escapeCSV(row.team_members),
         escapeCSV(row.phone_number),

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Upload, FileText, AlertCircle, Globe, Loader2, ExternalLink, Building2, Users, Share2, MessageCircle, Info, Database, Cpu, Sparkles, Phone, Mail, MapPin, Clock, LayoutGrid, List, Download } from "lucide-react";
+import { Upload, FileText, AlertCircle, Globe, Loader2, ExternalLink, Building2, Users, Share2, MessageCircle, Info, Database, Cpu, Sparkles, Phone, Mail, MapPin, Clock, LayoutGrid, List, Download, ImageOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -42,6 +42,8 @@ interface ScrapedResult {
   club_locations?: ClubLocation[];
   custom_answer_1?: string;
   custom_answer_2?: string;
+  logo_url?: string;
+  logo_storage_url?: string;
 }
 
 const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
@@ -141,7 +143,9 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
                 facilities_details: row.facilities_details,
                 club_locations: (Array.isArray(row.club_locations) ? row.club_locations : []) as unknown as ClubLocation[],
                 custom_answer_1: row.custom_answer_1,
-                custom_answer_2: row.custom_answer_2
+                custom_answer_2: row.custom_answer_2,
+                logo_url: row.logo_url,
+                logo_storage_url: row.logo_storage_url,
               };
             } else if (row.extraction_status === 'failed' || row.scrape_status === 'failed') {
               throw new Error(row.extraction_error_message || row.scrape_error_message || 'Scraping failed');
@@ -408,17 +412,49 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
           {/* Single Scrape Result */}
           {scrapedResult && (
             <div className="space-y-4 p-4 rounded-lg border border-border/50 bg-secondary/20">
-              <div className="flex items-center gap-2">
-                <Globe className="h-5 w-5 text-primary" />
-                <a
-                  href={scrapedResult.website_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-semibold text-primary hover:underline flex items-center gap-1"
-                >
-                  {scrapedResult.website_url}
-                  <ExternalLink className="h-3 w-3" />
-                </a>
+              {/* Logo and Website Header */}
+              <div className="flex items-start gap-4">
+                {/* Logo */}
+                {scrapedResult.logo_storage_url || scrapedResult.logo_url ? (
+                  <a
+                    href={scrapedResult.logo_storage_url || scrapedResult.logo_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-shrink-0"
+                  >
+                    <img
+                      src={scrapedResult.logo_storage_url || scrapedResult.logo_url}
+                      alt="Logo"
+                      className="w-16 h-16 object-contain rounded-lg border border-border bg-background"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        target.parentElement?.querySelector('.logo-fallback')?.classList.remove('hidden');
+                      }}
+                    />
+                    <div className="logo-fallback hidden w-16 h-16 flex items-center justify-center rounded-lg border border-border bg-muted">
+                      <ImageOff className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                  </a>
+                ) : (
+                  <div className="w-16 h-16 flex items-center justify-center rounded-lg border border-border bg-muted flex-shrink-0">
+                    <Globe className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                )}
+                
+                {/* Website URL */}
+                <div className="flex items-center gap-2 pt-4">
+                  <a
+                    href={scrapedResult.website_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-primary hover:underline flex items-center gap-1"
+                  >
+                    {scrapedResult.website_url}
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
               </div>
 
               {scrapedResult.business_description && (
