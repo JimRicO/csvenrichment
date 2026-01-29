@@ -1,94 +1,109 @@
-
-
-# Improve CSV Validation Feedback
+# Add Perplexity Search to Club Intelligence Enrichment
 
 ## Overview
 
-Add immediate validation after CSV parsing to inform users right away if their file is missing a required `website` or `url` column, rather than waiting until they click "Start Scraping Job".
+Enhance the Club Intelligence Enrichment module by adding Perplexity AI-powered web search to gather additional intelligence:
+
+1. **Club Description** - A concise, factual overview of the club (simple query using just club name)
+2. **Founder & History** - founding story, who started it, credentials
+3. **Recent Activities & News** - recent events, expansions, awards, press coverage
 
 ---
 
-## Current Flow
+## Architecture
 
-1. User uploads CSV file
-2. File is parsed successfully
-3. User sees: "File uploaded successfully - X rows found"
-4. User clicks "Start Scraping Job"
-5. **Only then** they get error: "CSV must contain a 'website' or 'url' column"
+```text
+Current Flow:
+┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
+│  1. Firecrawl   │ → │  2. Firecrawl   │ → │   3. Apify      │ → │  4. Claude AI   │
+│  (Website MD)   │   │  (Branding)     │   │  (Instagram)    │   │  (Analysis)     │
+└─────────────────┘   └─────────────────┘   └─────────────────┘   └─────────────────┘
 
-## Improved Flow
-
-1. User uploads CSV file
-2. File is parsed successfully
-3. System immediately checks for `website`/`url` column
-4. If missing: Show warning toast + visual indicator on the file
-5. "Start Scraping Job" button remains disabled until valid CSV uploaded
+New Flow:
+┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
+│  1. Firecrawl   │ → │  2. Firecrawl   │ → │   3. Apify      │ → │  4. Perplexity  │ → │  5. Claude AI   │
+│  (Website MD)   │   │  (Branding)     │   │  (Instagram)    │   │  (3 Searches)   │   │  (Analysis)     │
+└─────────────────┘   └─────────────────┘   └─────────────────┘   └─────────────────┘   └─────────────────┘
+```
 
 ---
 
-## Implementation Details
+## Perplexity Searches (3 queries per club)
 
-### File to Modify
-- `src/components/UploadSection.tsx`
+### Query 1: Club Description
+A simple, direct search using just the club name for a factual overview.
 
-### Changes
-
-**1. Add validation state variable (around line 58)**
 ```typescript
-const [csvValidationError, setCsvValidationError] = useState<string | null>(null);
+{
+  model: 'sonar',
+  messages: [{ role: 'user', content: clubName }],
+  max_tokens: 2000,
+  temperature: 0.1  // Low for factual results
+}
 ```
+→ Returns: General description of what the club is, what they offer, reputation
 
-**2. Update CSV parsing completion handler (lines 198-207)**
-Add immediate column validation after parsing:
-- Check if any row has a `website`, `Website`, `url`, or `URL` key
-- If missing, set validation error and show warning toast
-- If valid, clear any previous validation error
+### Query 2: Founder & History
+```typescript
+{
+  model: 'sonar',
+  messages: [{ role: 'user', content: `${clubName} founder history background` }],
+  max_tokens: 1500,
+  temperature: 0.1
+}
+```
+→ Returns: Founder name, background, when founded
 
-**3. Update UI to show validation status (in the file display area)**
-- Show a warning badge/icon next to the file name if validation failed
-- Display the specific error message (e.g., "Missing 'website' column")
-
-**4. Disable "Start Scraping Job" button when CSV is invalid**
-- Add `csvValidationError` to the button's disabled condition
-- This prevents users from even trying to start a job with invalid data
-
-**5. Keep existing validation in `handleCreateJob` as backup**
-- The server-side validation remains as a safety net
-- But users will rarely see it since client-side catches errors first
+### Query 3: Recent News & Activities
+```typescript
+{
+  model: 'sonar',
+  messages: [{ role: 'user', content: `${clubName} recent news events 2025` }],
+  search_recency_filter: 'year',
+  max_tokens: 1500,
+  temperature: 0.1
+}
+```
+→ Returns: Recent activities, awards, expansions
 
 ---
 
-## Visual Changes
+## Database Migration
 
-When CSV is invalid:
-```text
-+--------------------------------------------------+
-| 📄 clubs.csv                              ⚠️ Error |
-| 150 rows                                          |
-| ⚠️ CSV must contain a 'website' or 'url' column  |
-+--------------------------------------------------+
+Add new columns to `enriched_clubs` table:
 
-[Start Scraping Job] <-- disabled, greyed out
-```
-
-When CSV is valid:
-```text
-+--------------------------------------------------+
-| 📄 clubs.csv                              ✓ Valid |
-| 150 rows                                          |
-+--------------------------------------------------+
-
-[Start Scraping Job] <-- enabled
-```
+| Column | Type | Purpose |
+|--------|------|---------|
+| `perplexity_description` | text | Simple club description from Perplexity |
+| `founder_info` | text | Founder name, background, credentials |
+| `founding_year` | text | When the club was founded |
+| `recent_activities` | jsonb | Array of recent news/events/activities |
+| `perplexity_citations` | jsonb | All source URLs from Perplexity searches |
 
 ---
 
-## Summary
+## Files to Modify
 
-| Change | Purpose |
-|--------|---------|
-| Add validation immediately after parsing | Inform user right away |
-| Show visual error indicator on file | Clear feedback on what's wrong |
-| Disable submit button when invalid | Prevent futile submission attempts |
-| Keep existing server validation | Safety net for edge cases |
+| File | Changes |
+|------|---------|
+| `supabase/functions/enrichment-worker/index.ts` | Add 3 Perplexity searches, update Claude prompt, store new fields |
+| `src/components/EnrichedClubsDialog.tsx` | Display Perplexity description, founder info, recent activities with sources |
 
+---
+
+## Implementation Order
+
+1. ✅ Connect Perplexity connector
+2. Run database migration
+3. Update enrichment-worker with 3 Perplexity searches
+4. Update Claude prompt to synthesize all data
+5. Update EnrichedClubsDialog UI
+
+---
+
+## Considerations
+
+- **Rate Limits**: Handle 429 errors with backoff
+- **Optional Step**: Skip if PERPLEXITY_API_KEY not configured
+- **Cost**: ~$0.015-0.03 per club (3 searches)
+- **Parallel Queries**: Run all 3 Perplexity searches in parallel for speed
