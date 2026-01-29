@@ -16,6 +16,44 @@ interface EnrichmentRow {
   status: string;
 }
 
+interface PerplexityResult {
+  content: string;
+  citations: string[];
+}
+
+async function searchPerplexity(query: string, apiKey: string): Promise<PerplexityResult> {
+  try {
+    const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'sonar',
+        messages: [
+          { role: 'system', content: 'Be precise and concise. Provide factual information only.' },
+          { role: 'user', content: query }
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(`Perplexity API error: ${response.status}`);
+      return { content: '', citations: [] };
+    }
+
+    const data = await response.json();
+    return {
+      content: data.choices?.[0]?.message?.content || '',
+      citations: data.citations || []
+    };
+  } catch (error) {
+    console.error('Perplexity search error:', error);
+    return { content: '', citations: [] };
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -42,6 +80,7 @@ serve(async (req) => {
     const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
     const APIFY_API_TOKEN = Deno.env.get('APIFY_API_TOKEN');
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+    const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY');
 
     if (!FIRECRAWL_API_KEY) {
       return new Response(
@@ -88,6 +127,7 @@ serve(async (req) => {
     let brandingData: any = null;
     let instagramData: any = null;
     let aiAnalysis: any = null;
+    let perplexityData: { description: PerplexityResult; founder: PerplexityResult; news: PerplexityResult } | null = null;
 
     try {
       // ========== STEP 1: Website Scrape (Firecrawl markdown) ==========
@@ -307,8 +347,43 @@ serve(async (req) => {
         console.log('Step 3: Skipping Instagram (no handle provided or no API token)');
       }
 
-      // ========== STEP 4: AI Analysis (Claude Sonnet 4.5) ==========
-      console.log('Step 4: Running AI analysis...');
+      // ========== STEP 4: Perplexity Web Search ==========
+      let allCitations: string[] = [];
+      
+      if (PERPLEXITY_API_KEY) {
+        console.log('Step 4: Running Perplexity web searches...');
+        try {
+          // Run 3 parallel searches for speed
+          const [descriptionResult, founderResult, newsResult] = await Promise.all([
+            searchPerplexity(`What is ${row.club_name}? Provide a brief description of this business/club.`, PERPLEXITY_API_KEY),
+            searchPerplexity(`${row.club_name} founder history background origin story. Who founded it and when?`, PERPLEXITY_API_KEY),
+            searchPerplexity(`${row.club_name} recent news events activities 2025 2024. What have they done recently?`, PERPLEXITY_API_KEY)
+          ]);
+
+          perplexityData = {
+            description: descriptionResult,
+            founder: founderResult,
+            news: newsResult
+          };
+
+          // Collect all unique citations
+          allCitations = [...new Set([
+            ...descriptionResult.citations,
+            ...founderResult.citations,
+            ...newsResult.citations
+          ])];
+
+          console.log(`Perplexity searches completed. Found ${allCitations.length} citations.`);
+          totalCost += 0.02; // ~$0.005-0.01 per search x 3
+        } catch (perplexityError) {
+          console.error('Perplexity search error:', perplexityError);
+        }
+      } else {
+        console.log('Step 4: Skipping Perplexity (no API key configured)');
+      }
+
+      // ========== STEP 5: AI Analysis (Claude Sonnet 4.5) ==========
+      console.log('Step 5: Running AI analysis...');
       try {
         const colorPalette = brandingData?.colors || {};
         const fonts = brandingData?.fonts || [];
@@ -319,7 +394,24 @@ serve(async (req) => {
           ?.filter(Boolean)
           ?.join('\n---\n') || 'No Instagram posts available';
 
-        const aiPrompt = `Analyze this club/fitness business based on their website content and Instagram presence.
+        // Build Perplexity context if available
+        let perplexityContext = '';
+        if (perplexityData) {
+          perplexityContext = `
+PERPLEXITY WEB RESEARCH:
+
+Business Description (from web search):
+${perplexityData.description.content || 'No description found'}
+
+Founder & History (from web search):
+${perplexityData.founder.content || 'No founder information found'}
+
+Recent News & Activities (from web search):
+${perplexityData.news.content || 'No recent news found'}
+`;
+        }
+
+        const aiPrompt = `Analyze this club/fitness business based on their website content, Instagram presence, and web research.
 
 WEBSITE CONTENT:
 ${scrapedContent.substring(0, 8000) || 'No website content available'}
@@ -335,6 +427,7 @@ BRANDING:
 - Color scheme: ${brandingData?.colorScheme || 'unknown'}
 - Primary color: ${colorPalette.primary || 'unknown'}
 - Fonts: ${fonts.map((f: any) => f.family).join(', ') || 'unknown'}
+${perplexityContext}
 
 Generate the following in JSON format:
 
@@ -344,11 +437,23 @@ Generate the following in JSON format:
 
 3. AESTHETICS (2-3 sentences): Their visual style. Consider color mood, design style, and overall visual impression.
 
+4. PERPLEXITY_DESCRIPTION (2-3 sentences): A factual business description synthesized from the web research. If no web research is available, return null.
+
+5. FOUNDER_INFO (2-4 sentences): Information about the founder(s), their background, and how/why they started the business. If unknown, return null.
+
+6. FOUNDING_YEAR (string): The year the business was founded. Just the year like "2015" or a range like "2014-2015". If unknown, return null.
+
+7. RECENT_ACTIVITIES (array): Up to 5 recent activities, events, or news items. Each should have a "title" (brief description) and optional "date" (if mentioned). If none found, return empty array.
+
 Return ONLY valid JSON in this exact format:
 {
   "description": "...",
   "attitude": "...",
-  "aesthetics": "..."
+  "aesthetics": "...",
+  "perplexity_description": "..." or null,
+  "founder_info": "..." or null,
+  "founding_year": "..." or null,
+  "recent_activities": [{"title": "...", "date": "..."}] or []
 }`;
 
         const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
@@ -360,7 +465,7 @@ Return ONLY valid JSON in this exact format:
           },
           body: JSON.stringify({
             model: 'claude-sonnet-4-5',
-            max_tokens: 1024,
+            max_tokens: 2048,
             messages: [{ role: 'user', content: aiPrompt }]
           })
         });
@@ -375,7 +480,7 @@ Return ONLY valid JSON in this exact format:
             aiAnalysis = JSON.parse(jsonMatch[0]);
             console.log('AI analysis completed');
           }
-          totalCost += 0.003; // Estimated Claude cost
+          totalCost += 0.004; // Estimated Claude cost (slightly higher due to more output)
         } else {
           console.error('Claude API error:', claudeResponse.status);
         }
@@ -383,8 +488,8 @@ Return ONLY valid JSON in this exact format:
         console.error('AI analysis error:', aiError);
       }
 
-      // ========== STEP 5: Store Results ==========
-      console.log('Step 5: Storing enriched data...');
+      // ========== STEP 6: Store Results ==========
+      console.log('Step 6: Storing enriched data...');
 
       // Extract address, phone, email from scraped content or branding
       let address: string | null = null;
@@ -422,6 +527,11 @@ Return ONLY valid JSON in this exact format:
           description: aiAnalysis?.description || null,
           attitude: aiAnalysis?.attitude || null,
           aesthetics: aiAnalysis?.aesthetics || null,
+          perplexity_description: aiAnalysis?.perplexity_description || null,
+          founder_info: aiAnalysis?.founder_info || null,
+          founding_year: aiAnalysis?.founding_year || null,
+          recent_activities: aiAnalysis?.recent_activities || [],
+          perplexity_citations: allCitations,
           raw_branding_data: brandingData || {},
           raw_instagram_data: instagramData || {},
           scraped_content: scrapedContent.substring(0, 50000) // Limit storage
