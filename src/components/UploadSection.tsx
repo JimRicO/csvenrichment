@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Upload, FileText, AlertCircle, Globe, Loader2, ExternalLink, Building2, Users, Share2, MessageCircle, Info, Database, Cpu, Sparkles, Phone, Mail, MapPin, Clock, LayoutGrid, List, Download, ImageOff } from "lucide-react";
+import { Upload, FileText, AlertCircle, Globe, Loader2, ExternalLink, Building2, Users, Share2, MessageCircle, Info, Database, Cpu, Sparkles, Phone, Mail, MapPin, Clock, LayoutGrid, List, Download, ImageOff, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -56,6 +56,7 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [csvData, setCsvData] = useState<any[] | null>(null);
+  const [csvValidationError, setCsvValidationError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Extraction config (custom questions only - other fields always extracted)
@@ -199,7 +200,25 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
       header: true,
       complete: results => {
         setCsvData(results.data);
-        toast.success(`File "${uploadedFile.name}" uploaded successfully - ${results.data.length} rows found`);
+        
+        // Immediate validation for website/url column
+        const firstRow = results.data[0] as Record<string, unknown>;
+        const hasWebsiteColumn = firstRow && (
+          'website' in firstRow || 
+          'Website' in firstRow || 
+          'url' in firstRow || 
+          'URL' in firstRow
+        );
+        
+        if (!hasWebsiteColumn) {
+          setCsvValidationError("CSV must contain a 'website' or 'url' column");
+          toast.warning("Missing required column: 'website' or 'url'", {
+            description: "Please upload a CSV with a website column to proceed."
+          });
+        } else {
+          setCsvValidationError(null);
+          toast.success(`File "${uploadedFile.name}" uploaded successfully - ${results.data.length} rows found`);
+        }
       },
       error: error => {
         toast.error(`Failed to parse CSV: ${error.message}`);
@@ -286,6 +305,7 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
 
       setFile(null);
       setCsvData(null);
+      setCsvValidationError(null);
     } catch (error) {
       console.error('Error creating job:', error);
       toast.error(error instanceof Error ? error.message : "Failed to create job");
@@ -746,20 +766,46 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
         >
           {file ? (
             <div className="space-y-4">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/20 border border-success/50">
-                <FileText className="h-8 w-8 text-success" />
+              <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full ${
+                csvValidationError 
+                  ? "bg-destructive/20 border border-destructive/50" 
+                  : "bg-success/20 border border-success/50"
+              }`}>
+                {csvValidationError ? (
+                  <XCircle className="h-8 w-8 text-destructive" />
+                ) : (
+                  <CheckCircle2 className="h-8 w-8 text-success" />
+                )}
               </div>
               <div>
-                <p className="text-lg font-medium text-foreground">{file.name}</p>
+                <div className="flex items-center justify-center gap-2">
+                  <p className="text-lg font-medium text-foreground">{file.name}</p>
+                  {csvValidationError ? (
+                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-destructive/20 text-destructive">
+                      Invalid
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-success/20 text-success">
+                      Valid
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground mt-1">
                   {csvData?.length || 0} rows • {(file.size / 1024).toFixed(2)} KB
                 </p>
+                {csvValidationError && (
+                  <p className="text-sm text-destructive mt-2 flex items-center justify-center gap-1">
+                    <AlertCircle className="h-4 w-4" />
+                    {csvValidationError}
+                  </p>
+                )}
               </div>
               <Button
                 variant="outline"
                 onClick={() => {
                   setFile(null);
                   setCsvData(null);
+                  setCsvValidationError(null);
                 }}
                 className="transition-smooth hover:border-primary/50"
               >
@@ -893,11 +939,11 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
 
         <Button
           onClick={handleCreateJob}
-          disabled={!csvData || isProcessing}
+          disabled={!csvData || isProcessing || !!csvValidationError}
           className="w-full gradient-primary hover:opacity-90 transition-smooth disabled:opacity-50 glow-primary"
           size="lg"
         >
-          {isProcessing ? "Creating Job..." : !csvData ? "Upload CSV to Start Bulk Processing" : "Let's Go! 🚀"}
+          {isProcessing ? "Creating Job..." : !csvData ? "Upload CSV to Start Bulk Processing" : csvValidationError ? "Fix CSV to Continue" : "Let's Go! 🚀"}
         </Button>
       </div>
     </CollapsibleCard>
