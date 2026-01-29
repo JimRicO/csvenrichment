@@ -177,10 +177,17 @@ const EnrichmentJobsTable = () => {
                   ? (job.processed_rows / job.total_rows) * 100 
                   : 0;
                 
+                const isApiJob = job.id.startsWith('API_ENRICH_');
+                
                 return (
                   <TableRow key={job.id}>
                     <TableCell className="font-mono text-xs">
-                      {job.id.substring(0, 20)}...
+                      <div className="flex items-center gap-2">
+                        {isApiJob && (
+                          <Badge variant="outline" className="text-[10px] px-1 py-0">API</Badge>
+                        )}
+                        <span>{job.id.substring(0, 18)}...</span>
+                      </div>
                     </TableCell>
                     <TableCell>{getStatusBadge(job.status)}</TableCell>
                     <TableCell>
