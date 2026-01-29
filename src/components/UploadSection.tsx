@@ -58,11 +58,7 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
   const [csvData, setCsvData] = useState<any[] | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Extraction config
-  const [extractBusiness, setExtractBusiness] = useState(true);
-  const [extractTeam, setExtractTeam] = useState(true);
-  const [extractSocial, setExtractSocial] = useState(true);
-  const [extractWhatsApp, setExtractWhatsApp] = useState(true);
+  // Extraction config (custom questions only - other fields always extracted)
   const [customQuestion1, setCustomQuestion1] = useState("");
   const [customQuestion2, setCustomQuestion2] = useState("");
 
@@ -82,10 +78,10 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
         body: {
           csv_rows: [{ website: singleUrl.trim() }],
           extraction_config: {
-            business_description: extractBusiness,
-            team_members: extractTeam,
-            social_media: extractSocial,
-            whatsapp_contact: extractWhatsApp,
+            business_description: true,
+            team_members: true,
+            social_media: true,
+            whatsapp_contact: true,
             custom_question_1: customQuestion1 || null,
             custom_question_2: customQuestion2 || null
           }
@@ -247,21 +243,16 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
       return;
     }
 
-    if (!extractBusiness && !extractTeam && !extractSocial && !extractWhatsApp) {
-      toast.error("Please select at least one field to extract");
-      return;
-    }
-
     setIsProcessing(true);
     try {
       const { data, error } = await supabase.functions.invoke('create-scraping-job', {
         body: {
           csv_rows: csvData,
           extraction_config: {
-            business_description: extractBusiness,
-            team_members: extractTeam,
-            social_media: extractSocial,
-            whatsapp_contact: extractWhatsApp,
+            business_description: true,
+            team_members: true,
+            social_media: true,
+            whatsapp_contact: true,
             custom_question_1: customQuestion1 || null,
             custom_question_2: customQuestion2 || null
           }
@@ -790,39 +781,57 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
         {csvData && (
           <>
             <div className="space-y-4">
-              <h3 className="font-semibold text-foreground">Select Data to Extract:</h3>
+              <h3 className="font-semibold text-foreground">Data to Extract:</h3>
 
+              {/* Categorized Data Fields - All always extracted */}
               <div className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="business" checked={extractBusiness} onCheckedChange={checked => setExtractBusiness(checked as boolean)} />
-                  <Label htmlFor="business" className="text-sm cursor-pointer">
-                    Business Description
-                  </Label>
+                {/* Logo & Business Info */}
+                <div className="flex items-start space-x-2">
+                  <Checkbox id="business-info" checked={true} disabled className="mt-0.5" />
+                  <div>
+                    <Label htmlFor="business-info" className="text-sm font-medium cursor-default">
+                      Logo & Business Info
+                    </Label>
+                    <p className="text-xs text-muted-foreground">Logo, Description, Team Members</p>
+                  </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="team" checked={extractTeam} onCheckedChange={checked => setExtractTeam(checked as boolean)} />
-                  <Label htmlFor="team" className="text-sm cursor-pointer">
-                    Team Members
-                  </Label>
+                {/* Contact Details */}
+                <div className="flex items-start space-x-2">
+                  <Checkbox id="contact" checked={true} disabled className="mt-0.5" />
+                  <div>
+                    <Label htmlFor="contact" className="text-sm font-medium cursor-default">
+                      Contact Details
+                    </Label>
+                    <p className="text-xs text-muted-foreground">Phone, Email, Address, Hours, WhatsApp</p>
+                  </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="social" checked={extractSocial} onCheckedChange={checked => setExtractSocial(checked as boolean)} />
-                  <Label htmlFor="social" className="text-sm cursor-pointer">
-                    Social Media (Instagram, Facebook, LinkedIn, Twitter)
-                  </Label>
+                {/* Social Media */}
+                <div className="flex items-start space-x-2">
+                  <Checkbox id="social-media" checked={true} disabled className="mt-0.5" />
+                  <div>
+                    <Label htmlFor="social-media" className="text-sm font-medium cursor-default">
+                      Social Media
+                    </Label>
+                    <p className="text-xs text-muted-foreground">Instagram, Facebook, LinkedIn, Twitter</p>
+                  </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="whatsapp" checked={extractWhatsApp} onCheckedChange={checked => setExtractWhatsApp(checked as boolean)} />
-                  <Label htmlFor="whatsapp" className="text-sm cursor-pointer">
-                    WhatsApp Contact
-                  </Label>
+                {/* Facilities */}
+                <div className="flex items-start space-x-2">
+                  <Checkbox id="facilities" checked={true} disabled className="mt-0.5" />
+                  <div>
+                    <Label htmlFor="facilities" className="text-sm font-medium cursor-default">
+                      Facilities
+                    </Label>
+                    <p className="text-xs text-muted-foreground">Clubs, Courts, Details, Locations</p>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-3 pt-2">
+              {/* Custom Questions - Interactive */}
+              <div className="space-y-3 pt-2 border-t border-border/50">
                 <Label htmlFor="custom1" className="text-sm">
                   Custom Question 1 (optional)
                 </Label>
