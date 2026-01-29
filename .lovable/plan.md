@@ -68,6 +68,18 @@ A simple, direct search using just the club name for a factual overview.
 
 ---
 
+## Cost Estimate
+
+| Operation | Cost per Club | Notes |
+|-----------|---------------|-------|
+| Firecrawl (Website) | ~$0.003 | Multi-page crawl + logo |
+| Apify (Instagram) | ~$0.0027 | Profile + 6 images |
+| Claude Sonnet 4.5 | ~$0.003 | AI synthesis |
+| **Perplexity (3 searches)** | **~$0.015-0.03** | sonar model × 3 queries |
+| **Total per club** | **~$0.024-0.039** | Was ~$0.008, now includes Perplexity |
+
+---
+
 ## Database Migration
 
 Add new columns to `enriched_clubs` table:
