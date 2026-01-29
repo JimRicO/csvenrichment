@@ -20,7 +20,8 @@ import {
   MapPin,
   Clock,
   LayoutGrid,
-  List
+  List,
+  ImageOff
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -64,6 +65,8 @@ interface ScrapedRow {
   club_locations: ClubLocation[] | null;
   scrape_status: string;
   extraction_status: string;
+  logo_url: string | null;
+  logo_storage_url: string | null;
 }
 
 const SocialMediaIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -97,7 +100,7 @@ export const WebsiteResultsDialog = ({ jobId, projectId, isOpen, onClose }: Webs
     const [rowsResult, peopleResult, jobResult] = await Promise.all([
       supabase
         .from('scraped_rows')
-        .select('id, website_url, business_description, team_members, social_media, whatsapp_contact, phone_number, email, address, opening_hours, number_of_clubs, number_of_courts, facilities_details, club_locations, scrape_status, extraction_status')
+        .select('id, website_url, business_description, team_members, social_media, whatsapp_contact, phone_number, email, address, opening_hours, number_of_clubs, number_of_courts, facilities_details, club_locations, scrape_status, extraction_status, logo_url, logo_storage_url')
         .eq('job_id', jobId)
         .order('created_at', { ascending: true }),
       supabase
@@ -237,6 +240,7 @@ export const WebsiteResultsDialog = ({ jobId, projectId, isOpen, onClose }: Webs
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-[60px]">Logo</TableHead>
                       <TableHead>Website</TableHead>
                       <TableHead className="min-w-[200px]">Description</TableHead>
                       <TableHead>Contact</TableHead>
@@ -249,6 +253,49 @@ export const WebsiteResultsDialog = ({ jobId, projectId, isOpen, onClose }: Webs
                   <TableBody>
                     {rows.map((row) => (
                       <TableRow key={row.id}>
+                        <TableCell>
+                          {row.logo_storage_url || row.logo_url ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <a
+                                    href={row.logo_storage_url || row.logo_url || '#'}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block"
+                                  >
+                                    <img
+                                      src={row.logo_storage_url || row.logo_url || ''}
+                                      alt="Logo"
+                                      className="w-10 h-10 object-contain rounded border border-border bg-background"
+                                      referrerPolicy="no-referrer"
+                                      onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.style.display = 'none';
+                                        target.parentElement?.querySelector('.logo-fallback')?.classList.remove('hidden');
+                                      }}
+                                    />
+                                    <div className="logo-fallback hidden w-10 h-10 flex items-center justify-center rounded border border-border bg-muted">
+                                      <ImageOff className="h-4 w-4 text-muted-foreground" />
+                                    </div>
+                                  </a>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" className="p-2">
+                                  <img
+                                    src={row.logo_storage_url || row.logo_url || ''}
+                                    alt="Logo preview"
+                                    className="max-w-[200px] max-h-[200px] object-contain"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            <div className="w-10 h-10 flex items-center justify-center rounded border border-border bg-muted">
+                              <ImageOff className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          )}
+                        </TableCell>
                         <TableCell className="font-medium max-w-[180px]">
                           <a
                             href={row.website_url}

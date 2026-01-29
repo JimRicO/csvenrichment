@@ -452,6 +452,8 @@ export type Database = {
           id: string
           input_tokens: number | null
           job_id: string
+          logo_storage_url: string | null
+          logo_url: string | null
           model_id: string | null
           number_of_clubs: number | null
           number_of_courts: number | null
@@ -492,6 +494,8 @@ export type Database = {
           id?: string
           input_tokens?: number | null
           job_id: string
+          logo_storage_url?: string | null
+          logo_url?: string | null
           model_id?: string | null
           number_of_clubs?: number | null
           number_of_courts?: number | null
@@ -532,6 +536,8 @@ export type Database = {
           id?: string
           input_tokens?: number | null
           job_id?: string
+          logo_storage_url?: string | null
+          logo_url?: string | null
           model_id?: string | null
           number_of_clubs?: number | null
           number_of_courts?: number | null
