@@ -1,96 +1,74 @@
-# Add Perplexity Search to Club Intelligence Enrichment
 
-## Overview
+# Implementation: Add Perplexity Searches to Enrichment Pipeline
 
-Enhance the Club Intelligence Enrichment module by adding Perplexity AI-powered web search to gather additional intelligence:
+## Problem Identified
 
-1. **Club Description** - A concise, factual overview of the club (simple query using just club name)
-2. **Founder & History** - founding story, who started it, credentials
-3. **Recent Activities & News** - recent events, expansions, awards, press coverage
+The database migration added the new columns, but two key pieces are missing:
+1. The `enrichment-worker` edge function doesn't call Perplexity API
+2. The `EnrichedClubsDialog` UI doesn't display the new fields
 
 ---
 
-## Architecture
+## Implementation Steps
+
+### Step 1: Update enrichment-worker Edge Function
+
+**File:** `supabase/functions/enrichment-worker/index.ts`
+
+Add a new Step 4 (Perplexity Search) between Instagram scrape and Claude AI analysis:
+
+| Search | Query | Purpose |
+|--------|-------|---------|
+| 1 | `{clubName}` | Simple club description |
+| 2 | `{clubName} founder history background` | Founder info |
+| 3 | `{clubName} recent news events 2025` | Recent activities |
 
 ```text
-Current Flow:
-┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
-│  1. Firecrawl   │ → │  2. Firecrawl   │ → │   3. Apify      │ → │  4. Claude AI   │
-│  (Website MD)   │   │  (Branding)     │   │  (Instagram)    │   │  (Analysis)     │
-└─────────────────┘   └─────────────────┘   └─────────────────┘   └─────────────────┘
+// After Step 3 (Instagram), before Step 4 (Claude):
+// ========== STEP 4: Perplexity Web Search ==========
 
-New Flow:
-┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
-│  1. Firecrawl   │ → │  2. Firecrawl   │ → │   3. Apify      │ → │  4. Perplexity  │ → │  5. Claude AI   │
-│  (Website MD)   │   │  (Branding)     │   │  (Instagram)    │   │  (3 Searches)   │   │  (Analysis)     │
-└─────────────────┘   └─────────────────┘   └─────────────────┘   └─────────────────┘   └─────────────────┘
+1. Check if PERPLEXITY_API_KEY is configured
+2. Run 3 parallel searches using Promise.all()
+3. Parse responses and extract citations
+4. Pass results to Claude prompt
+5. Track cost (~$0.015-0.03 for 3 searches)
 ```
+
+Update the Claude prompt to include Perplexity data and generate additional fields:
+- `founder_info`
+- `founding_year`
+- `recent_activities` (array)
+
+Update the database insert to include:
+- `perplexity_description`
+- `founder_info`
+- `founding_year`
+- `recent_activities`
+- `perplexity_citations`
 
 ---
 
-## Perplexity Searches (3 queries per club)
+### Step 2: Update EnrichedClubsDialog UI
 
-### Query 1: Club Description
-A simple, direct search using just the club name for a factual overview.
+**File:** `src/components/EnrichedClubsDialog.tsx`
 
+1. Update `EnrichedClub` interface to include new fields:
 ```typescript
-{
-  model: 'sonar',
-  messages: [{ role: 'user', content: clubName }],
-  max_tokens: 2000,
-  temperature: 0.1  // Low for factual results
+interface EnrichedClub {
+  // ... existing fields ...
+  perplexity_description: string | null;
+  founder_info: string | null;
+  founding_year: string | null;
+  recent_activities: { title: string; date?: string; source?: string }[];
+  perplexity_citations: string[];
 }
 ```
-→ Returns: General description of what the club is, what they offer, reputation
 
-### Query 2: Founder & History
-```typescript
-{
-  model: 'sonar',
-  messages: [{ role: 'user', content: `${clubName} founder history background` }],
-  max_tokens: 1500,
-  temperature: 0.1
-}
-```
-→ Returns: Founder name, background, when founded
-
-### Query 3: Recent News & Activities
-```typescript
-{
-  model: 'sonar',
-  messages: [{ role: 'user', content: `${clubName} recent news events 2025` }],
-  search_recency_filter: 'year',
-  max_tokens: 1500,
-  temperature: 0.1
-}
-```
-→ Returns: Recent activities, awards, expansions
-
----
-
-## Cost Estimate
-
-| Operation | Cost per Club | Notes |
-|-----------|---------------|-------|
-| Firecrawl (Website) | ~$0.003 | Multi-page crawl + logo |
-| Apify (Instagram) | ~$0.0027 | Profile + 6 images |
-| Claude Sonnet 4.5 | ~$0.003 | AI synthesis |
-| **Perplexity (3 searches)** | **~$0.015-0.03** | sonar model × 3 queries |
-| **Total per club** | **~$0.024-0.039** | Was ~$0.008, now includes Perplexity |
-
----
-
-## Database Migration
-
-Add new columns to `enriched_clubs` table:
-
-| Column | Type | Purpose |
-|--------|------|---------|
-| `perplexity_description` | text | Simple club description from Perplexity |
-| `founder_info` | text | Founder name, background, credentials |
-| `founding_year` | text | When the club was founded |
-| `recent_activities` | jsonb | Array of recent news/events/activities |
-| `perplexity_citations` | jsonb | All source URLs from Perplexity searches |
+2. Add new UI sections:
+   - **Perplexity Description** - displayed prominently near the top
+   - **Founder Information** - with founding year badge
+   - **Recent Activities** - list with clickable source links
+   - **Sources** - collapsible section showing all Perplexity citations
 
 ---
 
@@ -98,24 +76,23 @@ Add new columns to `enriched_clubs` table:
 
 | File | Changes |
 |------|---------|
-| `supabase/functions/enrichment-worker/index.ts` | Add 3 Perplexity searches, update Claude prompt, store new fields |
-| `src/components/EnrichedClubsDialog.tsx` | Display Perplexity description, founder info, recent activities with sources |
+| `supabase/functions/enrichment-worker/index.ts` | Add Perplexity search step, update Claude prompt, store new fields |
+| `src/components/EnrichedClubsDialog.tsx` | Update interface, add UI sections for new fields |
 
 ---
 
-## Implementation Order
+## Cost Impact
 
-1. ✅ Connect Perplexity connector
-2. Run database migration
-3. Update enrichment-worker with 3 Perplexity searches
-4. Update Claude prompt to synthesize all data
-5. Update EnrichedClubsDialog UI
+| Item | Cost |
+|------|------|
+| Perplexity (3 searches) | ~$0.015-0.03 |
+| Total per club (with existing) | ~$0.024-0.039 |
 
 ---
 
 ## Considerations
 
-- **Rate Limits**: Handle 429 errors with backoff
-- **Optional Step**: Skip if PERPLEXITY_API_KEY not configured
-- **Cost**: ~$0.015-0.03 per club (3 searches)
-- **Parallel Queries**: Run all 3 Perplexity searches in parallel for speed
+- Perplexity step is optional - skips gracefully if API key not configured
+- All 3 Perplexity searches run in parallel for speed
+- Rate limit handling with exponential backoff for 429 errors
+- Citations stored for transparency and source verification
