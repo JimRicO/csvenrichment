@@ -63,3 +63,9 @@ verify_jwt = false
 
 [functions.api-update-clubs]
 verify_jwt = false
+
+[functions.api-create-enrichment-job]
+verify_jwt = false
+
+[functions.api-get-enrichment-status]
+verify_jwt = false
