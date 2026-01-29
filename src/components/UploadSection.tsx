@@ -243,6 +243,20 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
       return;
     }
 
+    // Validate CSV has website/url column before sending
+    const firstRow = csvData[0];
+    const hasWebsiteColumn = firstRow && (
+      'website' in firstRow || 
+      'Website' in firstRow || 
+      'url' in firstRow || 
+      'URL' in firstRow
+    );
+    
+    if (!hasWebsiteColumn) {
+      toast.error("CSV must contain a 'website' or 'url' column with valid URLs");
+      return;
+    }
+
     setIsProcessing(true);
     try {
       const { data, error } = await supabase.functions.invoke('create-scraping-job', {
@@ -259,7 +273,12 @@ const UploadSection = ({ onJobCreated }: UploadSectionProps) => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        // Try to extract error message from edge function response
+        const errorData = error.context?.body ? JSON.parse(error.context.body) : null;
+        const errorMessage = errorData?.error || error.message || "Failed to create job";
+        throw new Error(errorMessage);
+      }
       
       toast.success("Job created! Workers are processing your requests...");
       onJobCreated(data.job_id, data.project_id);
