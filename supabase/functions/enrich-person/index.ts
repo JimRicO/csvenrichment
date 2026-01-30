@@ -6,23 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface AgenticResearchResult {
-  full_name: string | null;
-  biography: string | null;
-  job_title: string | null;
-  company: string | null;
-  previous_roles: Array<{ title: string; company: string; years: string }>;
-  education: Array<{ degree: string; institution: string; year: string }>;
-  notable_achievements: string | null;
-  email: string | null;
-  phone: string | null;
-  linkedin_url: string | null;
-  twitter_handle: string | null;
-  other_socials: Record<string, string>;
-  confidence: 'high' | 'medium' | 'low';
-  sources: string[];
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -30,7 +13,7 @@ serve(async (req) => {
 
   try {
     const { name, company } = await req.json();
-
+    
     if (!name) {
       return new Response(
         JSON.stringify({ success: false, error: 'name is required' }),
@@ -46,39 +29,8 @@ serve(async (req) => {
       );
     }
 
-    const contextStr = company ? ` at ${company}` : '';
-    
-    const instructions = `You are a professional B2B contact researcher. Find comprehensive information about this person.
-
-SEARCH: LinkedIn profile, company websites, news articles, professional directories, social media, public records.
-
-RESPOND ONLY with this JSON, no other text:
-{
-  "full_name": "string or null",
-  "biography": "2-3 sentence professional biography summarizing their background and significance",
-  "job_title": "current job title or null",
-  "company": "current company/employer or null",
-  "previous_roles": [{"title": "Job Title", "company": "Company Name", "years": "2018-2022"}],
-  "education": [{"degree": "Degree Name", "institution": "University Name", "year": "2010"}],
-  "notable_achievements": "Key accomplishments, awards, or recognition in 1-2 sentences or null",
-  "email": "work email address or null",
-  "phone": "phone number or null",
-  "linkedin_url": "LinkedIn profile URL or null",
-  "twitter_handle": "@username or null",
-  "other_socials": {"platform": "url"},
-  "confidence": "high|medium|low",
-  "sources": ["URLs used to gather this information"]
-}
-
-RULES:
-- Only include verified information, use null for missing fields
-- Biography should synthesize their professional identity and significance
-- previous_roles and education should be empty arrays [] if not found
-- Prioritize work email over personal email
-- Never fabricate or guess data
-- Confidence: "high" if multiple sources agree, "medium" if single source, "low" if uncertain`;
-
-    console.log(`Enriching person: ${name}${contextStr}`);
+    const companyStr = company ? ` at ${company}` : '';
+    console.log(`Starting comprehensive intelligence research: ${name}${companyStr}`);
 
     const response = await fetch('https://api.perplexity.ai/v1/responses', {
       method: 'POST',
@@ -88,9 +40,160 @@ RULES:
       },
       body: JSON.stringify({
         model: "openai/gpt-5.2",
-        input: `Research ${name}${contextStr}. Find their professional background, career history, contact information, and notable achievements.`,
-        tools: [{ type: "web_search" }],
-        instructions: instructions
+        input: `Conduct comprehensive research on: ${name}${companyStr}. 
+        
+I need a complete intelligence profile on this person. Search extensively and gather everything you can find.`,
+        tools: [
+          { type: "web_search" },
+          { type: "fetch_url" }
+        ],
+        instructions: `You are an elite competitive intelligence researcher. Your task is to build a COMPREHENSIVE DOSSIER on this person.
+
+SEARCH EXTENSIVELY - Use multiple searches:
+- "${name}" - general presence
+- "${name} ${company || ''}" - current role
+- "${name} LinkedIn" - professional profile  
+- "${name} biography" - background info
+- "${name} interview" - quotes, perspectives
+- "${name} news" - recent mentions
+- "${name} Twitter OR X" - social presence
+- "${name} speaker OR conference" - public appearances
+- "${name} education university" - academic background
+- "${name} previous company" - career history
+
+Use fetch_url to extract full content from promising pages.
+
+BUILD A COMPLETE PROFILE:
+
+1. IDENTITY
+- Full legal name
+- Also known as / nicknames
+- Photo URL if available
+
+2. CURRENT ROLE
+- Job title
+- Company
+- Department/Division
+- Reporting structure if known
+- Time in role
+
+3. PROFESSIONAL BIOGRAPHY
+- Write a comprehensive 3-5 paragraph bio
+- Career narrative and trajectory
+- Key achievements and milestones
+- Areas of expertise
+- Industry reputation
+
+4. CAREER HISTORY
+- Previous positions (company, title, dates)
+- Notable projects or deals
+- Career pivots or transitions
+
+5. EDUCATION
+- Degrees, institutions, years
+- Certifications
+- Notable academic achievements
+
+6. PUBLIC PRESENCE
+- LinkedIn URL
+- Twitter/X handle
+- Other social profiles
+- Personal website/blog
+- Podcast appearances
+- Conference talks
+- Published articles or books
+
+7. NEWS & MENTIONS
+- Recent news articles mentioning them
+- Press releases
+- Industry coverage
+
+8. CONTACT INFORMATION
+- Work email (verified or pattern-based)
+- Company email pattern
+- Phone if publicly available
+- Office location
+
+9. INSIGHTS
+- Communication style (based on interviews/posts)
+- Topics they care about
+- Potential conversation starters
+- Connections or mutual interests
+
+RESPOND with this JSON structure:
+{
+  "identity": {
+    "full_name": "string",
+    "aliases": ["array of other names"],
+    "photo_url": "string or null"
+  },
+  "current_role": {
+    "title": "string",
+    "company": "string",
+    "department": "string or null",
+    "start_date": "string or null",
+    "reports_to": "string or null"
+  },
+  "biography": "string - comprehensive 3-5 paragraph narrative bio",
+  "career_history": [
+    {
+      "company": "string",
+      "title": "string",
+      "dates": "string",
+      "highlights": ["notable achievements"]
+    }
+  ],
+  "education": [
+    {
+      "institution": "string",
+      "degree": "string",
+      "field": "string",
+      "year": "string or null"
+    }
+  ],
+  "public_presence": {
+    "linkedin_url": "string or null",
+    "twitter_handle": "string or null",
+    "other_profiles": {},
+    "website": "string or null",
+    "notable_content": ["podcasts, talks, articles"]
+  },
+  "recent_news": [
+    {
+      "headline": "string",
+      "source": "string",
+      "date": "string",
+      "url": "string"
+    }
+  ],
+  "contact": {
+    "email": "string or null",
+    "email_confidence": "verified|pattern_based|not_found",
+    "email_pattern": "string - company email format",
+    "phone": "string or null",
+    "location": "string or null"
+  },
+  "insights": {
+    "communication_style": "string",
+    "key_interests": ["topics they discuss"],
+    "conversation_starters": ["potential icebreakers"],
+    "quotes": ["notable quotes from interviews"]
+  },
+  "sources": ["all URLs used"],
+  "research_summary": "brief meta-summary of research quality and gaps"
+}
+
+CRITICAL RULES:
+- SEARCH AGGRESSIVELY - use 5-10+ web searches minimum
+- USE fetch_url on LinkedIn, company pages, news articles
+- Write a REAL bio, not bullet points - narrative style
+- Include QUOTES when found
+- Be thorough - this is intelligence research, not a quick lookup
+- If information is sparse, say so in research_summary`,
+        reasoning: {
+          effort: "high"
+        },
+        max_output_tokens: 4000
       }),
     });
 
@@ -119,38 +222,36 @@ RULES:
       }
     }
 
-    console.log(`Agentic response length: ${outputText.length} chars`);
+    console.log(`Comprehensive research complete. Response length: ${outputText.length} chars`);
 
-    // Parse JSON from output
-    let enrichedData: AgenticResearchResult;
+    let profileData;
     try {
       const cleanedText = outputText.replace(/```json\n?|\n?```/g, '').trim();
-      enrichedData = JSON.parse(cleanedText);
-    } catch (parseError) {
-      console.error('Failed to parse response:', parseError);
-      console.log('Raw response (first 500 chars):', outputText.substring(0, 500));
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Failed to parse research results',
-          raw_text: outputText.substring(0, 1000)
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      profileData = JSON.parse(cleanedText);
+    } catch {
+      console.error('Failed to parse JSON response');
+      profileData = { 
+        raw_text: outputText, 
+        parsing_error: true 
+      };
     }
 
-    console.log(`Successfully enriched: ${name}, confidence: ${enrichedData.confidence}`);
-
-    return new Response(
-      JSON.stringify({ success: true, data: enrichedData }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ 
+      success: true, 
+      data: profileData,
+      usage: data.usage 
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
 
   } catch (error) {
     console.error('Error in enrich-person:', error);
-    return new Response(
-      JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });

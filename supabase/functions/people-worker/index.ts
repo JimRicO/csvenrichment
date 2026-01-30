@@ -15,57 +15,67 @@ interface PeopleRow {
   status: string;
 }
 
-interface AgenticResearchResult {
-  full_name: string | null;
+interface IntelligenceProfile {
+  identity: {
+    full_name: string | null;
+    aliases: string[];
+    photo_url: string | null;
+  };
+  current_role: {
+    title: string | null;
+    company: string | null;
+    department: string | null;
+    start_date: string | null;
+    reports_to: string | null;
+  };
   biography: string | null;
-  job_title: string | null;
-  company: string | null;
-  previous_roles: Array<{ title: string; company: string; years: string }>;
-  education: Array<{ degree: string; institution: string; year: string }>;
-  notable_achievements: string | null;
-  email: string | null;
-  phone: string | null;
-  linkedin_url: string | null;
-  twitter_handle: string | null;
-  other_socials: Record<string, string>;
-  confidence: 'high' | 'medium' | 'low';
+  career_history: Array<{
+    company: string;
+    title: string;
+    dates: string;
+    highlights: string[];
+  }>;
+  education: Array<{
+    institution: string;
+    degree: string;
+    field: string;
+    year: string | null;
+  }>;
+  public_presence: {
+    linkedin_url: string | null;
+    twitter_handle: string | null;
+    other_profiles: Record<string, string>;
+    website: string | null;
+    notable_content: string[];
+  };
+  recent_news: Array<{
+    headline: string;
+    source: string;
+    date: string;
+    url: string;
+  }>;
+  contact: {
+    email: string | null;
+    email_confidence: string | null;
+    email_pattern: string | null;
+    phone: string | null;
+    location: string | null;
+  };
+  insights: {
+    communication_style: string | null;
+    key_interests: string[];
+    conversation_starters: string[];
+    quotes: string[];
+  };
   sources: string[];
+  research_summary: string | null;
 }
 
-async function callAgenticResearch(personName: string, context: string | null, apiKey: string): Promise<AgenticResearchResult> {
+async function callComprehensiveResearch(personName: string, context: string | null, apiKey: string): Promise<IntelligenceProfile> {
   const contextStr = context ? ` (${context})` : '';
+  const companyHint = context || '';
   
-  const instructions = `You are a professional researcher. Find comprehensive information about this person.
-
-SEARCH: LinkedIn profile, company websites, news articles, professional directories, social media, public records.
-
-RESPOND ONLY with this JSON, no other text:
-{
-  "full_name": "string or null",
-  "biography": "2-3 sentence professional biography summarizing their background and significance",
-  "job_title": "current job title or null",
-  "company": "current company/employer or null",
-  "previous_roles": [{"title": "Job Title", "company": "Company Name", "years": "2018-2022"}],
-  "education": [{"degree": "Degree Name", "institution": "University Name", "year": "2010"}],
-  "notable_achievements": "Key accomplishments, awards, or recognition in 1-2 sentences or null",
-  "email": "work email address or null",
-  "phone": "phone number or null",
-  "linkedin_url": "LinkedIn profile URL or null",
-  "twitter_handle": "@username or null",
-  "other_socials": {"platform": "url"},
-  "confidence": "high|medium|low",
-  "sources": ["URLs used to gather this information"]
-}
-
-RULES:
-- Only include verified information, use null for missing fields
-- Biography should synthesize their professional identity and significance
-- previous_roles and education should be empty arrays [] if not found
-- Prioritize work email over personal email
-- Never fabricate or guess data
-- Confidence: "high" if multiple sources agree, "medium" if single source, "low" if uncertain`;
-
-  console.log(`Calling Perplexity Agentic Research for: ${personName}${contextStr}`);
+  console.log(`Calling Perplexity Comprehensive Intelligence Research for: ${personName}${contextStr}`);
   
   const response = await fetch('https://api.perplexity.ai/v1/responses', {
     method: 'POST',
@@ -75,15 +85,166 @@ RULES:
     },
     body: JSON.stringify({
       model: "openai/gpt-5.2",
-      input: `Research ${personName}${contextStr}. Find their professional background, career history, contact information, and notable achievements.`,
-      tools: [{ type: "web_search" }],
-      instructions: instructions
+      input: `Conduct comprehensive research on: ${personName}${contextStr}. 
+      
+I need a complete intelligence profile on this person. Search extensively and gather everything you can find.`,
+      tools: [
+        { type: "web_search" },
+        { type: "fetch_url" }
+      ],
+      instructions: `You are an elite competitive intelligence researcher. Your task is to build a COMPREHENSIVE DOSSIER on this person.
+
+SEARCH EXTENSIVELY - Use multiple searches:
+- "${personName}" - general presence
+- "${personName} ${companyHint}" - current role
+- "${personName} LinkedIn" - professional profile  
+- "${personName} biography" - background info
+- "${personName} interview" - quotes, perspectives
+- "${personName} news" - recent mentions
+- "${personName} Twitter OR X" - social presence
+- "${personName} speaker OR conference" - public appearances
+- "${personName} education university" - academic background
+- "${personName} previous company" - career history
+
+Use fetch_url to extract full content from promising pages.
+
+BUILD A COMPLETE PROFILE:
+
+1. IDENTITY
+- Full legal name
+- Also known as / nicknames
+- Photo URL if available
+
+2. CURRENT ROLE
+- Job title
+- Company
+- Department/Division
+- Reporting structure if known
+- Time in role
+
+3. PROFESSIONAL BIOGRAPHY
+- Write a comprehensive 3-5 paragraph bio
+- Career narrative and trajectory
+- Key achievements and milestones
+- Areas of expertise
+- Industry reputation
+
+4. CAREER HISTORY
+- Previous positions (company, title, dates)
+- Notable projects or deals
+- Career pivots or transitions
+
+5. EDUCATION
+- Degrees, institutions, years
+- Certifications
+- Notable academic achievements
+
+6. PUBLIC PRESENCE
+- LinkedIn URL
+- Twitter/X handle
+- Other social profiles
+- Personal website/blog
+- Podcast appearances
+- Conference talks
+- Published articles or books
+
+7. NEWS & MENTIONS
+- Recent news articles mentioning them
+- Press releases
+- Industry coverage
+
+8. CONTACT INFORMATION
+- Work email (verified or pattern-based)
+- Company email pattern
+- Phone if publicly available
+- Office location
+
+9. INSIGHTS
+- Communication style (based on interviews/posts)
+- Topics they care about
+- Potential conversation starters
+- Connections or mutual interests
+
+RESPOND with this JSON structure:
+{
+  "identity": {
+    "full_name": "string",
+    "aliases": ["array of other names"],
+    "photo_url": "string or null"
+  },
+  "current_role": {
+    "title": "string",
+    "company": "string",
+    "department": "string or null",
+    "start_date": "string or null",
+    "reports_to": "string or null"
+  },
+  "biography": "string - comprehensive 3-5 paragraph narrative bio",
+  "career_history": [
+    {
+      "company": "string",
+      "title": "string",
+      "dates": "string",
+      "highlights": ["notable achievements"]
+    }
+  ],
+  "education": [
+    {
+      "institution": "string",
+      "degree": "string",
+      "field": "string",
+      "year": "string or null"
+    }
+  ],
+  "public_presence": {
+    "linkedin_url": "string or null",
+    "twitter_handle": "string or null",
+    "other_profiles": {},
+    "website": "string or null",
+    "notable_content": ["podcasts, talks, articles"]
+  },
+  "recent_news": [
+    {
+      "headline": "string",
+      "source": "string",
+      "date": "string",
+      "url": "string"
+    }
+  ],
+  "contact": {
+    "email": "string or null",
+    "email_confidence": "verified|pattern_based|not_found",
+    "email_pattern": "string - company email format",
+    "phone": "string or null",
+    "location": "string or null"
+  },
+  "insights": {
+    "communication_style": "string",
+    "key_interests": ["topics they discuss"],
+    "conversation_starters": ["potential icebreakers"],
+    "quotes": ["notable quotes from interviews"]
+  },
+  "sources": ["all URLs used"],
+  "research_summary": "brief meta-summary of research quality and gaps"
+}
+
+CRITICAL RULES:
+- SEARCH AGGRESSIVELY - use 5-10+ web searches minimum
+- USE fetch_url on LinkedIn, company pages, news articles
+- Write a REAL bio, not bullet points - narrative style
+- Include QUOTES when found
+- Be thorough - this is intelligence research, not a quick lookup
+- If information is sparse, say so in research_summary`,
+      reasoning: {
+        effort: "high"
+      },
+      max_output_tokens: 4000
     }),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`Perplexity Agentic API error: ${response.status} - ${errorText}`);
+    console.error(`Perplexity API error: ${response.status} - ${errorText}`);
     throw new Error(`Perplexity API error: ${response.status}`);
   }
 
@@ -103,34 +264,30 @@ RULES:
     }
   }
 
-  console.log(`Agentic response length: ${outputText.length} chars`);
+  console.log(`Comprehensive research response length: ${outputText.length} chars`);
 
   // Parse JSON from output
-  let parsedResult: AgenticResearchResult;
+  let parsedResult: IntelligenceProfile;
   try {
-    // Remove markdown code blocks if present
     const cleanedText = outputText.replace(/```json\n?|\n?```/g, '').trim();
     parsedResult = JSON.parse(cleanedText);
   } catch (parseError) {
-    console.error('Failed to parse agentic response:', parseError);
+    console.error('Failed to parse comprehensive response:', parseError);
     console.log('Raw response (first 500 chars):', outputText.substring(0, 500));
     
     // Return minimal result
     parsedResult = {
-      full_name: null,
+      identity: { full_name: null, aliases: [], photo_url: null },
+      current_role: { title: null, company: null, department: null, start_date: null, reports_to: null },
       biography: null,
-      job_title: null,
-      company: null,
-      previous_roles: [],
+      career_history: [],
       education: [],
-      notable_achievements: null,
-      email: null,
-      phone: null,
-      linkedin_url: null,
-      twitter_handle: null,
-      other_socials: {},
-      confidence: 'low',
-      sources: []
+      public_presence: { linkedin_url: null, twitter_handle: null, other_profiles: {}, website: null, notable_content: [] },
+      recent_news: [],
+      contact: { email: null, email_confidence: null, email_pattern: null, phone: null, location: null },
+      insights: { communication_style: null, key_interests: [], conversation_starters: [], quotes: [] },
+      sources: [],
+      research_summary: 'Failed to parse research results'
     };
   }
 
@@ -195,16 +352,30 @@ serve(async (req) => {
       .update({ status: 'processing' })
       .eq('id', row.id);
 
-    // Estimated cost for single Agentic Research call (~$0.03-0.05)
-    const estimatedCost = 0.035;
+    // Estimated cost for comprehensive research (~$0.08-0.15)
+    const estimatedCost = 0.10;
 
     try {
-      // ========== Single Agentic Research Call ==========
-      console.log('Calling Perplexity Agentic Research API...');
+      // ========== Comprehensive Intelligence Research ==========
+      console.log('Calling Perplexity Comprehensive Intelligence Research API...');
       
-      const result = await callAgenticResearch(row.person_name, row.context, PERPLEXITY_API_KEY);
+      const result = await callComprehensiveResearch(row.person_name, row.context, PERPLEXITY_API_KEY);
       
-      console.log(`Research complete. Confidence: ${result.confidence}, Sources: ${result.sources.length}`);
+      console.log(`Research complete. Sources: ${result.sources?.length || 0}`);
+
+      // ========== Map to previous_roles format for DB compatibility ==========
+      const previousRoles = (result.career_history || []).map(role => ({
+        title: role.title,
+        company: role.company,
+        years: role.dates
+      }));
+
+      // ========== Map education format ==========
+      const education = (result.education || []).map(edu => ({
+        degree: edu.degree,
+        institution: edu.institution,
+        year: edu.year || ''
+      }));
 
       // ========== Store Results ==========
       console.log('Storing enriched person data...');
@@ -214,26 +385,65 @@ serve(async (req) => {
         .insert({
           job_id: row.job_id,
           people_row_id: row.id,
-          person_name: result.full_name || row.person_name,
+          person_name: result.identity?.full_name || row.person_name,
           context: row.context,
+          
+          // Identity fields
+          aliases: result.identity?.aliases || [],
+          photo_url: result.identity?.photo_url || null,
+          
+          // Current role
+          job_title: result.current_role?.title || null,
+          company: result.current_role?.company || null,
+          department: result.current_role?.department || null,
+          start_date: result.current_role?.start_date || null,
+          reports_to: result.current_role?.reports_to || null,
+          
+          // Biography
           biography: result.biography || null,
           biography_source: result.sources?.[0] || null,
-          job_title: result.job_title || null,
-          company: result.company || null,
           role_source: result.sources?.[0] || null,
-          previous_roles: result.previous_roles || [],
-          education: result.education || [],
-          notable_achievements: result.notable_achievements || null,
+          
+          // Career history
+          previous_roles: previousRoles,
+          career_highlights: result.career_history?.flatMap(r => r.highlights || []) || [],
+          
+          // Education
+          education: education,
+          
+          // Notable achievements (synthesized from career highlights)
+          notable_achievements: result.career_history?.flatMap(r => r.highlights || []).slice(0, 3).join('. ') || null,
           achievements_source: result.sources?.[0] || null,
-          email: result.email || null,
+          
+          // Public presence
+          linkedin_url: result.public_presence?.linkedin_url || null,
+          twitter_handle: result.public_presence?.twitter_handle || null,
+          other_socials: result.public_presence?.other_profiles || {},
+          website: result.public_presence?.website || null,
+          notable_content: result.public_presence?.notable_content || [],
+          
+          // News
+          recent_news: result.recent_news || [],
+          
+          // Contact
+          email: result.contact?.email || null,
           email_source: result.sources?.find(s => s.includes('linkedin') || s.includes('contact')) || null,
-          phone: result.phone || null,
+          email_confidence: result.contact?.email_confidence || null,
+          email_pattern: result.contact?.email_pattern || null,
+          phone: result.contact?.phone || null,
           phone_source: null,
-          linkedin_url: result.linkedin_url || null,
-          twitter_handle: result.twitter_handle || null,
-          other_socials: result.other_socials || {},
+          location: result.contact?.location || null,
+          
+          // Insights
+          communication_style: result.insights?.communication_style || null,
+          key_interests: result.insights?.key_interests || [],
+          conversation_starters: result.insights?.conversation_starters || [],
+          quotes: result.insights?.quotes || [],
+          
+          // Sources and quality
           all_citations: result.sources || [],
-          confidence_score: result.confidence || 'medium'
+          confidence_score: result.sources?.length >= 5 ? 'high' : result.sources?.length >= 2 ? 'medium' : 'low',
+          research_summary: result.research_summary || null
         });
 
       if (insertError) {
@@ -252,7 +462,7 @@ serve(async (req) => {
         cost_increment: estimatedCost
       });
 
-      console.log(`Successfully processed: ${row.person_name}, cost: $${estimatedCost.toFixed(4)}`);
+      console.log(`Successfully processed: ${row.person_name}, cost: $${estimatedCost.toFixed(2)}`);
 
       return new Response(
         JSON.stringify({
@@ -260,7 +470,8 @@ serve(async (req) => {
           person_name: row.person_name,
           cost: estimatedCost,
           citations_found: result.sources?.length || 0,
-          confidence: result.confidence
+          has_biography: !!result.biography,
+          has_insights: !!(result.insights?.communication_style || result.insights?.quotes?.length)
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
