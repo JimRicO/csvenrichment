@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { url } = await req.json();
+    const { url, logoOnly = false } = await req.json();
 
     if (!url) {
       return new Response(
@@ -20,6 +20,8 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log('Extract branding request:', { url, logoOnly });
 
     const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
     if (!FIRECRAWL_API_KEY) {
@@ -80,81 +82,111 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Download and upload images to storage
+    // Helper function to download and upload an image
+    const processImage = async (key: string, imageUrl: string): Promise<string> => {
+      try {
+        console.log(`[${key}] Attempting to download from:`, imageUrl);
+        
+        let imageResponse;
+        try {
+          imageResponse = await fetch(imageUrl, {
+            headers: { 
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+          });
+        } catch (sslError) {
+          const errorMsg = sslError instanceof Error ? sslError.message : String(sslError);
+          console.log(`[${key}] HTTPS failed, trying HTTP:`, errorMsg);
+          const httpUrl = imageUrl.replace('https://', 'http://');
+          imageResponse = await fetch(httpUrl, {
+            headers: { 
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+          });
+        }
+        
+        if (!imageResponse.ok) {
+          console.error(`[${key}] Failed to download, status:`, imageResponse.status);
+          return imageUrl;
+        }
+
+        const imageBlob = await imageResponse.blob();
+        console.log(`[${key}] Downloaded blob size:`, imageBlob.size, 'bytes');
+        
+        const contentType = imageResponse.headers.get('content-type') || 'image/png';
+        let fileExt = 'png';
+        if (contentType.includes('svg')) fileExt = 'svg';
+        else if (contentType.includes('jpeg') || contentType.includes('jpg')) fileExt = 'jpg';
+        else if (contentType.includes('png')) fileExt = 'png';
+        else if (contentType.includes('webp')) fileExt = 'webp';
+        else if (contentType.includes('gif')) fileExt = 'gif';
+        
+        const hostname = new URL(url).hostname.replace(/\./g, '-');
+        const fileName = `${hostname}/${key}-${Date.now()}.${fileExt}`;
+        
+        console.log(`[${key}] Uploading to storage as:`, fileName);
+        const { error: uploadError } = await supabase.storage
+          .from('brand-images')
+          .upload(fileName, imageBlob, {
+            contentType,
+            upsert: true,
+            cacheControl: '3600'
+          });
+
+        if (uploadError) {
+          console.error(`[${key}] Storage upload error:`, uploadError);
+          return imageUrl;
+        }
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('brand-images')
+          .getPublicUrl(fileName);
+        
+        console.log(`[${key}] ✓ Successfully uploaded to:`, publicUrl);
+        return publicUrl;
+      } catch (err) {
+        console.error(`[${key}] Error processing image:`, err);
+        return imageUrl;
+      }
+    };
+
+    // Logo-only mode: just extract and return the logo
+    if (logoOnly) {
+      const logoUrl = branding.images?.logo;
+      if (!logoUrl) {
+        return new Response(
+          JSON.stringify({ error: 'No logo found on this website' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const persistedLogoUrl = await processImage('logo', logoUrl);
+      console.log('Logo-only extraction complete:', persistedLogoUrl);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          logo: persistedLogoUrl,
+          metadata: {
+            url,
+            timestamp: new Date().toISOString(),
+          },
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Full branding extraction mode
     const finalImages: Record<string, string> = {};
     let uploadedCount = 0;
     
     if (branding.images && typeof branding.images === 'object') {
       for (const [key, imageUrl] of Object.entries(branding.images)) {
         if (imageUrl && typeof imageUrl === 'string') {
-          try {
-            console.log(`[${key}] Attempting to download from:`, imageUrl);
-            
-            // Try HTTP if HTTPS fails (common for development sites)
-            let imageResponse;
-            try {
-              imageResponse = await fetch(imageUrl, {
-                headers: { 
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                }
-              });
-            } catch (sslError) {
-              const errorMsg = sslError instanceof Error ? sslError.message : String(sslError);
-              console.log(`[${key}] HTTPS failed, trying HTTP:`, errorMsg);
-              // Try HTTP version if HTTPS fails
-              const httpUrl = imageUrl.replace('https://', 'http://');
-              imageResponse = await fetch(httpUrl, {
-                headers: { 
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                }
-              });
-            }
-            
-            if (!imageResponse.ok) {
-              console.error(`[${key}] Failed to download, status:`, imageResponse.status);
-              finalImages[key] = imageUrl; // Keep original URL as fallback
-              continue;
-            }
-
-            const imageBlob = await imageResponse.blob();
-            console.log(`[${key}] Downloaded blob size:`, imageBlob.size, 'bytes');
-            
-            // Determine file extension
-            const contentType = imageResponse.headers.get('content-type') || 'image/png';
-            let fileExt = 'png';
-            if (contentType.includes('svg')) fileExt = 'svg';
-            else if (contentType.includes('jpeg') || contentType.includes('jpg')) fileExt = 'jpg';
-            else if (contentType.includes('png')) fileExt = 'png';
-            else if (contentType.includes('webp')) fileExt = 'webp';
-            else if (contentType.includes('gif')) fileExt = 'gif';
-            
-            const hostname = new URL(url).hostname.replace(/\./g, '-');
-            const fileName = `${hostname}/${key}-${Date.now()}.${fileExt}`;
-            
-            console.log(`[${key}] Uploading to storage as:`, fileName);
-            const { data: uploadData, error: uploadError } = await supabase.storage
-              .from('brand-images')
-              .upload(fileName, imageBlob, {
-                contentType,
-                upsert: true,
-                cacheControl: '3600'
-              });
-
-            if (uploadError) {
-              console.error(`[${key}] Storage upload error:`, uploadError);
-              finalImages[key] = imageUrl; // Keep original URL as fallback
-            } else {
-              const { data: { publicUrl } } = supabase.storage
-                .from('brand-images')
-                .getPublicUrl(fileName);
-              
-              finalImages[key] = publicUrl;
-              uploadedCount++;
-              console.log(`[${key}] ✓ Successfully uploaded to:`, publicUrl);
-            }
-          } catch (err) {
-            console.error(`[${key}] Error processing image:`, err);
-            finalImages[key] = imageUrl; // Keep original URL as fallback
+          const persistedUrl = await processImage(key, imageUrl);
+          finalImages[key] = persistedUrl;
+          if (persistedUrl !== imageUrl) {
+            uploadedCount++;
           }
         }
       }
@@ -162,13 +194,11 @@ serve(async (req) => {
 
     console.log(`Successfully uploaded ${uploadedCount}/${Object.keys(finalImages).length} images`);
 
-    // Update branding with permanent image URLs
     const updatedBranding = {
       ...branding,
       images: finalImages
     };
 
-    // Save to database
     const { error: dbError } = await supabase
       .from('visual_identity')
       .upsert({

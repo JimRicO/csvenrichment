@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Palette, ImageOff, ExternalLink } from "lucide-react";
+import { Loader2, Palette, ImageOff, ExternalLink, Image } from "lucide-react";
 
 interface BrandingData {
   colorScheme?: string;
@@ -63,7 +63,9 @@ interface BrandingData {
 export const WebsiteBrandingScraper = () => {
   const [url, setUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isExtractingLogo, setIsExtractingLogo] = useState(false);
   const [branding, setBranding] = useState<BrandingData | null>(null);
+  const [extractedLogo, setExtractedLogo] = useState<string | null>(null);
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
 
   const handleExtract = async () => {
@@ -123,6 +125,41 @@ export const WebsiteBrandingScraper = () => {
     }
   };
 
+  const handleExtractLogo = async () => {
+    if (!url) {
+      toast.error("Please enter a website URL");
+      return;
+    }
+
+    setIsExtractingLogo(true);
+    setExtractedLogo(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('extract-branding', {
+        body: { url, logoOnly: true },
+      });
+
+      if (error) throw error;
+
+      if (data.error) {
+        toast.error(data.error);
+        return;
+      }
+
+      if (data.logo) {
+        setExtractedLogo(data.logo);
+        toast.success("Logo extracted successfully!");
+      } else {
+        toast.error("No logo found on this website");
+      }
+    } catch (error) {
+      console.error("Error extracting logo:", error);
+      toast.error("Failed to extract logo");
+    } finally {
+      setIsExtractingLogo(false);
+    }
+  };
+
   const header = (
     <div className="flex items-center gap-3 p-6">
       <div className="p-2 rounded-lg bg-primary/10">
@@ -147,9 +184,22 @@ export const WebsiteBrandingScraper = () => {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             className="flex-1"
-            disabled={isLoading}
+            disabled={isLoading || isExtractingLogo}
           />
-          <Button onClick={handleExtract} disabled={isLoading}>
+          <Button onClick={handleExtractLogo} disabled={isLoading || isExtractingLogo} variant="outline">
+            {isExtractingLogo ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Extracting...
+              </>
+            ) : (
+              <>
+                <Image className="w-4 h-4 mr-2" />
+                Extract Logo
+              </>
+            )}
+          </Button>
+          <Button onClick={handleExtract} disabled={isLoading || isExtractingLogo}>
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -160,6 +210,43 @@ export const WebsiteBrandingScraper = () => {
             )}
           </Button>
         </div>
+
+        {/* Extracted Logo Display */}
+        {extractedLogo && (
+          <div className="border border-border/50 rounded-lg p-4 bg-background/50">
+            <h3 className="font-semibold mb-3">Extracted Logo</h3>
+            <div className="flex items-center gap-4">
+              {imageErrors['extractedLogo'] ? (
+                <div className="h-24 w-24 flex flex-col items-center justify-center bg-muted/30 p-2 rounded text-muted-foreground">
+                  <ImageOff className="w-8 h-8 mb-1" />
+                  <a 
+                    href={extractedLogo} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-xs hover:text-primary flex items-center gap-1"
+                  >
+                    View URL <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              ) : (
+                <img
+                  src={extractedLogo}
+                  alt="Extracted Logo"
+                  className="max-h-24 object-contain bg-muted/30 p-2 rounded"
+                  onError={() => setImageErrors(prev => ({ ...prev, extractedLogo: true }))}
+                />
+              )}
+              <a 
+                href={extractedLogo} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1"
+              >
+                Open in new tab <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
+        )}
 
       {branding && (
         <div className="space-y-6 animate-fade-in">
