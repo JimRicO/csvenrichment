@@ -96,3 +96,9 @@ verify_jwt = false
 
 [functions.api-update-people]
 verify_jwt = false
+
+[functions.api-extract-logo]
+verify_jwt = false
+
+[functions.api-extract-instagram-pfp]
+verify_jwt = false

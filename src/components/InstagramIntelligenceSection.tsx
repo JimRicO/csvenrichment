@@ -372,7 +372,7 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
               ) : (
                 <>
                   <Image className="w-4 h-4 mr-2" />
-                  Extract PFP
+                  Extract Profile Picture
                 </>
               )}
             </Button>
