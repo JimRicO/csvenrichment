@@ -81,3 +81,6 @@ verify_jwt = false
 
 [functions.download-people-csv]
 verify_jwt = false
+
+[functions.enrich-person]
+verify_jwt = false
