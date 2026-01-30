@@ -39,6 +39,10 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
   const [singleUrl, setSingleUrl] = useState("");
   const [singleLoading, setSingleLoading] = useState(false);
   const [profile, setProfile] = useState<InstagramProfile | null>(null);
+  
+  // Profile picture extraction state
+  const [isExtractingPic, setIsExtractingPic] = useState(false);
+  const [extractedProfilePic, setExtractedProfilePic] = useState<string | null>(null);
 
   // CSV bulk processing state
   const [isDragging, setIsDragging] = useState(false);
@@ -84,6 +88,37 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
       toast.error(error.message || "Failed to scrape profile");
     } finally {
       setSingleLoading(false);
+    }
+  };
+
+  // Quick profile picture extraction
+  const handleExtractProfilePic = async () => {
+    if (!singleUrl.trim()) {
+      toast.error("Please enter an Instagram URL");
+      return;
+    }
+
+    setIsExtractingPic(true);
+    setExtractedProfilePic(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('instagram-scraper', {
+        body: { url: singleUrl.trim(), profilePicOnly: true }
+      });
+
+      if (error) throw error;
+
+      if (data?.profilePicUrl) {
+        setExtractedProfilePic(data.profilePicUrl);
+        toast.success("Profile picture extracted!");
+      } else {
+        toast.error("No profile picture found");
+      }
+    } catch (error: any) {
+      console.error('Profile pic extraction error:', error);
+      toast.error(error.message || "Failed to extract profile picture");
+    } finally {
+      setIsExtractingPic(false);
     }
   };
 
@@ -322,9 +357,26 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
               placeholder="https://www.instagram.com/username"
               value={singleUrl}
               onChange={(e) => setSingleUrl(e.target.value)}
-              disabled={singleLoading}
+              disabled={singleLoading || isExtractingPic}
             />
-            <Button onClick={handleSingleScrape} disabled={singleLoading}>
+            <Button 
+              onClick={handleExtractProfilePic} 
+              disabled={singleLoading || isExtractingPic}
+              variant="outline"
+            >
+              {isExtractingPic ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Extracting...
+                </>
+              ) : (
+                <>
+                  <Image className="w-4 h-4 mr-2" />
+                  Extract PFP
+                </>
+              )}
+            </Button>
+            <Button onClick={handleSingleScrape} disabled={singleLoading || isExtractingPic}>
               {singleLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -335,6 +387,33 @@ const InstagramIntelligenceSection = ({ onJobCreated }: InstagramIntelligenceSec
               )}
             </Button>
           </div>
+
+          {/* Extracted Profile Picture */}
+          {extractedProfilePic && (
+            <div className="flex items-center gap-4 p-4 rounded-lg border border-border/50 bg-secondary/20">
+              <img
+                src={extractedProfilePic}
+                alt="Extracted profile picture"
+                className="w-20 h-20 rounded-full object-cover"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  e.currentTarget.src = "/placeholder.svg";
+                }}
+              />
+              <div className="flex-1">
+                <p className="text-sm font-medium">Profile Picture Extracted</p>
+                <a 
+                  href={extractedProfilePic} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
+                >
+                  Open in new tab <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+          )}
 
           {/* Single Profile Result */}
           {profile && (
