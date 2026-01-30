@@ -1,164 +1,173 @@
 
-# Create CRM API Endpoints for External Integration
+
+# People Intelligence Module
 
 ## Overview
 
-Create two secure API endpoints that allow another Lovable app to fetch clubs needing enrichment and push back enriched data. Both endpoints will be protected with API key authentication.
+A new module to research individuals using Perplexity AI. Given a person's name and optional context (company, title, location), the system performs two web searches and synthesizes the results with **source URLs** so users can verify information.
 
 ---
 
-## New Edge Functions to Create
+## Source Verification (Simplified)
 
-### 1. `api-get-clubs` - Fetch Clubs Needing Enrichment
-
-**Purpose:** Returns a list of clubs that need enrichment data
-
-**Endpoint:** `GET /api-get-clubs`
-
-**Query Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `needs_enrichment` | boolean | If true, return only clubs missing key fields |
-| `limit` | number | Max clubs to return (default: 50, max: 200) |
-| `offset` | number | Pagination offset (default: 0) |
-
-**Authentication:** Requires `x-api-key` header matching `CRM_API_KEY` secret
-
-**Response:** JSON with clubs array containing id, club_name, website_url, instagram_handle, and all enriched fields (nulls indicate needs enrichment)
-
----
-
-### 2. `api-update-clubs` - Push Enriched Data Back
-
-**Purpose:** Receives enriched club data and updates the database
-
-**Endpoint:** `POST /api-update-clubs`
-
-**Request Body:**
-```json
-{
-  "clubs": [
-    {
-      "id": "uuid-of-club",
-      "perplexity_description": "...",
-      "founder_info": "...",
-      "founding_year": "2015",
-      "recent_activities": [...],
-      "perplexity_citations": [...]
-    }
-  ]
-}
-```
-
-**Authentication:** Requires `x-api-key` header matching `CRM_API_KEY` secret
-
-**Response:** JSON with success status and count of updated clubs
-
----
-
-## Security Implementation
-
-Both endpoints will:
-1. Check for `x-api-key` header
-2. Validate against `CRM_API_KEY` environment variable
-3. Return 401 Unauthorized if invalid
-4. Log all access attempts
-
----
-
-## Files to Create/Modify
-
-| File | Action | Purpose |
-|------|--------|---------|
-| `supabase/functions/api-get-clubs/index.ts` | Create | GET endpoint for fetching clubs |
-| `supabase/functions/api-update-clubs/index.ts` | Create | POST endpoint for updating clubs |
-| `supabase/config.toml` | Modify | Add function configs with `verify_jwt = false` |
-
----
-
-## Secret Required
-
-A new secret `CRM_API_KEY` needs to be created. This key should be:
-- Generated as a secure random string (e.g., 32+ characters)
-- Shared securely with the other Lovable app
-- Stored as a secret in both projects
-
----
-
-## Integration Code for Other App
-
-After implementation, the other Lovable app can integrate like this:
-
-```typescript
-const CRM_API_URL = "https://etscplmovnooalqfbzvy.supabase.co/functions/v1";
-const API_KEY = Deno.env.get("CRM_API_KEY");
-
-// Fetch clubs needing enrichment
-const response = await fetch(
-  `${CRM_API_URL}/api-get-clubs?needs_enrichment=true&limit=50`,
-  { headers: { "x-api-key": API_KEY } }
-);
-const { clubs } = await response.json();
-
-// After enrichment, push back
-await fetch(`${CRM_API_URL}/api-update-clubs`, {
-  method: "POST",
-  headers: { 
-    "x-api-key": API_KEY,
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({ clubs: enrichedClubs })
-});
-```
-
----
-
-## Implementation Details
-
-### api-get-clubs Logic
+Each enriched field will have an associated source URL:
 
 ```text
-1. Validate x-api-key header against CRM_API_KEY
-2. Parse query parameters (needs_enrichment, limit, offset)
-3. If needs_enrichment=true:
-   - Query enriched_clubs WHERE perplexity_description IS NULL 
-     OR founder_info IS NULL
-4. Otherwise return all clubs
-5. Apply limit/offset for pagination
-6. Return JSON response with clubs array
+biography: "John founded Acme Corp in 2015..."
+biography_source: "https://forbes.com/article/john-smith-profile"
 ```
 
-### api-update-clubs Logic
-
-```text
-1. Validate x-api-key header against CRM_API_KEY
-2. Parse request body with clubs array
-3. For each club in array:
-   - Validate required id field exists
-   - Update enriched_clubs record with provided fields
-4. Return success count and any errors
-```
+Users can click the URL to verify the information directly.
 
 ---
 
-## Data Flow Diagram
+## Database Schema
+
+### 1. `people_jobs` - Job tracking
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | text PK | Job ID (e.g., `PEOPLE_1738...`) |
+| project_id | text | Project identifier |
+| status | text | pending, processing, completed, failed |
+| total_rows | integer | Number of people to research |
+| processed_rows | integer | Completed count |
+| estimated_cost_usd | numeric | Running cost total |
+| created_at | timestamptz | Job creation time |
+| updated_at | timestamptz | Last update time |
+
+### 2. `people_rows` - Processing queue
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid PK | Row identifier |
+| job_id | text FK | Reference to people_jobs |
+| person_name | text | Full name to research |
+| context | text | Optional context (company, title, etc.) |
+| status | text | pending, processing, completed, failed |
+| error_message | text | Error details if failed |
+| created_at | timestamptz | Row creation time |
+
+### 3. `enriched_people` - Research results with source URLs
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid PK | Record identifier |
+| job_id | text FK | Reference to people_jobs |
+| people_row_id | uuid FK | Reference to people_rows |
+| person_name | text | Full name |
+| context | text | Original context provided |
+| biography | text | Synthesized bio/background |
+| biography_source | text | URL source for biography |
+| current_role | text | Current job title |
+| current_company | text | Current employer |
+| role_source | text | URL source for role/company |
+| previous_roles | jsonb | Array of `{title, company, years}` |
+| education | jsonb | Array of `{degree, institution, year}` |
+| notable_achievements | text | Key accomplishments |
+| achievements_source | text | URL source for achievements |
+| email | text | Email if found |
+| email_source | text | URL source for email |
+| phone | text | Phone if found |
+| phone_source | text | URL source for phone |
+| linkedin_url | text | LinkedIn profile URL |
+| twitter_handle | text | Twitter/X handle |
+| other_socials | jsonb | Other social media links |
+| all_citations | jsonb | Complete list of all source URLs |
+| confidence_score | text | low, medium, high |
+| created_at | timestamptz | Record creation time |
+| updated_at | timestamptz | Last update time |
+
+---
+
+## Edge Functions
+
+### 1. `create-people-job`
+
+Creates job, inserts rows into queue, triggers first worker invocation.
+
+### 2. `people-worker`
+
+1. Find next pending row
+2. Run Perplexity search #1: "Who is [name] [context]?"
+3. Run Perplexity search #2: "[name] contact email phone linkedin"
+4. Claude synthesizes both responses with source attribution
+5. Store in `enriched_people` with per-field source URLs
+6. Update job progress
+
+### 3. `get-people-status`
+
+Returns job progress and recent results.
+
+### 4. `download-people-csv`
+
+Exports enriched data as CSV.
+
+---
+
+## Frontend Components
+
+| Component | Purpose |
+|-----------|---------|
+| `PeopleIntelligenceSection.tsx` | Input form (name + context) |
+| `PeopleJobsTable.tsx` | Job history with realtime updates |
+| `EnrichedPeopleDialog.tsx` | Results with clickable source URLs |
+| `ActivePeopleJobMonitor.tsx` | Live progress display |
+| `usePeopleJobStatus.ts` | Polling hook for job status |
+
+---
+
+## UI Source Display
+
+Each field shows a small link icon when a source exists:
 
 ```text
-Other Lovable App                         This CRM
-      │                                       │
-      │  GET /api-get-clubs?needs_enrichment  │
-      │ ─────────────────────────────────────►│
-      │  (x-api-key: CRM_API_KEY)             │
-      │                                       │
-      │◄───────────────────────────────────── │
-      │  { clubs: [...unenriched clubs] }     │
-      │                                       │
-      │  [Process & Enrich Data]              │
-      │                                       │
-      │  POST /api-update-clubs               │
-      │ ─────────────────────────────────────►│
-      │  { clubs: [...enriched data] }        │
-      │                                       │
-      │◄───────────────────────────────────── │
-      │  { success: true, updated: 50 }       │
++------------------------------------------+
+|  Biography                          [🔗] |
+|  ---------------------------------------- |
+|  John Smith is a serial entrepreneur...   |
++------------------------------------------+
 ```
+
+Clicking the icon opens the source URL in a new tab.
+
+---
+
+## Files to Create
+
+| File | Purpose |
+|------|---------|
+| `supabase/functions/create-people-job/index.ts` | Job creation |
+| `supabase/functions/people-worker/index.ts` | Background processor |
+| `supabase/functions/get-people-status/index.ts` | Status endpoint |
+| `supabase/functions/download-people-csv/index.ts` | CSV export |
+| `src/components/PeopleIntelligenceSection.tsx` | Input UI |
+| `src/components/PeopleJobsTable.tsx` | Job history table |
+| `src/components/EnrichedPeopleDialog.tsx` | Results viewer |
+| `src/components/ActivePeopleJobMonitor.tsx` | Live monitor |
+| `src/hooks/usePeopleJobStatus.ts` | Status hook |
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `supabase/config.toml` | Add new function configs |
+| `src/pages/Index.tsx` | Add People Intelligence section |
+
+---
+
+## Cost Estimate
+
+Per person: ~$0.014 (2x Perplexity + Claude synthesis)
+
+---
+
+## Implementation Order
+
+1. Database: Create tables via migration
+2. Edge Functions: create-people-job, people-worker, get-people-status
+3. Frontend: PeopleIntelligenceSection + usePeopleJobStatus hook
+4. Frontend: ActivePeopleJobMonitor
+5. Frontend: PeopleJobsTable + EnrichedPeopleDialog
+6. Edge Function: download-people-csv
+
