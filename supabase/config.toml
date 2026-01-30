@@ -84,3 +84,15 @@ verify_jwt = false
 
 [functions.enrich-person]
 verify_jwt = false
+
+[functions.api-get-people]
+verify_jwt = false
+
+[functions.api-create-people-job]
+verify_jwt = false
+
+[functions.api-get-people-status]
+verify_jwt = false
+
+[functions.api-update-people]
+verify_jwt = false
