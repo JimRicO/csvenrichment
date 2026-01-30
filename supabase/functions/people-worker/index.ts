@@ -227,8 +227,8 @@ serve(async (req) => {
       .update({ status: 'processing' })
       .eq('id', row.id);
 
-    // Estimated cost for comprehensive research (~$0.08-0.15)
-    const estimatedCost = 0.10;
+    // Estimated cost for deep-research preset (~$0.50-1.00, includes GPT-5.2 reasoning)
+    const estimatedCost = 0.75;
 
     try {
       // ========== Comprehensive Intelligence Research ==========
