@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { scraped_row_id, url } = await req.json();
+    const { scraped_row_id, url, profilePicOnly = false } = await req.json();
     
     // If scraped_row_id is provided, fetch from database (worker mode)
     // If url is provided, direct scrape mode (legacy)
@@ -21,6 +21,8 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log('Instagram scraper request:', { scraped_row_id, url, profilePicOnly });
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -304,6 +306,19 @@ serve(async (req) => {
         console.error('Error downloading/uploading profile picture:', picError);
         // Continue without profile picture - not critical
       }
+    }
+
+    // Profile picture only mode - return early with just the pic URL
+    if (profilePicOnly) {
+      console.log('Profile pic only mode - returning early');
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          profilePicUrl: profilePicStorageUrl || profilePicUrl,
+          username: profileData.username
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Download and persist latest post images (limit to 6 posts)
