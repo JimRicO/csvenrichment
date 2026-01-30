@@ -1,47 +1,57 @@
 
 
-## Add Screenshot Type Toggle (Full Page vs Viewport Only)
+## Add Logo Extractor Button to Website Visual Identity Scraper
 
-This plan adds a simple toggle option to let you choose between capturing a full-page screenshot or just the visible viewport.
+This plan adds a dedicated "Extract Logo" button that quickly extracts just the logo from a website using Firecrawl's branding engine.
 
 ### What Will Change
 
-**Frontend (ScreenshotTest.tsx):**
-- Add a toggle switch or radio button to select between "Full Page" and "Viewport Only"
-- Pass the selected option to the backend function
-- Update the result label to reflect which type was captured
+**Frontend (WebsiteBrandingScraper.tsx):**
+- Add a new "Extract Logo" button next to the existing "Extract Identity" button
+- Add state for loading and displaying the extracted logo separately
+- Show the extracted logo in a prominent display area
+- The logo extraction will be faster since it only focuses on the logo
 
-**Backend (screenshot-test/index.ts):**
-- Accept a new `fullPage` parameter (defaults to `true` for backward compatibility)
-- Use `screenshot@fullPage` when full page is selected
-- Use `screenshot` when viewport only is selected
+**Backend (extract-branding/index.ts):**
+- Add a `logoOnly` parameter option
+- When `logoOnly` is true, still use the branding format but only process and return the logo image
+- This keeps it simple by reusing the same Firecrawl call but filtering the response
 
 ### User Experience
 
-You'll see a simple toggle next to the URL input:
-- **Full Page** (default): Captures the entire scrollable page
-- **Viewport Only**: Captures only what's visible in the browser window (faster, smaller file)
+You'll see two buttons next to the URL input:
+- **Extract Identity** (existing): Full brand extraction (colors, fonts, images, etc.)
+- **Extract Logo**: Quick logo-only extraction
+
+When you click "Extract Logo":
+1. It calls Firecrawl's branding format
+2. Extracts and persists just the logo to storage
+3. Displays the logo prominently
 
 ### Technical Details
 
 **Frontend changes:**
-```
-- Add state: const [fullPage, setFullPage] = useState(true)
-- Add Switch component from shadcn/ui with labels
-- Pass { url, fullPage } to the edge function
+```text
+- Add state: isExtractingLogo, extractedLogo
+- Add "Extract Logo" button with Image icon
+- Pass { url, logoOnly: true } to edge function when extracting logo
+- Display extracted logo in a dedicated section above the full branding results
 ```
 
 **Backend changes:**
-```
-- Extract fullPage from request body (default: true)
-- Set formats to fullPage ? ['screenshot@fullPage'] : ['screenshot']
-- Log which mode is being used
+```text
+- Accept logoOnly parameter from request body
+- When logoOnly is true:
+  - Still call Firecrawl with formats: ['branding']
+  - Only process branding.images.logo (skip other images)
+  - Return { logo: persistedLogoUrl } instead of full branding
+- This avoids processing unnecessary data
 ```
 
 ### Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/components/ScreenshotTest.tsx` | Add toggle switch and pass `fullPage` option |
-| `supabase/functions/screenshot-test/index.ts` | Accept `fullPage` param and adjust Firecrawl format |
+| `src/components/WebsiteBrandingScraper.tsx` | Add "Extract Logo" button, loading state, and logo display section |
+| `supabase/functions/extract-branding/index.ts` | Add `logoOnly` mode that returns just the logo |
 
