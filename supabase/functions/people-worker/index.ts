@@ -15,43 +15,126 @@ interface PeopleRow {
   status: string;
 }
 
-interface PerplexityResult {
-  content: string;
-  citations: string[];
+interface AgenticResearchResult {
+  full_name: string | null;
+  biography: string | null;
+  job_title: string | null;
+  company: string | null;
+  previous_roles: Array<{ title: string; company: string; years: string }>;
+  education: Array<{ degree: string; institution: string; year: string }>;
+  notable_achievements: string | null;
+  email: string | null;
+  phone: string | null;
+  linkedin_url: string | null;
+  twitter_handle: string | null;
+  other_socials: Record<string, string>;
+  confidence: 'high' | 'medium' | 'low';
+  sources: string[];
 }
 
-async function searchPerplexity(query: string, apiKey: string): Promise<PerplexityResult> {
-  try {
-    console.log('Perplexity search query:', query.substring(0, 100));
-    const response = await fetch('https://api.perplexity.ai/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'sonar-pro',
-        messages: [
-          { role: 'system', content: 'Be precise and concise. Provide factual information with specific details when available.' },
-          { role: 'user', content: query }
-        ],
-      }),
-    });
+async function callAgenticResearch(personName: string, context: string | null, apiKey: string): Promise<AgenticResearchResult> {
+  const contextStr = context ? ` (${context})` : '';
+  
+  const instructions = `You are a professional researcher. Find comprehensive information about this person.
 
-    if (!response.ok) {
-      console.error(`Perplexity API error: ${response.status}`);
-      return { content: '', citations: [] };
-    }
+SEARCH: LinkedIn profile, company websites, news articles, professional directories, social media, public records.
 
-    const data = await response.json();
-    return {
-      content: data.choices?.[0]?.message?.content || '',
-      citations: data.citations || []
-    };
-  } catch (error) {
-    console.error('Perplexity search error:', error);
-    return { content: '', citations: [] };
+RESPOND ONLY with this JSON, no other text:
+{
+  "full_name": "string or null",
+  "biography": "2-3 sentence professional biography summarizing their background and significance",
+  "job_title": "current job title or null",
+  "company": "current company/employer or null",
+  "previous_roles": [{"title": "Job Title", "company": "Company Name", "years": "2018-2022"}],
+  "education": [{"degree": "Degree Name", "institution": "University Name", "year": "2010"}],
+  "notable_achievements": "Key accomplishments, awards, or recognition in 1-2 sentences or null",
+  "email": "work email address or null",
+  "phone": "phone number or null",
+  "linkedin_url": "LinkedIn profile URL or null",
+  "twitter_handle": "@username or null",
+  "other_socials": {"platform": "url"},
+  "confidence": "high|medium|low",
+  "sources": ["URLs used to gather this information"]
+}
+
+RULES:
+- Only include verified information, use null for missing fields
+- Biography should synthesize their professional identity and significance
+- previous_roles and education should be empty arrays [] if not found
+- Prioritize work email over personal email
+- Never fabricate or guess data
+- Confidence: "high" if multiple sources agree, "medium" if single source, "low" if uncertain`;
+
+  console.log(`Calling Perplexity Agentic Research for: ${personName}${contextStr}`);
+  
+  const response = await fetch('https://api.perplexity.ai/responses', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: "openai/gpt-5.2",
+      input: `Research ${personName}${contextStr}. Find their professional background, career history, contact information, and notable achievements.`,
+      tools: [{ type: "web_search" }],
+      instructions: instructions
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`Perplexity Agentic API error: ${response.status} - ${errorText}`);
+    throw new Error(`Perplexity API error: ${response.status}`);
   }
+
+  const data = await response.json();
+  
+  // Extract output_text from the agentic response format
+  let outputText = data.output_text || "";
+  if (!outputText && data.output) {
+    for (const item of data.output) {
+      if (item.type === "message" && item.content) {
+        for (const content of item.content) {
+          if (content.type === "output_text") {
+            outputText += content.text;
+          }
+        }
+      }
+    }
+  }
+
+  console.log(`Agentic response length: ${outputText.length} chars`);
+
+  // Parse JSON from output
+  let parsedResult: AgenticResearchResult;
+  try {
+    // Remove markdown code blocks if present
+    const cleanedText = outputText.replace(/```json\n?|\n?```/g, '').trim();
+    parsedResult = JSON.parse(cleanedText);
+  } catch (parseError) {
+    console.error('Failed to parse agentic response:', parseError);
+    console.log('Raw response (first 500 chars):', outputText.substring(0, 500));
+    
+    // Return minimal result
+    parsedResult = {
+      full_name: null,
+      biography: null,
+      job_title: null,
+      company: null,
+      previous_roles: [],
+      education: [],
+      notable_achievements: null,
+      email: null,
+      phone: null,
+      linkedin_url: null,
+      twitter_handle: null,
+      other_socials: {},
+      confidence: 'low',
+      sources: []
+    };
+  }
+
+  return parsedResult;
 }
 
 serve(async (req) => {
@@ -76,20 +159,12 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get API keys
+    // Get API key
     const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY');
-    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 
     if (!PERPLEXITY_API_KEY) {
       return new Response(
         JSON.stringify({ error: 'PERPLEXITY_API_KEY not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!ANTHROPIC_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -120,153 +195,45 @@ serve(async (req) => {
       .update({ status: 'processing' })
       .eq('id', row.id);
 
-    let totalCost = 0;
+    // Estimated cost for single Agentic Research call (~$0.03-0.05)
+    const estimatedCost = 0.035;
 
     try {
-      // ========== STEP 1: Perplexity Search - "Who is" ==========
-      console.log('Step 1: Running biographical search...');
-      const contextStr = row.context ? ` (${row.context})` : '';
-      const bioQuery = `Who is ${row.person_name}${contextStr}? Provide their background, current role, company, career history, education, and notable achievements. Be specific with dates, company names, and titles.`;
+      // ========== Single Agentic Research Call ==========
+      console.log('Calling Perplexity Agentic Research API...');
       
-      const bioResult = await searchPerplexity(bioQuery, PERPLEXITY_API_KEY);
-      console.log(`Bio search returned ${bioResult.content.length} chars, ${bioResult.citations.length} citations`);
-      totalCost += 0.015; // Perplexity sonar-pro cost estimate
-
-      // ========== STEP 2: Perplexity Search - Contact Details ==========
-      console.log('Step 2: Running contact details search...');
-      const contactQuery = `${row.person_name}${contextStr} contact information: email address, phone number, LinkedIn profile URL, Twitter/X handle. Only provide verified contact information if publicly available.`;
+      const result = await callAgenticResearch(row.person_name, row.context, PERPLEXITY_API_KEY);
       
-      const contactResult = await searchPerplexity(contactQuery, PERPLEXITY_API_KEY);
-      console.log(`Contact search returned ${contactResult.content.length} chars, ${contactResult.citations.length} citations`);
-      totalCost += 0.015; // Perplexity sonar-pro cost estimate
+      console.log(`Research complete. Confidence: ${result.confidence}, Sources: ${result.sources.length}`);
 
-      // Combine all citations
-      const allCitations = [...new Set([...bioResult.citations, ...contactResult.citations])];
-
-      // ========== STEP 3: Claude Synthesis ==========
-      console.log('Step 3: Running Claude synthesis...');
-      
-      const synthesisPrompt = `Analyze the following web research about a person and extract structured information with source attribution.
-
-SEARCH 1 - BIOGRAPHICAL INFORMATION:
-${bioResult.content || 'No biographical information found.'}
-
-Source URLs from Search 1:
-${bioResult.citations.length > 0 ? bioResult.citations.map((c, i) => `[${i + 1}] ${c}`).join('\n') : 'No sources'}
-
-SEARCH 2 - CONTACT INFORMATION:
-${contactResult.content || 'No contact information found.'}
-
-Source URLs from Search 2:
-${contactResult.citations.length > 0 ? contactResult.citations.map((c, i) => `[${bioResult.citations.length + i + 1}] ${c}`).join('\n') : 'No sources'}
-
-PERSON NAME: ${row.person_name}
-CONTEXT PROVIDED: ${row.context || 'None'}
-
-Extract and synthesize the information. For each field, identify which source URL (if any) supports that information. Return ONLY valid JSON in this exact format:
-
-{
-  "biography": "2-3 sentence biography synthesizing the person's background and significance",
-  "biography_source": "URL that best supports the biography, or null",
-  "job_title": "Current job title, or null if unknown",
-  "company": "Current company/employer, or null if unknown",
-  "role_source": "URL that supports the role/company info, or null",
-  "previous_roles": [{"title": "Job Title", "company": "Company Name", "years": "2018-2022"}],
-  "education": [{"degree": "Degree Name", "institution": "University Name", "year": "2010"}],
-  "notable_achievements": "Key accomplishments in 1-2 sentences, or null",
-  "achievements_source": "URL that supports achievements, or null",
-  "email": "email@example.com or null if not found",
-  "email_source": "URL where email was found, or null",
-  "phone": "+1-555-123-4567 or null if not found",
-  "phone_source": "URL where phone was found, or null",
-  "linkedin_url": "https://linkedin.com/in/username or null",
-  "twitter_handle": "@username or null",
-  "other_socials": {"platform": "url"},
-  "confidence_score": "high/medium/low based on data quality and source reliability"
-}
-
-Important:
-- Only include information that was actually found in the searches
-- Use null for any field where no reliable information was found
-- previous_roles and education should be empty arrays if not found
-- Confidence should be "high" if multiple sources agree, "medium" if single source, "low" if uncertain`;
-
-      const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 2000,
-          messages: [{ role: 'user', content: synthesisPrompt }],
-        }),
-      });
-
-      if (!claudeResponse.ok) {
-        const errorText = await claudeResponse.text();
-        throw new Error(`Claude API error: ${claudeResponse.status} - ${errorText}`);
-      }
-
-      const claudeData = await claudeResponse.json();
-      const claudeContent = claudeData.content?.[0]?.text || '';
-      
-      // Calculate Claude cost
-      const inputTokens = claudeData.usage?.input_tokens || 0;
-      const outputTokens = claudeData.usage?.output_tokens || 0;
-      totalCost += (inputTokens * 0.003 + outputTokens * 0.015) / 1000;
-
-      console.log(`Claude synthesis complete. Tokens: ${inputTokens} in, ${outputTokens} out`);
-
-      // Parse Claude response
-      let parsedResult: any = {};
-      try {
-        // Extract JSON from response (handle markdown code blocks)
-        const jsonMatch = claudeContent.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, claudeContent];
-        const jsonStr = jsonMatch[1] || claudeContent;
-        parsedResult = JSON.parse(jsonStr.trim());
-      } catch (parseError) {
-        console.error('Failed to parse Claude response:', parseError);
-        console.log('Raw response:', claudeContent.substring(0, 500));
-        // Create minimal result
-        parsedResult = {
-          biography: null,
-          job_title: null,
-          company: null,
-          confidence_score: 'low'
-        };
-      }
-
-      // ========== STEP 4: Store Results ==========
-      console.log('Step 4: Storing enriched person data...');
+      // ========== Store Results ==========
+      console.log('Storing enriched person data...');
       
       const { error: insertError } = await supabase
         .from('enriched_people')
         .insert({
           job_id: row.job_id,
           people_row_id: row.id,
-          person_name: row.person_name,
+          person_name: result.full_name || row.person_name,
           context: row.context,
-          biography: parsedResult.biography || null,
-          biography_source: parsedResult.biography_source || null,
-          job_title: parsedResult.job_title || null,
-          company: parsedResult.company || null,
-          role_source: parsedResult.role_source || null,
-          previous_roles: parsedResult.previous_roles || [],
-          education: parsedResult.education || [],
-          notable_achievements: parsedResult.notable_achievements || null,
-          achievements_source: parsedResult.achievements_source || null,
-          email: parsedResult.email || null,
-          email_source: parsedResult.email_source || null,
-          phone: parsedResult.phone || null,
-          phone_source: parsedResult.phone_source || null,
-          linkedin_url: parsedResult.linkedin_url || null,
-          twitter_handle: parsedResult.twitter_handle || null,
-          other_socials: parsedResult.other_socials || {},
-          all_citations: allCitations,
-          confidence_score: parsedResult.confidence_score || 'medium'
+          biography: result.biography || null,
+          biography_source: result.sources?.[0] || null,
+          job_title: result.job_title || null,
+          company: result.company || null,
+          role_source: result.sources?.[0] || null,
+          previous_roles: result.previous_roles || [],
+          education: result.education || [],
+          notable_achievements: result.notable_achievements || null,
+          achievements_source: result.sources?.[0] || null,
+          email: result.email || null,
+          email_source: result.sources?.find(s => s.includes('linkedin') || s.includes('contact')) || null,
+          phone: result.phone || null,
+          phone_source: null,
+          linkedin_url: result.linkedin_url || null,
+          twitter_handle: result.twitter_handle || null,
+          other_socials: result.other_socials || {},
+          all_citations: result.sources || [],
+          confidence_score: result.confidence || 'medium'
         });
 
       if (insertError) {
@@ -282,17 +249,18 @@ Important:
       // Update job progress
       await supabase.rpc('increment_people_job_processed', {
         job_id_param: row.job_id,
-        cost_increment: totalCost
+        cost_increment: estimatedCost
       });
 
-      console.log(`Successfully processed: ${row.person_name}, cost: $${totalCost.toFixed(4)}`);
+      console.log(`Successfully processed: ${row.person_name}, cost: $${estimatedCost.toFixed(4)}`);
 
       return new Response(
         JSON.stringify({
           success: true,
           person_name: row.person_name,
-          cost: totalCost,
-          citations_found: allCitations.length
+          cost: estimatedCost,
+          citations_found: result.sources?.length || 0,
+          confidence: result.confidence
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -312,7 +280,7 @@ Important:
       // Still increment job progress for failed rows
       await supabase.rpc('increment_people_job_processed', {
         job_id_param: row.job_id,
-        cost_increment: totalCost
+        cost_increment: estimatedCost
       });
 
       return new Response(
