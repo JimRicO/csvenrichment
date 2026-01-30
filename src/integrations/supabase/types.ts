@@ -164,84 +164,135 @@ export type Database = {
       enriched_people: {
         Row: {
           achievements_source: string | null
+          aliases: Json | null
           all_citations: Json | null
           biography: string | null
           biography_source: string | null
+          career_highlights: Json | null
+          communication_style: string | null
           company: string | null
           confidence_score: string | null
           context: string | null
+          conversation_starters: Json | null
           created_at: string
+          department: string | null
           education: Json | null
           email: string | null
+          email_confidence: string | null
+          email_pattern: string | null
           email_source: string | null
           id: string
           job_id: string
           job_title: string | null
+          key_interests: Json | null
           linkedin_url: string | null
+          location: string | null
           notable_achievements: string | null
+          notable_content: Json | null
           other_socials: Json | null
           people_row_id: string
           person_name: string
           phone: string | null
           phone_source: string | null
+          photo_url: string | null
           previous_roles: Json | null
+          quotes: Json | null
+          recent_news: Json | null
+          reports_to: string | null
+          research_summary: string | null
           role_source: string | null
+          start_date: string | null
           twitter_handle: string | null
           updated_at: string
+          website: string | null
         }
         Insert: {
           achievements_source?: string | null
+          aliases?: Json | null
           all_citations?: Json | null
           biography?: string | null
           biography_source?: string | null
+          career_highlights?: Json | null
+          communication_style?: string | null
           company?: string | null
           confidence_score?: string | null
           context?: string | null
+          conversation_starters?: Json | null
           created_at?: string
+          department?: string | null
           education?: Json | null
           email?: string | null
+          email_confidence?: string | null
+          email_pattern?: string | null
           email_source?: string | null
           id?: string
           job_id: string
           job_title?: string | null
+          key_interests?: Json | null
           linkedin_url?: string | null
+          location?: string | null
           notable_achievements?: string | null
+          notable_content?: Json | null
           other_socials?: Json | null
           people_row_id: string
           person_name: string
           phone?: string | null
           phone_source?: string | null
+          photo_url?: string | null
           previous_roles?: Json | null
+          quotes?: Json | null
+          recent_news?: Json | null
+          reports_to?: string | null
+          research_summary?: string | null
           role_source?: string | null
+          start_date?: string | null
           twitter_handle?: string | null
           updated_at?: string
+          website?: string | null
         }
         Update: {
           achievements_source?: string | null
+          aliases?: Json | null
           all_citations?: Json | null
           biography?: string | null
           biography_source?: string | null
+          career_highlights?: Json | null
+          communication_style?: string | null
           company?: string | null
           confidence_score?: string | null
           context?: string | null
+          conversation_starters?: Json | null
           created_at?: string
+          department?: string | null
           education?: Json | null
           email?: string | null
+          email_confidence?: string | null
+          email_pattern?: string | null
           email_source?: string | null
           id?: string
           job_id?: string
           job_title?: string | null
+          key_interests?: Json | null
           linkedin_url?: string | null
+          location?: string | null
           notable_achievements?: string | null
+          notable_content?: Json | null
           other_socials?: Json | null
           people_row_id?: string
           person_name?: string
           phone?: string | null
           phone_source?: string | null
+          photo_url?: string | null
           previous_roles?: Json | null
+          quotes?: Json | null
+          recent_news?: Json | null
+          reports_to?: string | null
+          research_summary?: string | null
           role_source?: string | null
+          start_date?: string | null
           twitter_handle?: string | null
           updated_at?: string
+          website?: string | null
         }
         Relationships: [
           {

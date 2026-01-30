@@ -7,9 +7,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   User, Briefcase, GraduationCap, Mail, Phone, 
-  Linkedin, Twitter, Link2, ChevronDown, Award, ExternalLink
+  Linkedin, Twitter, Link2, ChevronDown, Award, ExternalLink,
+  Globe, MapPin, Calendar, Building2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import PersonPhoto from "./person-intelligence/PersonPhoto";
+import PersonNews from "./person-intelligence/PersonNews";
+import PersonInsights from "./person-intelligence/PersonInsights";
+import ResearchSummary from "./person-intelligence/ResearchSummary";
 
 interface PreviousRole {
   title: string;
@@ -21,6 +26,14 @@ interface Education {
   degree: string;
   institution: string;
   year?: string;
+  field?: string;
+}
+
+interface NewsItem {
+  headline: string;
+  source: string;
+  date: string;
+  url: string;
 }
 
 interface EnrichedPerson {
@@ -46,6 +59,23 @@ interface EnrichedPerson {
   all_citations: string[];
   confidence_score: string | null;
   created_at: string;
+  // New comprehensive fields
+  aliases: string[];
+  photo_url: string | null;
+  department: string | null;
+  start_date: string | null;
+  reports_to: string | null;
+  recent_news: NewsItem[];
+  website: string | null;
+  notable_content: string[];
+  email_confidence: string | null;
+  email_pattern: string | null;
+  location: string | null;
+  communication_style: string | null;
+  key_interests: string[];
+  conversation_starters: string[];
+  quotes: string[];
+  research_summary: string | null;
 }
 
 interface EnrichedPeopleDialogProps {
@@ -89,7 +119,7 @@ const EnrichedPeopleDialog = ({ jobId, open, onOpenChange }: EnrichedPeopleDialo
 
         if (error) throw error;
         
-        // Type cast the data with explicit handling
+        // Type cast with handling for new fields
         const typedPeople = (data || []).map(person => ({
           ...person,
           previous_roles: (Array.isArray(person.previous_roles) 
@@ -101,6 +131,25 @@ const EnrichedPeopleDialog = ({ jobId, open, onOpenChange }: EnrichedPeopleDialo
           other_socials: (person.other_socials as Record<string, string>) || {},
           all_citations: (Array.isArray(person.all_citations) 
             ? person.all_citations as unknown as string[] 
+            : []),
+          // New fields
+          aliases: (Array.isArray(person.aliases) 
+            ? person.aliases as unknown as string[] 
+            : []),
+          recent_news: (Array.isArray(person.recent_news) 
+            ? person.recent_news as unknown as NewsItem[] 
+            : []),
+          notable_content: (Array.isArray(person.notable_content) 
+            ? person.notable_content as unknown as string[] 
+            : []),
+          key_interests: (Array.isArray(person.key_interests) 
+            ? person.key_interests as unknown as string[] 
+            : []),
+          conversation_starters: (Array.isArray(person.conversation_starters) 
+            ? person.conversation_starters as unknown as string[] 
+            : []),
+          quotes: (Array.isArray(person.quotes) 
+            ? person.quotes as unknown as string[] 
             : [])
         })) as EnrichedPerson[];
         
@@ -118,37 +167,24 @@ const EnrichedPeopleDialog = ({ jobId, open, onOpenChange }: EnrichedPeopleDialo
     fetchPeople();
   }, [jobId, open]);
 
-  const getConfidenceBadge = (score: string | null) => {
-    switch (score) {
-      case 'high':
-        return <Badge className="bg-green-500/20 text-green-400 border-green-500/30">High Confidence</Badge>;
-      case 'medium':
-        return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">Medium Confidence</Badge>;
-      case 'low':
-        return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">Low Confidence</Badge>;
-      default:
-        return null;
-    }
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[85vh] p-0">
+      <DialogContent className="max-w-5xl max-h-[90vh] p-0">
         <DialogHeader className="p-6 pb-0">
           <DialogTitle className="flex items-center gap-2">
             <User className="h-5 w-5 text-primary" />
-            Enriched People
+            Intelligence Dossiers
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex h-[70vh]">
+        <div className="flex h-[75vh]">
           {/* People list sidebar */}
-          <div className="w-64 border-r border-border/50 p-4">
+          <div className="w-72 border-r border-border/50 p-4">
             <ScrollArea className="h-full">
               {isLoading ? (
                 <div className="space-y-2">
                   {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-12 w-full" />
+                    <Skeleton key={i} className="h-14 w-full" />
                   ))}
                 </div>
               ) : people.length === 0 ? (
@@ -161,7 +197,7 @@ const EnrichedPeopleDialog = ({ jobId, open, onOpenChange }: EnrichedPeopleDialo
                     <button
                       key={person.id}
                       onClick={() => setSelectedPerson(person)}
-                      className={`w-full flex flex-col items-start p-2 rounded-lg text-left transition-all ${
+                      className={`w-full flex flex-col items-start p-3 rounded-lg text-left transition-all ${
                         selectedPerson?.id === person.id
                           ? 'neu-pressed'
                           : 'hover:bg-muted/50'
@@ -170,6 +206,9 @@ const EnrichedPeopleDialog = ({ jobId, open, onOpenChange }: EnrichedPeopleDialo
                       <span className="text-sm font-medium truncate w-full">{person.person_name}</span>
                       {person.job_title && (
                         <span className="text-xs text-muted-foreground truncate w-full">{person.job_title}</span>
+                      )}
+                      {person.company && (
+                        <span className="text-xs text-muted-foreground/70 truncate w-full">{person.company}</span>
                       )}
                     </button>
                   ))}
@@ -182,27 +221,63 @@ const EnrichedPeopleDialog = ({ jobId, open, onOpenChange }: EnrichedPeopleDialo
           <ScrollArea className="flex-1 p-6">
             {selectedPerson ? (
               <div className="space-y-6">
-                {/* Header */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <h2 className="text-2xl font-bold">{selectedPerson.person_name}</h2>
-                    {getConfidenceBadge(selectedPerson.confidence_score)}
-                  </div>
-                  {(selectedPerson.job_title || selectedPerson.company) && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Briefcase className="h-4 w-4" />
-                      <span>
+                {/* Header with Photo */}
+                <PersonPhoto 
+                  name={selectedPerson.person_name}
+                  photoUrl={selectedPerson.photo_url}
+                  aliases={selectedPerson.aliases}
+                />
+
+                {/* Research Summary */}
+                <ResearchSummary 
+                  summary={selectedPerson.research_summary}
+                  confidenceScore={selectedPerson.confidence_score}
+                  sourcesCount={selectedPerson.all_citations?.length || 0}
+                />
+
+                {/* Current Role with enhanced info */}
+                {(selectedPerson.job_title || selectedPerson.company) && (
+                  <div className="p-4 rounded-xl neu-subtle space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Briefcase className="h-4 w-4 text-primary" />
+                      <span className="font-medium">
                         {selectedPerson.job_title}
                         {selectedPerson.job_title && selectedPerson.company && ' at '}
                         {selectedPerson.company}
                       </span>
                       <SourceLink url={selectedPerson.role_source} />
                     </div>
-                  )}
-                  {selectedPerson.context && (
-                    <p className="text-sm text-muted-foreground italic">Context: {selectedPerson.context}</p>
-                  )}
-                </div>
+                    <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+                      {selectedPerson.department && (
+                        <span className="flex items-center gap-1">
+                          <Building2 className="h-3.5 w-3.5" />
+                          {selectedPerson.department}
+                        </span>
+                      )}
+                      {selectedPerson.start_date && (
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3.5 w-3.5" />
+                          Since {selectedPerson.start_date}
+                        </span>
+                      )}
+                      {selectedPerson.location && (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="h-3.5 w-3.5" />
+                          {selectedPerson.location}
+                        </span>
+                      )}
+                    </div>
+                    {selectedPerson.reports_to && (
+                      <p className="text-xs text-muted-foreground">
+                        Reports to: {selectedPerson.reports_to}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {selectedPerson.context && (
+                  <p className="text-sm text-muted-foreground italic">Context: {selectedPerson.context}</p>
+                )}
 
                 {/* Biography */}
                 {selectedPerson.biography && (
@@ -212,9 +287,9 @@ const EnrichedPeopleDialog = ({ jobId, open, onOpenChange }: EnrichedPeopleDialo
                       Biography
                       <SourceLink url={selectedPerson.biography_source} />
                     </h3>
-                    <p className="text-sm p-4 rounded-xl neu-pressed leading-relaxed">
+                    <div className="text-sm p-4 rounded-xl neu-pressed leading-relaxed whitespace-pre-wrap">
                       {selectedPerson.biography}
-                    </p>
+                    </div>
                   </div>
                 )}
 
@@ -223,7 +298,14 @@ const EnrichedPeopleDialog = ({ jobId, open, onOpenChange }: EnrichedPeopleDialo
                   {selectedPerson.email && (
                     <div className="flex items-center gap-2 p-3 rounded-lg neu-subtle">
                       <Mail className="h-4 w-4 text-primary" />
-                      <span className="text-sm">{selectedPerson.email}</span>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm truncate block">{selectedPerson.email}</span>
+                        {selectedPerson.email_confidence && (
+                          <span className="text-xs text-muted-foreground capitalize">
+                            {selectedPerson.email_confidence.replace('_', ' ')}
+                          </span>
+                        )}
+                      </div>
                       <SourceLink url={selectedPerson.email_source} />
                     </div>
                   )}
@@ -256,7 +338,29 @@ const EnrichedPeopleDialog = ({ jobId, open, onOpenChange }: EnrichedPeopleDialo
                       <span className="text-sm text-primary hover:underline">{selectedPerson.twitter_handle}</span>
                     </a>
                   )}
+                  {selectedPerson.website && (
+                    <a
+                      href={selectedPerson.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 p-3 rounded-lg neu-subtle hover:bg-primary/10 transition-colors"
+                    >
+                      <Globe className="h-4 w-4 text-primary" />
+                      <span className="text-sm text-primary hover:underline truncate">Personal Website</span>
+                    </a>
+                  )}
                 </div>
+
+                {/* Recent News */}
+                <PersonNews news={selectedPerson.recent_news} />
+
+                {/* Sales Insights */}
+                <PersonInsights 
+                  communicationStyle={selectedPerson.communication_style}
+                  keyInterests={selectedPerson.key_interests}
+                  conversationStarters={selectedPerson.conversation_starters}
+                  quotes={selectedPerson.quotes}
+                />
 
                 {/* Previous Roles */}
                 {selectedPerson.previous_roles.length > 0 && (
@@ -292,7 +396,7 @@ const EnrichedPeopleDialog = ({ jobId, open, onOpenChange }: EnrichedPeopleDialo
                     <div className="flex flex-wrap gap-2">
                       {selectedPerson.education.map((edu, idx) => (
                         <Badge key={idx} variant="secondary" className="py-1.5">
-                          {edu.degree} - {edu.institution}
+                          {edu.degree}{edu.field ? ` in ${edu.field}` : ''} - {edu.institution}
                           {edu.year && ` (${edu.year})`}
                         </Badge>
                       ))}
@@ -309,6 +413,20 @@ const EnrichedPeopleDialog = ({ jobId, open, onOpenChange }: EnrichedPeopleDialo
                       <SourceLink url={selectedPerson.achievements_source} />
                     </h3>
                     <p className="text-sm p-4 rounded-xl neu-pressed">{selectedPerson.notable_achievements}</p>
+                  </div>
+                )}
+
+                {/* Notable Content (podcasts, talks, articles) */}
+                {selectedPerson.notable_content && selectedPerson.notable_content.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Public Appearances & Content</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedPerson.notable_content.slice(0, 5).map((content, idx) => (
+                        <Badge key={idx} variant="outline" className="text-xs">
+                          {content}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -363,7 +481,7 @@ const EnrichedPeopleDialog = ({ jobId, open, onOpenChange }: EnrichedPeopleDialo
               </div>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
-                Select a person to view details
+                Select a person to view their intelligence dossier
               </div>
             )}
           </ScrollArea>
