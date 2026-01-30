@@ -80,7 +80,7 @@ RULES:
 
     console.log(`Enriching person: ${name}${contextStr}`);
 
-    const response = await fetch('https://api.perplexity.ai/responses', {
+    const response = await fetch('https://api.perplexity.ai/v1/responses', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
