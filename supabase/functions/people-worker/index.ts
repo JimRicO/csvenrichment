@@ -30,7 +30,7 @@ async function searchPerplexity(query: string, apiKey: string): Promise<Perplexi
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'sonar',
+        model: 'sonar-pro',
         messages: [
           { role: 'system', content: 'Be precise and concise. Provide factual information with specific details when available.' },
           { role: 'user', content: query }
@@ -130,7 +130,7 @@ serve(async (req) => {
       
       const bioResult = await searchPerplexity(bioQuery, PERPLEXITY_API_KEY);
       console.log(`Bio search returned ${bioResult.content.length} chars, ${bioResult.citations.length} citations`);
-      totalCost += 0.005; // Perplexity cost estimate
+      totalCost += 0.015; // Perplexity sonar-pro cost estimate
 
       // ========== STEP 2: Perplexity Search - Contact Details ==========
       console.log('Step 2: Running contact details search...');
@@ -138,7 +138,7 @@ serve(async (req) => {
       
       const contactResult = await searchPerplexity(contactQuery, PERPLEXITY_API_KEY);
       console.log(`Contact search returned ${contactResult.content.length} chars, ${contactResult.citations.length} citations`);
-      totalCost += 0.005; // Perplexity cost estimate
+      totalCost += 0.015; // Perplexity sonar-pro cost estimate
 
       // Combine all citations
       const allCitations = [...new Set([...bioResult.citations, ...contactResult.citations])];
