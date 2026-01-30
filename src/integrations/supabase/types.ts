@@ -161,6 +161,105 @@ export type Database = {
           },
         ]
       }
+      enriched_people: {
+        Row: {
+          achievements_source: string | null
+          all_citations: Json | null
+          biography: string | null
+          biography_source: string | null
+          company: string | null
+          confidence_score: string | null
+          context: string | null
+          created_at: string
+          education: Json | null
+          email: string | null
+          email_source: string | null
+          id: string
+          job_id: string
+          job_title: string | null
+          linkedin_url: string | null
+          notable_achievements: string | null
+          other_socials: Json | null
+          people_row_id: string
+          person_name: string
+          phone: string | null
+          phone_source: string | null
+          previous_roles: Json | null
+          role_source: string | null
+          twitter_handle: string | null
+          updated_at: string
+        }
+        Insert: {
+          achievements_source?: string | null
+          all_citations?: Json | null
+          biography?: string | null
+          biography_source?: string | null
+          company?: string | null
+          confidence_score?: string | null
+          context?: string | null
+          created_at?: string
+          education?: Json | null
+          email?: string | null
+          email_source?: string | null
+          id?: string
+          job_id: string
+          job_title?: string | null
+          linkedin_url?: string | null
+          notable_achievements?: string | null
+          other_socials?: Json | null
+          people_row_id: string
+          person_name: string
+          phone?: string | null
+          phone_source?: string | null
+          previous_roles?: Json | null
+          role_source?: string | null
+          twitter_handle?: string | null
+          updated_at?: string
+        }
+        Update: {
+          achievements_source?: string | null
+          all_citations?: Json | null
+          biography?: string | null
+          biography_source?: string | null
+          company?: string | null
+          confidence_score?: string | null
+          context?: string | null
+          created_at?: string
+          education?: Json | null
+          email?: string | null
+          email_source?: string | null
+          id?: string
+          job_id?: string
+          job_title?: string | null
+          linkedin_url?: string | null
+          notable_achievements?: string | null
+          other_socials?: Json | null
+          people_row_id?: string
+          person_name?: string
+          phone?: string | null
+          phone_source?: string | null
+          previous_roles?: Json | null
+          role_source?: string | null
+          twitter_handle?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enriched_people_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "people_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enriched_people_people_row_id_fkey"
+            columns: ["people_row_id"]
+            isOneToOne: false
+            referencedRelation: "people_rows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       enrichment_jobs: {
         Row: {
           created_at: string
@@ -449,6 +548,77 @@ export type Database = {
           },
         ]
       }
+      people_jobs: {
+        Row: {
+          created_at: string
+          estimated_cost_usd: number
+          id: string
+          processed_rows: number
+          project_id: string
+          status: string
+          total_rows: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          estimated_cost_usd?: number
+          id: string
+          processed_rows?: number
+          project_id: string
+          status?: string
+          total_rows?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          estimated_cost_usd?: number
+          id?: string
+          processed_rows?: number
+          project_id?: string
+          status?: string
+          total_rows?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      people_rows: {
+        Row: {
+          context: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          job_id: string
+          person_name: string
+          status: string
+        }
+        Insert: {
+          context?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          job_id: string
+          person_name: string
+          status?: string
+        }
+        Update: {
+          context?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          job_id?: string
+          person_name?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "people_rows_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "people_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scraped_rows: {
         Row: {
           address: string | null
@@ -706,6 +876,15 @@ export type Database = {
           processed_rows: number
           status: string
           total_pages_scraped: number
+          total_rows: number
+        }[]
+      }
+      increment_people_job_processed: {
+        Args: { cost_increment: number; job_id_param: string }
+        Returns: {
+          estimated_cost_usd: number
+          processed_rows: number
+          status: string
           total_rows: number
         }[]
       }

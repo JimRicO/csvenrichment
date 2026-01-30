@@ -12,12 +12,16 @@ import ActiveInstagramJobMonitor from "@/components/ActiveInstagramJobMonitor";
 import ClubEnrichmentSection from "@/components/ClubEnrichmentSection";
 import EnrichmentJobsTable from "@/components/EnrichmentJobsTable";
 import ActiveEnrichmentJobMonitor from "@/components/ActiveEnrichmentJobMonitor";
+import PeopleIntelligenceSection from "@/components/PeopleIntelligenceSection";
+import PeopleJobsTable from "@/components/PeopleJobsTable";
+import ActivePeopleJobMonitor from "@/components/ActivePeopleJobMonitor";
 
 const Index = () => {
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [activeInstagramJobId, setActiveInstagramJobId] = useState<string | null>(null);
   const [activeEnrichmentJobId, setActiveEnrichmentJobId] = useState<string | null>(null);
+  const [activePeopleJobId, setActivePeopleJobId] = useState<string | null>(null);
 
   const handleJobCreated = (jobId: string, projectId: string) => {
     setActiveJobId(jobId);
@@ -30,6 +34,10 @@ const Index = () => {
 
   const handleEnrichmentJobCreated = (jobId: string, projectId: string) => {
     setActiveEnrichmentJobId(jobId);
+  };
+
+  const handlePeopleJobCreated = (jobId: string, projectId: string) => {
+    setActivePeopleJobId(jobId);
   };
 
   return (
@@ -47,6 +55,17 @@ const Index = () => {
           )}
           
           <EnrichmentJobsTable />
+        </div>
+        
+        {/* People Intelligence Section */}
+        <div className="pt-8 border-t-2 border-primary/20 space-y-8">
+          <PeopleIntelligenceSection onJobCreated={handlePeopleJobCreated} />
+          
+          {activePeopleJobId && (
+            <ActivePeopleJobMonitor jobId={activePeopleJobId} />
+          )}
+          
+          <PeopleJobsTable />
         </div>
         
         <ScreenshotTest />
