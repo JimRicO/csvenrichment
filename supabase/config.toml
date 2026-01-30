@@ -69,3 +69,15 @@ verify_jwt = false
 
 [functions.api-get-enrichment-status]
 verify_jwt = false
+
+[functions.create-people-job]
+verify_jwt = false
+
+[functions.people-worker]
+verify_jwt = false
+
+[functions.get-people-status]
+verify_jwt = false
+
+[functions.download-people-csv]
+verify_jwt = false
