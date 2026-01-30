@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Camera } from "lucide-react";
@@ -11,6 +12,7 @@ export const ScreenshotTest = () => {
   const [url, setUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [screenshot, setScreenshot] = useState<string | null>(null);
+  const [fullPage, setFullPage] = useState(true);
   const { toast } = useToast();
 
   const captureScreenshot = async () => {
@@ -28,7 +30,7 @@ export const ScreenshotTest = () => {
 
     try {
       const { data, error } = await supabase.functions.invoke("screenshot-test", {
-        body: { url },
+        body: { url, fullPage },
       });
 
       if (error) throw error;
@@ -85,30 +87,44 @@ export const ScreenshotTest = () => {
   return (
     <CollapsibleCard header={header} defaultOpen={false} className="border-border/50">
       <div className="p-6 pt-0 space-y-4">
-        <div className="flex gap-2">
-          <Input
-            type="url"
-            placeholder="Enter website URL (e.g., https://example.com)"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            onKeyPress={handleKeyPress}
-            disabled={isLoading}
-          />
-          <Button onClick={captureScreenshot} disabled={isLoading}>
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Capturing...
-              </>
-            ) : (
-              "Capture Screenshot"
-            )}
-          </Button>
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Switch
+              id="fullPage"
+              checked={fullPage}
+              onCheckedChange={setFullPage}
+            />
+            <Label htmlFor="fullPage" className="text-sm text-muted-foreground">
+              {fullPage ? "Full Page" : "Viewport Only"}
+            </Label>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              type="url"
+              placeholder="Enter website URL (e.g., https://example.com)"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={isLoading}
+            />
+            <Button onClick={captureScreenshot} disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Capturing...
+                </>
+              ) : (
+                "Capture Screenshot"
+              )}
+            </Button>
+          </div>
         </div>
 
         {screenshot && (
           <div className="space-y-2">
-            <h3 className="text-sm font-medium">Full Page Screenshot</h3>
+            <h3 className="text-sm font-medium">
+              {fullPage ? "Full Page Screenshot" : "Viewport Screenshot"}
+            </h3>
             <img
               src={screenshot}
               alt="Full page screenshot"
