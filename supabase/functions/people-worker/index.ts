@@ -84,160 +84,35 @@ async function callComprehensiveResearch(personName: string, context: string | n
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: "openai/gpt-5.2",
-      input: `Conduct comprehensive research on: ${personName}${contextStr}. 
-      
-I need a complete intelligence profile on this person. Search extensively and gather everything you can find.`,
-      tools: [
-        { type: "web_search" },
-        { type: "fetch_url" }
-      ],
-      instructions: `You are an elite competitive intelligence researcher. Your task is to build a COMPREHENSIVE DOSSIER on this person.
+      preset: "deep-research",
+      input: `Build a comprehensive intelligence dossier on: ${personName}${contextStr}.
 
-SEARCH EXTENSIVELY - Use multiple searches:
-- "${personName}" - general presence
-- "${personName} ${companyHint}" - current role
-- "${personName} LinkedIn" - professional profile  
-- "${personName} biography" - background info
-- "${personName} interview" - quotes, perspectives
-- "${personName} news" - recent mentions
-- "${personName} Twitter OR X" - social presence
-- "${personName} speaker OR conference" - public appearances
-- "${personName} education university" - academic background
-- "${personName} previous company" - career history
+Research their professional background, career history, education, public presence, recent news mentions, contact information, and insights for sales outreach.
 
-Use fetch_url to extract full content from promising pages.
-
-BUILD A COMPLETE PROFILE:
-
-1. IDENTITY
-- Full legal name
-- Also known as / nicknames
-- Photo URL if available
-
-2. CURRENT ROLE
-- Job title
-- Company
-- Department/Division
-- Reporting structure if known
-- Time in role
-
-3. PROFESSIONAL BIOGRAPHY
-- Write a comprehensive 3-5 paragraph bio
-- Career narrative and trajectory
-- Key achievements and milestones
-- Areas of expertise
-- Industry reputation
-
-4. CAREER HISTORY
-- Previous positions (company, title, dates)
-- Notable projects or deals
-- Career pivots or transitions
-
-5. EDUCATION
-- Degrees, institutions, years
-- Certifications
-- Notable academic achievements
-
-6. PUBLIC PRESENCE
-- LinkedIn URL
-- Twitter/X handle
-- Other social profiles
-- Personal website/blog
-- Podcast appearances
-- Conference talks
-- Published articles or books
-
-7. NEWS & MENTIONS
+I need:
+- Full biography (3-5 paragraphs, narrative style)
+- Career history with dates and highlights
+- Education and certifications
+- LinkedIn, Twitter, website URLs
 - Recent news articles mentioning them
-- Press releases
-- Industry coverage
-
-8. CONTACT INFORMATION
 - Work email (verified or pattern-based)
-- Company email pattern
-- Phone if publicly available
-- Office location
+- Communication style and conversation starters`,
+      instructions: `You are building a premium competitive intelligence dossier. Research exhaustively using multiple searches and fetch_url to get full page content.
 
-9. INSIGHTS
-- Communication style (based on interviews/posts)
-- Topics they care about
-- Potential conversation starters
-- Connections or mutual interests
-
-RESPOND with this JSON structure:
+OUTPUT FORMAT - Respond with this JSON structure only:
 {
-  "identity": {
-    "full_name": "string",
-    "aliases": ["array of other names"],
-    "photo_url": "string or null"
-  },
-  "current_role": {
-    "title": "string",
-    "company": "string",
-    "department": "string or null",
-    "start_date": "string or null",
-    "reports_to": "string or null"
-  },
-  "biography": "string - comprehensive 3-5 paragraph narrative bio",
-  "career_history": [
-    {
-      "company": "string",
-      "title": "string",
-      "dates": "string",
-      "highlights": ["notable achievements"]
-    }
-  ],
-  "education": [
-    {
-      "institution": "string",
-      "degree": "string",
-      "field": "string",
-      "year": "string or null"
-    }
-  ],
-  "public_presence": {
-    "linkedin_url": "string or null",
-    "twitter_handle": "string or null",
-    "other_profiles": {},
-    "website": "string or null",
-    "notable_content": ["podcasts, talks, articles"]
-  },
-  "recent_news": [
-    {
-      "headline": "string",
-      "source": "string",
-      "date": "string",
-      "url": "string"
-    }
-  ],
-  "contact": {
-    "email": "string or null",
-    "email_confidence": "verified|pattern_based|not_found",
-    "email_pattern": "string - company email format",
-    "phone": "string or null",
-    "location": "string or null"
-  },
-  "insights": {
-    "communication_style": "string",
-    "key_interests": ["topics they discuss"],
-    "conversation_starters": ["potential icebreakers"],
-    "quotes": ["notable quotes from interviews"]
-  },
+  "identity": { "full_name": "...", "aliases": [], "photo_url": null },
+  "current_role": { "title": "...", "company": "...", "department": null, "start_date": null, "reports_to": null },
+  "biography": "3-5 paragraph narrative biography...",
+  "career_history": [{ "company": "...", "title": "...", "dates": "...", "highlights": [] }],
+  "education": [{ "institution": "...", "degree": "...", "field": "...", "year": null }],
+  "public_presence": { "linkedin_url": null, "twitter_handle": null, "other_profiles": {}, "website": null, "notable_content": [] },
+  "recent_news": [{ "headline": "...", "source": "...", "date": "...", "url": "..." }],
+  "contact": { "email": null, "email_confidence": "verified|pattern_based|not_found", "email_pattern": null, "phone": null, "location": null },
+  "insights": { "communication_style": "...", "key_interests": [], "conversation_starters": [], "quotes": [] },
   "sources": ["all URLs used"],
-  "research_summary": "brief meta-summary of research quality and gaps"
-}
-
-CRITICAL RULES:
-- SEARCH AGGRESSIVELY - use 5-10+ web searches minimum
-- USE fetch_url on LinkedIn, company pages, news articles
-- Write a REAL bio, not bullet points - narrative style
-- Include QUOTES when found
-- Be thorough - this is intelligence research, not a quick lookup
-- If information is sparse, say so in research_summary`,
-      reasoning: {
-        effort: "high"
-      },
+  "research_summary": "Brief summary of research quality and any gaps"
+}`,
       max_output_tokens: 4000
     }),
   });
