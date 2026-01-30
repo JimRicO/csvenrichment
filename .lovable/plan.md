@@ -1,55 +1,30 @@
 
 
-# Upgrade to Comprehensive Person Intelligence Tool
+# Fix Person Intelligence: Use Perplexity `deep-research` Preset
 
-## Overview
+## Problem Identified
 
-Transform the current basic person enrichment into an **elite competitive intelligence research system** that produces complete dossiers with narrative biographies, career histories, public presence, news mentions, and actionable sales insights.
+The current implementation is **not performing proper web searches** because it's using the raw Agentic Research API with manual configuration instead of Perplexity's optimized **presets**.
 
-## Current vs New Approach
+### Current Implementation Issues:
+- Passes `model: "openai/gpt-5.2"` directly but **no preset**
+- Manually defines tools but misses the optimized multi-step research workflow
+- Only getting 5 sources (logs show: "Sources: 5")
+- Model doing minimal searching because it lacks the preset's research methodology
 
-| Aspect | Current | New (Intelligence Tool) |
-|--------|---------|------------------------|
-| **Model** | `openai/gpt-5.2` | `openai/gpt-5.2` |
-| **Tools** | `web_search` only | `web_search` + `fetch_url` |
-| **Search depth** | 1 generic search | 10+ targeted searches |
-| **Biography** | 2-3 sentences | 3-5 paragraph narrative |
-| **Output tokens** | Default (~1000) | 4000 tokens |
-| **Reasoning** | Default | `effort: "high"` |
-| **Data sections** | 6 basic | 9 comprehensive |
+### What Presets Provide:
 
-## New Data Schema
+| Preset | Max Steps | Expected Sources | Tools |
+|--------|-----------|------------------|-------|
+| `fast-search` | 1 | ~10-20 | `web_search` |
+| `pro-search` | 3 | ~30-50 | `web_search` + `fetch_url` |
+| **`deep-research`** | **10** | **50-80+** | `web_search` + `fetch_url` |
 
-The enhanced output includes 9 intelligence sections:
-
-```text
-1. IDENTITY
-   - full_name, aliases, photo_url
-
-2. CURRENT ROLE
-   - title, company, department, start_date, reports_to
-
-3. BIOGRAPHY
-   - 3-5 paragraph narrative (not bullet points)
-
-4. CAREER HISTORY
-   - Previous roles with dates and highlights
-
-5. EDUCATION
-   - Degrees, institutions, fields, years
-
-6. PUBLIC PRESENCE
-   - LinkedIn, Twitter, website, podcasts, talks, articles
-
-7. RECENT NEWS
-   - Headlines, sources, dates, URLs
-
-8. CONTACT
-   - Email (with confidence), phone, location, company pattern
-
-9. INSIGHTS
-   - Communication style, key interests, conversation starters, quotes
-```
+The `deep-research` preset includes a sophisticated system prompt that instructs the model to:
+- Act as a "world-class research expert"
+- Iterate on tool calls until comprehensive coverage
+- Use 50-80+ sources for complex research
+- Generate premium-quality dossiers
 
 ## Technical Changes
 
@@ -57,112 +32,93 @@ The enhanced output includes 9 intelligence sections:
 
 **File:** `supabase/functions/enrich-person/index.ts`
 
-Major rewrite with:
-- Add `fetch_url` tool for extracting full page content
-- Add 10+ prescribed search queries in the instructions
-- Request narrative biography (not bullet points)
-- Set `max_output_tokens: 4000`
-- Enable `reasoning: { effort: "high" }`
-- New comprehensive JSON schema with 9 sections
-- Include `research_summary` for quality assessment
+Switch from manual configuration to the `deep-research` preset:
+
+```typescript
+// OLD (current - not working well)
+body: JSON.stringify({
+  model: "openai/gpt-5.2",
+  input: "...",
+  tools: [{ type: "web_search" }, { type: "fetch_url" }],
+  instructions: "...",
+  reasoning: { effort: "high" },
+  max_output_tokens: 4000
+})
+
+// NEW (using deep-research preset)
+body: JSON.stringify({
+  preset: "deep-research",
+  input: `Build a comprehensive intelligence dossier on: ${name}${companyStr}.
+
+Research their professional background, career history, education, public presence, recent news mentions, contact information, and insights for sales outreach.
+
+I need:
+- Full biography (3-5 paragraphs, narrative style)
+- Career history with dates and highlights
+- Education and certifications
+- LinkedIn, Twitter, website URLs
+- Recent news articles mentioning them
+- Work email (verified or pattern-based)
+- Communication style and conversation starters`,
+  instructions: `You are building a premium competitive intelligence dossier. Research exhaustively.
+
+OUTPUT FORMAT - Respond with this JSON structure only:
+{
+  "identity": { "full_name": "...", "aliases": [], "photo_url": null },
+  "current_role": { "title": "...", "company": "...", "department": null, "start_date": null, "reports_to": null },
+  "biography": "3-5 paragraph narrative biography...",
+  "career_history": [{ "company": "...", "title": "...", "dates": "...", "highlights": [] }],
+  "education": [{ "institution": "...", "degree": "...", "field": "...", "year": null }],
+  "public_presence": { "linkedin_url": null, "twitter_handle": null, "other_profiles": {}, "website": null, "notable_content": [] },
+  "recent_news": [{ "headline": "...", "source": "...", "date": "...", "url": "..." }],
+  "contact": { "email": null, "email_confidence": "verified|pattern_based|not_found", "email_pattern": null, "phone": null, "location": null },
+  "insights": { "communication_style": "...", "key_interests": [], "conversation_starters": [], "quotes": [] },
+  "sources": ["all URLs used"],
+  "research_summary": "Brief summary of research quality and any gaps"
+}`,
+  max_output_tokens: 4000
+})
+```
 
 ### 2. Update `people-worker` Edge Function
 
 **File:** `supabase/functions/people-worker/index.ts`
 
-Same upgrade to the worker function that processes batch jobs:
-- Use the comprehensive intelligence prompt
-- Add `fetch_url` tool
-- Enable high reasoning effort
-- Map new data fields to database columns
+Same change - use `preset: "deep-research"` instead of manual model/tools configuration.
 
-### 3. Database Migration
+### Key Differences with Preset:
 
-**New columns needed for `enriched_people` table:**
+| Aspect | Manual Config | `deep-research` Preset |
+|--------|---------------|------------------------|
+| Research steps | 1 (default) | **10** |
+| Sources | 5 (observed) | **50-80+** |
+| System prompt | Custom (basic) | **Premium research methodology** |
+| Tool orchestration | Basic | **Iterative multi-query** |
+| Output quality | Basic | **$200K consultant-grade** |
 
-| New Column | Type | Purpose |
-|------------|------|---------|
-| `aliases` | JSONB | Alternative names |
-| `photo_url` | TEXT | Profile photo URL |
-| `department` | TEXT | Current department |
-| `start_date` | TEXT | Time in current role |
-| `reports_to` | TEXT | Manager/reporting line |
-| `career_highlights` | JSONB | Notable achievements per role |
-| `recent_news` | JSONB | News mentions array |
-| `email_confidence` | TEXT | verified/pattern_based/not_found |
-| `email_pattern` | TEXT | Company email format |
-| `location` | TEXT | Office location |
-| `communication_style` | TEXT | How they communicate |
-| `key_interests` | JSONB | Topics they care about |
-| `conversation_starters` | JSONB | Icebreakers |
-| `quotes` | JSONB | Notable quotes |
-| `website` | TEXT | Personal website |
-| `notable_content` | JSONB | Podcasts, talks, articles |
-| `research_summary` | TEXT | Quality/gaps assessment |
+## Expected Improvements
 
-### 4. Update TypeScript Interface and Hook
-
-**File:** `src/hooks/useEnrichPerson.ts`
-
-Update the interface to match the new comprehensive data structure.
-
-### 5. Update UI Component
-
-**File:** `src/components/EnrichedPeopleDialog.tsx`
-
-Add new sections to display:
-- Photo (if available)
-- Aliases
-- Recent news mentions
-- Insights section (communication style, interests, quotes)
-- Conversation starters for sales outreach
-- Research quality summary
-
-## Search Strategy
-
-The prompt prescribes 10+ targeted searches:
-
-```text
-- "{name}" - general presence
-- "{name} {company}" - current role
-- "{name} LinkedIn" - professional profile
-- "{name} biography" - background info
-- "{name} interview" - quotes, perspectives
-- "{name} news" - recent mentions
-- "{name} Twitter OR X" - social presence
-- "{name} speaker OR conference" - public appearances
-- "{name} education university" - academic background
-- "{name} previous company" - career history
-```
+1. **Deep web searches** - 10 iterative steps with multiple queries
+2. **50-80+ sources** - Exhaustive LinkedIn, news, company page coverage
+3. **Premium system prompt** - Research expert methodology built-in
+4. **Multi-step reasoning** - Iterates until comprehensive coverage
+5. **Better citations** - More sources in the final response
 
 ## Cost Impact
 
-| Item | Old | New |
-|------|-----|-----|
+| Aspect | Current | With `deep-research` |
+|--------|---------|---------------------|
 | API calls | 1 | 1 |
-| Tokens | ~1000 | ~4000 |
-| Reasoning | Default | High |
-| Estimated cost per person | ~$0.03-0.05 | ~$0.08-0.15 |
+| Searches | ~1-2 | 10-30+ |
+| Sources | 5 | 50-80+ |
+| Estimated cost/person | ~$0.05-0.10 | ~$0.30-0.50 |
 
-The cost increases ~3x but delivers significantly richer intelligence.
+Cost increases but delivers dramatically better results.
 
-## Files to Create/Modify
+## Files to Modify
 
-| File | Action |
+| File | Change |
 |------|--------|
-| `supabase/functions/enrich-person/index.ts` | Major rewrite |
-| `supabase/functions/people-worker/index.ts` | Major rewrite |
-| Database migration | Add 17 new columns |
-| `src/hooks/useEnrichPerson.ts` | Update interface |
-| `src/components/EnrichedPeopleDialog.tsx` | Add new UI sections |
-
-## Benefits
-
-1. **Elite-level research** - Comprehensive dossiers, not quick lookups
-2. **Narrative biographies** - Real written bios, not bullet points
-3. **Sales intelligence** - Conversation starters, quotes, interests
-4. **Deep search** - 10+ targeted searches per person
-5. **Page extraction** - Full content from LinkedIn, company pages
-6. **News tracking** - Recent mentions and coverage
-7. **Quality transparency** - Research summary shows gaps
+| `supabase/functions/enrich-person/index.ts` | Use `preset: "deep-research"` |
+| `supabase/functions/people-worker/index.ts` | Use `preset: "deep-research"` |
 
