@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { url } = await req.json();
+    const { url, fullPage = true } = await req.json();
 
     if (!url) {
       return new Response(
@@ -28,7 +28,8 @@ serve(async (req) => {
       );
     }
 
-    console.log('Capturing screenshots for URL:', url);
+    const screenshotFormat = fullPage ? 'screenshot@fullPage' : 'screenshot';
+    console.log('Capturing screenshot for URL:', url, '| Mode:', fullPage ? 'Full Page' : 'Viewport Only');
 
     const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
       method: 'POST',
@@ -38,7 +39,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         url,
-        formats: ['screenshot@fullPage'],
+        formats: [screenshotFormat],
         waitFor: 2000,
       }),
     });
