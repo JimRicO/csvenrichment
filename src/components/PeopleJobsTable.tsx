@@ -152,7 +152,7 @@ const PeopleJobsTable = () => {
             </Button>
           </div>
         }
-        defaultOpen={false}
+        defaultOpen={true}
         contentClassName="p-6 pt-0"
       >
         {jobs.length === 0 ? (
