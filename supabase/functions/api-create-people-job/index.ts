@@ -141,6 +141,28 @@ serve(async (req) => {
       .update({ status: 'processing' })
       .eq('id', jobId);
 
+    // Trigger workers for each row (fire and forget)
+    console.log(`api-create-people-job: Triggering workers for ${people.length} people`);
+    
+    for (let i = 0; i < people.length; i++) {
+      // Small delay between invocations to avoid rate limiting
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      // Fire and forget - don't await the full response
+      fetch(`${supabaseUrl}/functions/v1/people-worker`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ job_id: jobId }),
+      }).catch(err => console.error(`Worker invocation error: ${err.message}`));
+    }
+
+    console.log(`api-create-people-job: Workers triggered for job ${jobId}`);
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -149,7 +171,7 @@ serve(async (req) => {
         total_people: people.length,
         status_endpoint: `/api-get-people-status?job_id=${jobId}`,
         results_endpoint: `/api-get-people?job_id=${jobId}`,
-        message: `People research job created with ${people.length} person(s)`
+        message: `People research job created with ${people.length} person(s). Processing started.`
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

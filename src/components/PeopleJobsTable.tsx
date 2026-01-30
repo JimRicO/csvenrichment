@@ -180,7 +180,14 @@ const PeopleJobsTable = () => {
                 return (
                   <TableRow key={job.id}>
                     <TableCell className="font-mono text-xs">
-                      {job.id.substring(0, 18)}...
+                      <div className="flex items-center gap-2">
+                        {job.id.startsWith('API_') && (
+                          <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 text-[10px] px-1.5">
+                            API
+                          </Badge>
+                        )}
+                        {job.id.substring(0, 18)}...
+                      </div>
                     </TableCell>
                     <TableCell>{getStatusBadge(job.status)}</TableCell>
                     <TableCell>
