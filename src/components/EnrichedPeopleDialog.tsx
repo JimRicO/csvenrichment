@@ -67,7 +67,7 @@ interface EnrichedPerson {
   reports_to: string | null;
   recent_news: NewsItem[];
   website: string | null;
-  notable_content: string[];
+  notable_content: (string | { url?: string; title?: string })[];
   email_confidence: string | null;
   email_pattern: string | null;
   location: string | null;
@@ -137,10 +137,21 @@ const EnrichedPeopleDialog = ({ jobId, open, onOpenChange }: EnrichedPeopleDialo
             ? person.aliases as unknown as string[] 
             : []),
           recent_news: (Array.isArray(person.recent_news) 
-            ? person.recent_news as unknown as NewsItem[] 
+            ? (person.recent_news as unknown[]).map((item: unknown) => {
+                if (typeof item === 'object' && item !== null) {
+                  const newsItem = item as Record<string, unknown>;
+                  return {
+                    headline: (newsItem.headline || newsItem.title || '') as string,
+                    source: (newsItem.source || '') as string,
+                    date: (newsItem.date || '') as string,
+                    url: (newsItem.url || '') as string,
+                  };
+                }
+                return { headline: '', source: '', date: '', url: '' };
+              })
             : []),
           notable_content: (Array.isArray(person.notable_content) 
-            ? person.notable_content as unknown as string[] 
+            ? person.notable_content as unknown[] 
             : []),
           key_interests: (Array.isArray(person.key_interests) 
             ? person.key_interests as unknown as string[] 
@@ -421,11 +432,26 @@ const EnrichedPeopleDialog = ({ jobId, open, onOpenChange }: EnrichedPeopleDialo
                   <div className="space-y-2">
                     <h3 className="text-sm font-medium">Public Appearances & Content</h3>
                     <div className="flex flex-wrap gap-2">
-                      {selectedPerson.notable_content.slice(0, 5).map((content, idx) => (
-                        <Badge key={idx} variant="outline" className="text-xs">
-                          {content}
-                        </Badge>
-                      ))}
+                      {selectedPerson.notable_content.slice(0, 5).map((content, idx) => {
+                        // Handle both string and object formats
+                        const displayText = typeof content === 'string' 
+                          ? content 
+                          : (content as { title?: string; url?: string })?.title || (content as { title?: string; url?: string })?.url || 'Content';
+                        const contentUrl = typeof content === 'object' ? (content as { url?: string })?.url : null;
+                        
+                        return contentUrl ? (
+                          <a key={idx} href={contentUrl} target="_blank" rel="noopener noreferrer">
+                            <Badge variant="outline" className="text-xs hover:bg-primary/10 cursor-pointer">
+                              {displayText}
+                              <ExternalLink className="h-3 w-3 ml-1" />
+                            </Badge>
+                          </a>
+                        ) : (
+                          <Badge key={idx} variant="outline" className="text-xs">
+                            {displayText}
+                          </Badge>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
