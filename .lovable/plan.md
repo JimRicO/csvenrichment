@@ -1,57 +1,130 @@
 
 
-## Add Logo Extractor Button to Website Visual Identity Scraper
+## API Endpoints for Logo/Profile Picture Extraction + UI Rename
 
-This plan adds a dedicated "Extract Logo" button that quickly extracts just the logo from a website using Firecrawl's branding engine.
+This plan adds two new API endpoints for external integration and renames the button text in the UI.
 
-### What Will Change
+### Overview
 
-**Frontend (WebsiteBrandingScraper.tsx):**
-- Add a new "Extract Logo" button next to the existing "Extract Identity" button
-- Add state for loading and displaying the extracted logo separately
-- Show the extracted logo in a prominent display area
-- The logo extraction will be faster since it only focuses on the logo
+We'll create two new API-secured edge functions that wrap the existing extraction capabilities, allowing external Lovable instances (or any external system) to extract logos/profile pictures via API calls.
 
-**Backend (extract-branding/index.ts):**
-- Add a `logoOnly` parameter option
-- When `logoOnly` is true, still use the branding format but only process and return the logo image
-- This keeps it simple by reusing the same Firecrawl call but filtering the response
+### Changes
 
-### User Experience
+#### 1. Rename "Extract PFP" to "Extract Profile Picture" (UI)
 
-You'll see two buttons next to the URL input:
-- **Extract Identity** (existing): Full brand extraction (colors, fonts, images, etc.)
-- **Extract Logo**: Quick logo-only extraction
+**File: `src/components/InstagramIntelligenceSection.tsx`**
 
-When you click "Extract Logo":
-1. It calls Firecrawl's branding format
-2. Extracts and persists just the logo to storage
-3. Displays the logo prominently
+Change the button text from "Extract PFP" to "Extract Profile Picture" for better clarity.
 
-### Technical Details
-
-**Frontend changes:**
 ```text
-- Add state: isExtractingLogo, extractedLogo
-- Add "Extract Logo" button with Image icon
-- Pass { url, logoOnly: true } to edge function when extracting logo
-- Display extracted logo in a dedicated section above the full branding results
+Before: "Extract PFP"
+After:  "Extract Profile Picture"
 ```
 
-**Backend changes:**
-```text
-- Accept logoOnly parameter from request body
-- When logoOnly is true:
-  - Still call Firecrawl with formats: ['branding']
-  - Only process branding.images.logo (skip other images)
-  - Return { logo: persistedLogoUrl } instead of full branding
-- This avoids processing unnecessary data
+---
+
+#### 2. New API: Website Logo Extraction
+
+**File: `supabase/functions/api-extract-logo/index.ts`** (new)
+
+Creates a new edge function that:
+- Authenticates requests via `x-api-key` header (validates against `CRM_API_KEY` secret)
+- Accepts a `url` parameter (website URL)
+- Calls the existing `extract-branding` function with `logoOnly: true`
+- Returns the persisted logo URL
+
+**Request:**
+```json
+POST /api-extract-logo
+Headers: { "x-api-key": "your-crm-api-key" }
+Body: { "url": "https://example.com" }
 ```
 
-### Files to Modify
+**Response:**
+```json
+{
+  "success": true,
+  "logo_url": "https://storage.url/brand-images/example-com/logo-123.png",
+  "source_url": "https://example.com",
+  "extracted_at": "2026-01-30T12:00:00.000Z"
+}
+```
 
-| File | Change |
-|------|--------|
-| `src/components/WebsiteBrandingScraper.tsx` | Add "Extract Logo" button, loading state, and logo display section |
-| `supabase/functions/extract-branding/index.ts` | Add `logoOnly` mode that returns just the logo |
+---
+
+#### 3. New API: Instagram Profile Picture Extraction
+
+**File: `supabase/functions/api-extract-instagram-pfp/index.ts`** (new)
+
+Creates a new edge function that:
+- Authenticates requests via `x-api-key` header (validates against `CRM_API_KEY` secret)
+- Accepts an `instagram_url` or `username` parameter
+- Calls the existing `instagram-scraper` function with `profilePicOnly: true`
+- Returns the persisted profile picture URL
+
+**Request:**
+```json
+POST /api-extract-instagram-pfp
+Headers: { "x-api-key": "your-crm-api-key" }
+Body: { "instagram_url": "https://instagram.com/username" }
+// OR
+Body: { "username": "username" }
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "profile_pic_url": "https://storage.url/instagram-profile-pics/username_123.jpg",
+  "username": "username",
+  "extracted_at": "2026-01-30T12:00:00.000Z"
+}
+```
+
+---
+
+### Configuration Update
+
+**File: `supabase/config.toml`**
+
+Add the two new functions with `verify_jwt = false` (authentication handled in code via API key).
+
+---
+
+### Files Summary
+
+| File | Action | Description |
+|------|--------|-------------|
+| `src/components/InstagramIntelligenceSection.tsx` | Modify | Rename "Extract PFP" → "Extract Profile Picture" |
+| `supabase/functions/api-extract-logo/index.ts` | Create | API endpoint for website logo extraction |
+| `supabase/functions/api-extract-instagram-pfp/index.ts` | Create | API endpoint for Instagram profile picture extraction |
+| `supabase/config.toml` | Modify | Register both new edge functions |
+
+---
+
+### How to Call from Another Lovable Instance
+
+From your other Lovable project, you can call these APIs like this:
+
+```typescript
+// In an edge function on the other project
+const response = await fetch(
+  'https://etscplmovnooalqfbzvy.supabase.co/functions/v1/api-extract-logo',
+  {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': Deno.env.get('CRM_API_KEY')!
+    },
+    body: JSON.stringify({ url: 'https://example.com' })
+  }
+);
+const data = await response.json();
+// data.logo_url contains the persisted logo URL
+```
+
+### Cost Reference
+
+- **Website Logo Extraction**: ~$0.001-0.003 per extraction (Firecrawl branding format)
+- **Instagram Profile Picture**: ~$0.0027 per extraction (Apify Instagram scraper)
 
