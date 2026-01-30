@@ -1,219 +1,168 @@
 
 
-# Upgrade People Intelligence to Perplexity Agentic Research API
+# Upgrade to Comprehensive Person Intelligence Tool
 
 ## Overview
 
-Replace the current two-step approach (Perplexity sonar-pro + Claude synthesis) with Perplexity's new Agentic Research API that provides built-in reasoning with web search tools—delivering better results in a single API call.
+Transform the current basic person enrichment into an **elite competitive intelligence research system** that produces complete dossiers with narrative biographies, career histories, public presence, news mentions, and actionable sales insights.
 
 ## Current vs New Approach
 
-| Aspect | Current | New (Agentic) |
-|--------|---------|---------------|
-| **API Endpoint** | `/chat/completions` | `/responses` |
-| **Model** | `sonar-pro` | `openai/gpt-5.2` with tools |
-| **Search** | Manual queries | Built-in `web_search` tool |
-| **Synthesis** | Separate Claude API call | Built into response |
-| **API Calls per person** | 3 (2 Perplexity + 1 Claude) | 1 |
+| Aspect | Current | New (Intelligence Tool) |
+|--------|---------|------------------------|
+| **Model** | `openai/gpt-5.2` | `openai/gpt-5.2` |
+| **Tools** | `web_search` only | `web_search` + `fetch_url` |
+| **Search depth** | 1 generic search | 10+ targeted searches |
+| **Biography** | 2-3 sentences | 3-5 paragraph narrative |
+| **Output tokens** | Default (~1000) | 4000 tokens |
+| **Reasoning** | Default | `effort: "high"` |
+| **Data sections** | 6 basic | 9 comprehensive |
+
+## New Data Schema
+
+The enhanced output includes 9 intelligence sections:
+
+```text
+1. IDENTITY
+   - full_name, aliases, photo_url
+
+2. CURRENT ROLE
+   - title, company, department, start_date, reports_to
+
+3. BIOGRAPHY
+   - 3-5 paragraph narrative (not bullet points)
+
+4. CAREER HISTORY
+   - Previous roles with dates and highlights
+
+5. EDUCATION
+   - Degrees, institutions, fields, years
+
+6. PUBLIC PRESENCE
+   - LinkedIn, Twitter, website, podcasts, talks, articles
+
+7. RECENT NEWS
+   - Headlines, sources, dates, URLs
+
+8. CONTACT
+   - Email (with confidence), phone, location, company pattern
+
+9. INSIGHTS
+   - Communication style, key interests, conversation starters, quotes
+```
 
 ## Technical Changes
 
-### 1. Update `people-worker` Edge Function
-
-**File:** `supabase/functions/people-worker/index.ts`
-
-Replace the current implementation with the Agentic Research API using an enhanced prompt that captures full biographical data:
-
-```typescript
-const response = await fetch('https://api.perplexity.ai/responses', {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    model: "openai/gpt-5.2",
-    input: `Research ${personName}${contextStr}. Find their professional background, career history, contact information, and notable achievements.`,
-    tools: [{ type: "web_search" }],
-    instructions: `You are a professional researcher. Find comprehensive information about this person.
-
-SEARCH: LinkedIn profile, company websites, news articles, professional directories, social media, public records.
-
-RESPOND ONLY with this JSON, no other text:
-{
-  "full_name": "string or null",
-  "biography": "2-3 sentence professional biography summarizing their background and significance",
-  "job_title": "current job title or null",
-  "company": "current company/employer or null",
-  "previous_roles": [{"title": "Job Title", "company": "Company Name", "years": "2018-2022"}],
-  "education": [{"degree": "Degree Name", "institution": "University Name", "year": "2010"}],
-  "notable_achievements": "Key accomplishments, awards, or recognition in 1-2 sentences or null",
-  "email": "work email address or null",
-  "phone": "phone number or null",
-  "linkedin_url": "LinkedIn profile URL or null",
-  "twitter_handle": "@username or null",
-  "other_socials": {"platform": "url"},
-  "confidence": "high|medium|low",
-  "sources": ["URLs used to gather this information"]
-}
-
-RULES:
-- Only include verified information, use null for missing fields
-- Biography should synthesize their professional identity and significance
-- previous_roles and education should be empty arrays [] if not found
-- Prioritize work email over personal email
-- Never fabricate or guess data
-- Confidence: "high" if multiple sources agree, "medium" if single source, "low" if uncertain`
-  }),
-});
-```
-
-**Key changes:**
-- Remove the `searchPerplexity` function (no longer needed)
-- Remove the Claude API call (synthesis is now built-in)
-- Remove `ANTHROPIC_API_KEY` dependency
-- Add new `callAgenticResearch` function for the `/responses` endpoint
-- Parse `output_text` from the new response format
-- Update cost estimation (single API call pricing)
-
-### 2. Expected JSON Output (Comprehensive)
-
-The Agentic API will return rich biographical data:
-
-```json
-{
-  "full_name": "John Smith",
-  "biography": "John Smith is the VP of Sales at Acme Corp, where he has led the enterprise sales team since 2020. Previously, he spent 8 years at Salesforce building their EMEA division.",
-  "job_title": "VP of Sales",
-  "company": "Acme Corp",
-  "previous_roles": [
-    {"title": "Senior Director, Enterprise Sales", "company": "Salesforce", "years": "2012-2020"},
-    {"title": "Account Executive", "company": "Oracle", "years": "2008-2012"}
-  ],
-  "education": [
-    {"degree": "MBA", "institution": "Stanford GSB", "year": "2008"},
-    {"degree": "BS Computer Science", "institution": "UC Berkeley", "year": "2004"}
-  ],
-  "notable_achievements": "Led Acme's 200% revenue growth in 2023. Named to Forbes 30 Under 30 in 2015.",
-  "email": "john.smith@acme.com",
-  "phone": "+1-555-123-4567",
-  "linkedin_url": "https://linkedin.com/in/johnsmith",
-  "twitter_handle": "@johnsmith",
-  "other_socials": {"github": "https://github.com/johnsmith"},
-  "confidence": "high",
-  "sources": [
-    "https://acme.com/team",
-    "https://linkedin.com/in/johnsmith",
-    "https://forbes.com/30-under-30/2015"
-  ]
-}
-```
-
-### 3. Create Standalone `enrich-person` Edge Function
+### 1. Update `enrich-person` Edge Function
 
 **File:** `supabase/functions/enrich-person/index.ts`
 
-A simpler, standalone function for quick one-off lookups (same comprehensive prompt).
+Major rewrite with:
+- Add `fetch_url` tool for extracting full page content
+- Add 10+ prescribed search queries in the instructions
+- Request narrative biography (not bullet points)
+- Set `max_output_tokens: 4000`
+- Enable `reasoning: { effort: "high" }`
+- New comprehensive JSON schema with 9 sections
+- Include `research_summary` for quality assessment
 
-### 4. Create Hook: `useEnrichPerson.ts`
+### 2. Update `people-worker` Edge Function
+
+**File:** `supabase/functions/people-worker/index.ts`
+
+Same upgrade to the worker function that processes batch jobs:
+- Use the comprehensive intelligence prompt
+- Add `fetch_url` tool
+- Enable high reasoning effort
+- Map new data fields to database columns
+
+### 3. Database Migration
+
+**New columns needed for `enriched_people` table:**
+
+| New Column | Type | Purpose |
+|------------|------|---------|
+| `aliases` | JSONB | Alternative names |
+| `photo_url` | TEXT | Profile photo URL |
+| `department` | TEXT | Current department |
+| `start_date` | TEXT | Time in current role |
+| `reports_to` | TEXT | Manager/reporting line |
+| `career_highlights` | JSONB | Notable achievements per role |
+| `recent_news` | JSONB | News mentions array |
+| `email_confidence` | TEXT | verified/pattern_based/not_found |
+| `email_pattern` | TEXT | Company email format |
+| `location` | TEXT | Office location |
+| `communication_style` | TEXT | How they communicate |
+| `key_interests` | JSONB | Topics they care about |
+| `conversation_starters` | JSONB | Icebreakers |
+| `quotes` | JSONB | Notable quotes |
+| `website` | TEXT | Personal website |
+| `notable_content` | JSONB | Podcasts, talks, articles |
+| `research_summary` | TEXT | Quality/gaps assessment |
+
+### 4. Update TypeScript Interface and Hook
 
 **File:** `src/hooks/useEnrichPerson.ts`
 
-```typescript
-import { supabase } from "@/integrations/supabase/client"
+Update the interface to match the new comprehensive data structure.
 
-export const useEnrichPerson = () => {
-  const enrichPerson = async (name: string, company: string) => {
-    const { data, error } = await supabase.functions.invoke('enrich-person', {
-      body: { name, company }
-    })
-    if (error) throw error
-    return data
-  }
-  return { enrichPerson }
-}
+### 5. Update UI Component
+
+**File:** `src/components/EnrichedPeopleDialog.tsx`
+
+Add new sections to display:
+- Photo (if available)
+- Aliases
+- Recent news mentions
+- Insights section (communication style, interests, quotes)
+- Conversation starters for sales outreach
+- Research quality summary
+
+## Search Strategy
+
+The prompt prescribes 10+ targeted searches:
+
+```text
+- "{name}" - general presence
+- "{name} {company}" - current role
+- "{name} LinkedIn" - professional profile
+- "{name} biography" - background info
+- "{name} interview" - quotes, perspectives
+- "{name} news" - recent mentions
+- "{name} Twitter OR X" - social presence
+- "{name} speaker OR conference" - public appearances
+- "{name} education university" - academic background
+- "{name} previous company" - career history
 ```
-
-### 5. Update `config.toml`
-
-Add the new edge function:
-
-```toml
-[functions.enrich-person]
-verify_jwt = false
-```
-
-## Response Format Handling
-
-The Agentic API returns data differently than chat completions:
-
-```typescript
-// Extract output_text from response
-let outputText = data.output_text || "";
-if (!outputText && data.output) {
-  for (const item of data.output) {
-    if (item.type === "message" && item.content) {
-      for (const content of item.content) {
-        if (content.type === "output_text") {
-          outputText += content.text;
-        }
-      }
-    }
-  }
-}
-
-// Parse JSON from output
-const cleanedText = outputText.replace(/```json\n?|\n?```/g, '').trim();
-const enrichedData = JSON.parse(cleanedText);
-```
-
-## Database Compatibility
-
-The new output maps directly to existing `enriched_people` table columns:
-
-| New Field | Existing Column |
-|-----------|-----------------|
-| `full_name` | `person_name` |
-| `biography` | `biography` |
-| `job_title` | `job_title` |
-| `company` | `company` |
-| `previous_roles` | `previous_roles` (JSONB) |
-| `education` | `education` (JSONB) |
-| `notable_achievements` | `notable_achievements` |
-| `email` | `email` |
-| `phone` | `phone` |
-| `linkedin_url` | `linkedin_url` |
-| `twitter_handle` | `twitter_handle` |
-| `other_socials` | `other_socials` (JSONB) |
-| `confidence` | `confidence_score` |
-| `sources` | `all_citations` (JSONB) |
-
-No database schema changes required!
 
 ## Cost Impact
 
-| Item | Old Cost | New Cost |
-|------|----------|----------|
-| 2x Perplexity sonar-pro | ~$0.030 | - |
-| 1x Claude synthesis | ~$0.004 | - |
-| 1x Agentic Research | - | ~$0.02-0.05 |
-| **Total per person** | ~$0.034 | ~$0.02-0.05 |
+| Item | Old | New |
+|------|-----|-----|
+| API calls | 1 | 1 |
+| Tokens | ~1000 | ~4000 |
+| Reasoning | Default | High |
+| Estimated cost per person | ~$0.03-0.05 | ~$0.08-0.15 |
+
+The cost increases ~3x but delivers significantly richer intelligence.
 
 ## Files to Create/Modify
 
 | File | Action |
 |------|--------|
-| `supabase/functions/people-worker/index.ts` | Major rewrite - use Agentic API |
-| `supabase/functions/enrich-person/index.ts` | Create - standalone enrichment |
-| `src/hooks/useEnrichPerson.ts` | Create - hook for ad-hoc use |
-| `supabase/config.toml` | Add `enrich-person` function |
+| `supabase/functions/enrich-person/index.ts` | Major rewrite |
+| `supabase/functions/people-worker/index.ts` | Major rewrite |
+| Database migration | Add 17 new columns |
+| `src/hooks/useEnrichPerson.ts` | Update interface |
+| `src/components/EnrichedPeopleDialog.tsx` | Add new UI sections |
 
 ## Benefits
 
-1. **Rich biographical data** - Full career history, education, achievements
-2. **Single API call** instead of 3 calls per person
-3. **Built-in reasoning** with web search tools for better accuracy
-4. **GPT-5.2 model** for superior synthesis
-5. **Simpler code** - no orchestration of multiple AI providers
-6. **Source attribution** maintained via `sources` array
+1. **Elite-level research** - Comprehensive dossiers, not quick lookups
+2. **Narrative biographies** - Real written bios, not bullet points
+3. **Sales intelligence** - Conversation starters, quotes, interests
+4. **Deep search** - 10+ targeted searches per person
+5. **Page extraction** - Full content from LinkedIn, company pages
+6. **News tracking** - Recent mentions and coverage
+7. **Quality transparency** - Research summary shows gaps
 
