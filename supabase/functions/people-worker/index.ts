@@ -125,6 +125,11 @@ OUTPUT FORMAT - Respond with this JSON structure only:
 
   const data = await response.json();
   
+  // Log usage data if available from Perplexity
+  if (data.usage) {
+    console.log(`Perplexity usage data:`, JSON.stringify(data.usage));
+  }
+  
   // Extract output_text from the agentic response format
   let outputText = data.output_text || "";
   if (!outputText && data.output) {
@@ -227,8 +232,8 @@ serve(async (req) => {
       .update({ status: 'processing' })
       .eq('id', row.id);
 
-    // Estimated cost for deep-research preset (~$0.50-1.00, includes GPT-5.2 reasoning)
-    const estimatedCost = 0.75;
+    // Estimated cost for deep-research preset (based on observed actual costs ~$0.30-0.50)
+    const estimatedCost = 0.38;
 
     try {
       // ========== Comprehensive Intelligence Research ==========
