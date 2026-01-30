@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { usePeopleJobStatus } from "@/hooks/usePeopleJobStatus";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Users, CheckCircle, XCircle, Clock, DollarSign } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Users, CheckCircle, XCircle, Clock, DollarSign, Eye } from "lucide-react";
+import EnrichedPeopleDialog from "./EnrichedPeopleDialog";
 
 interface ActivePeopleJobMonitorProps {
   jobId: string;
@@ -10,6 +13,7 @@ interface ActivePeopleJobMonitorProps {
 
 const ActivePeopleJobMonitor = ({ jobId }: ActivePeopleJobMonitorProps) => {
   const { jobStatus, isLoading, error } = usePeopleJobStatus(jobId);
+  const [showResults, setShowResults] = useState(false);
 
   if (error) {
     return (
@@ -39,6 +43,9 @@ const ActivePeopleJobMonitor = ({ jobId }: ActivePeopleJobMonitorProps) => {
     ? (jobStatus.processed_rows / jobStatus.total_rows) * 100 
     : 0;
 
+  const isCompleted = jobStatus.status === 'completed';
+  const hasResults = jobStatus.processed_rows > 0;
+
   const getStatusBadge = () => {
     switch (jobStatus.status) {
       case 'completed':
@@ -66,82 +73,115 @@ const ActivePeopleJobMonitor = ({ jobId }: ActivePeopleJobMonitorProps) => {
   };
 
   return (
-    <Card className="neu-flat">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Users className="h-5 w-5 text-primary" />
-            Active People Research Job
-          </CardTitle>
-          {getStatusBadge()}
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Progress</span>
-            <span className="font-medium">{jobStatus.processed_rows} / {jobStatus.total_rows}</span>
-          </div>
-          <Progress value={progress} className="h-3" />
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="flex items-center gap-2 p-3 rounded-xl neu-pressed">
-            <Clock className="h-4 w-4 text-yellow-400" />
-            <div>
-              <p className="text-xs text-muted-foreground">Pending</p>
-              <p className="font-semibold">{jobStatus.stats.pending}</p>
+    <>
+      <Card className="neu-flat">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Users className="h-5 w-5 text-primary" />
+              Active People Research Job
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              {hasResults && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setShowResults(true)}
+                  className="gap-1"
+                >
+                  <Eye className="h-4 w-4" />
+                  View Results
+                </Button>
+              )}
+              {getStatusBadge()}
             </div>
           </div>
-          <div className="flex items-center gap-2 p-3 rounded-xl neu-pressed">
-            <Users className="h-4 w-4 text-blue-400" />
-            <div>
-              <p className="text-xs text-muted-foreground">Processing</p>
-              <p className="font-semibold">{jobStatus.stats.processing}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 p-3 rounded-xl neu-pressed">
-            <CheckCircle className="h-4 w-4 text-green-400" />
-            <div>
-              <p className="text-xs text-muted-foreground">Completed</p>
-              <p className="font-semibold">{jobStatus.stats.completed}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 p-3 rounded-xl neu-pressed">
-            <XCircle className="h-4 w-4 text-red-400" />
-            <div>
-              <p className="text-xs text-muted-foreground">Failed</p>
-              <p className="font-semibold">{jobStatus.stats.failed}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 p-3 rounded-xl neu-pressed">
-          <DollarSign className="h-4 w-4 text-primary" />
-          <div>
-            <p className="text-xs text-muted-foreground">Estimated Cost</p>
-            <p className="font-semibold">${jobStatus.estimated_cost_usd.toFixed(4)}</p>
-          </div>
-        </div>
-
-        {jobStatus.recent_people.length > 0 && (
+        </CardHeader>
+        <CardContent className="space-y-4">
           <div className="space-y-2">
-            <p className="text-sm font-medium text-muted-foreground">Recently Researched</p>
-            <div className="flex flex-wrap gap-2">
-              {jobStatus.recent_people.map((person) => (
-                <div key={person.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg neu-subtle">
-                  <span className="text-sm">{person.person_name}</span>
-                  {person.job_title && (
-                    <span className="text-xs text-muted-foreground">• {person.job_title}</span>
-                  )}
-                  {getConfidenceBadge(person.confidence_score)}
-                </div>
-              ))}
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Progress</span>
+              <span className="font-medium">{jobStatus.processed_rows} / {jobStatus.total_rows}</span>
+            </div>
+            <Progress value={progress} className="h-3" />
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="flex items-center gap-2 p-3 rounded-xl neu-pressed">
+              <Clock className="h-4 w-4 text-yellow-400" />
+              <div>
+                <p className="text-xs text-muted-foreground">Pending</p>
+                <p className="font-semibold">{jobStatus.stats.pending}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 p-3 rounded-xl neu-pressed">
+              <Users className="h-4 w-4 text-blue-400" />
+              <div>
+                <p className="text-xs text-muted-foreground">Processing</p>
+                <p className="font-semibold">{jobStatus.stats.processing}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 p-3 rounded-xl neu-pressed">
+              <CheckCircle className="h-4 w-4 text-green-400" />
+              <div>
+                <p className="text-xs text-muted-foreground">Completed</p>
+                <p className="font-semibold">{jobStatus.stats.completed}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 p-3 rounded-xl neu-pressed">
+              <XCircle className="h-4 w-4 text-red-400" />
+              <div>
+                <p className="text-xs text-muted-foreground">Failed</p>
+                <p className="font-semibold">{jobStatus.stats.failed}</p>
+              </div>
             </div>
           </div>
-        )}
-      </CardContent>
-    </Card>
+
+          <div className="flex items-center gap-2 p-3 rounded-xl neu-pressed">
+            <DollarSign className="h-4 w-4 text-primary" />
+            <div>
+              <p className="text-xs text-muted-foreground">Estimated Cost</p>
+              <p className="font-semibold">${jobStatus.estimated_cost_usd.toFixed(4)}</p>
+            </div>
+          </div>
+
+          {jobStatus.recent_people.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">Recently Researched</p>
+              <div className="flex flex-wrap gap-2">
+                {jobStatus.recent_people.map((person) => (
+                  <div key={person.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg neu-subtle">
+                    <span className="text-sm">{person.person_name}</span>
+                    {person.job_title && (
+                      <span className="text-xs text-muted-foreground">• {person.job_title}</span>
+                    )}
+                    {getConfidenceBadge(person.confidence_score)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {isCompleted && hasResults && (
+            <div className="pt-2 border-t border-border/50">
+              <Button 
+                onClick={() => setShowResults(true)}
+                className="w-full"
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                View Full Research Results
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <EnrichedPeopleDialog
+        jobId={jobId}
+        open={showResults}
+        onOpenChange={setShowResults}
+      />
+    </>
   );
 };
 
