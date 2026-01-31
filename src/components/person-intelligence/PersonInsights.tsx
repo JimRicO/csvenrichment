@@ -90,14 +90,36 @@ const PersonInsights = ({
             </span>
           </div>
           <div className="space-y-2">
-            {quotes.slice(0, 3).map((quote, idx) => (
-              <blockquote 
-                key={idx} 
-                className="text-sm italic border-l-2 border-primary/50 pl-3 py-1 text-muted-foreground"
-              >
-                "{quote}"
-              </blockquote>
-            ))}
+            {quotes.slice(0, 3).map((quote, idx) => {
+              // Handle both string quotes and object quotes with {quote, source_url}
+              const quoteText = typeof quote === 'string' 
+                ? quote 
+                : (quote as { quote?: string; source_url?: string })?.quote || '';
+              const sourceUrl = typeof quote === 'object' 
+                ? (quote as { quote?: string; source_url?: string })?.source_url 
+                : null;
+              
+              if (!quoteText) return null;
+              
+              return (
+                <blockquote 
+                  key={idx} 
+                  className="text-sm italic border-l-2 border-primary/50 pl-3 py-1 text-muted-foreground"
+                >
+                  "{quoteText}"
+                  {sourceUrl && (
+                    <a 
+                      href={sourceUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="ml-2 text-primary hover:underline text-xs not-italic"
+                    >
+                      [source]
+                    </a>
+                  )}
+                </blockquote>
+              );
+            })}
           </div>
         </div>
       )}
