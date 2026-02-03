@@ -1,319 +1,171 @@
-# CRM Integration API Documentation
 
-## Overview
+# Plan: Add Pre-Pipeline Social Media Discovery Search
 
-This document provides the complete API specification for external CRM systems to integrate with the Club & People Intelligence platform.
+## Problem Statement
+
+The current enrichment pipeline assumes the input includes `website_url` and optionally `instagram_handle`. However:
+- API requests may only contain `club_name`
+- Social media URLs (Facebook, Twitter, LinkedIn) are not discovered reliably
+- The existing Perplexity searches focus on business info, not social discovery
+
+## Solution: Two-Phase Approach
+
+Add a **discovery phase** BEFORE the main pipeline that uses Perplexity to find the club's web presence and social media profiles.
 
 ---
 
-## Authentication
+## New Pipeline Flow
 
-All API endpoints require authentication via the `x-api-key` header:
-
+```text
+┌────────────────────────────────────────────────────────┐
+│  STEP 0 (NEW): Social Media Discovery                  │
+│  Input: club_name only                                 │
+│  Perplexity search for:                                │
+│    - Official website URL                              │
+│    - Instagram handle                                  │
+│    - Facebook page URL                                 │
+│    - Twitter/X handle                                  │
+│    - LinkedIn company page                             │
+│  Output: Discovered URLs and handles                   │
+└────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌────────────────────────────────────────────────────────┐
+│  Merge discovered data with input data                 │
+│  - Use discovered website_url if not provided          │
+│  - Use discovered instagram_handle if not provided     │
+│  - Store all social URLs for later                     │
+└────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌────────────────────────────────────────────────────────┐
+│  EXISTING PIPELINE (Steps 1-6)                         │
+│  Now runs with enhanced input data                     │
+│  Step 1: Website Scrape (uses discovered URL)          │
+│  Step 2: Branding Extraction                           │
+│  Step 3: Instagram Scrape (uses discovered handle)     │
+│  Step 4: Perplexity Research (4 searches)              │
+│  Step 5: Claude AI Analysis                            │
+│  Step 6: Store Results (includes discovered socials)   │
+└────────────────────────────────────────────────────────┘
 ```
-x-api-key: YOUR_CRM_API_KEY
-```
 
 ---
 
-## Club Intelligence API
+## Technical Changes
 
-### Endpoints
+### File: `supabase/functions/enrichment-worker/index.ts`
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api-create-enrichment-job` | POST | Create a new club enrichment job |
-| `/api-get-enrichment-status` | GET | Check job status |
-| `/api-get-clubs` | GET | Retrieve enriched club data |
-| `/api-update-clubs` | POST | Update club records |
-
----
-
-### `api-get-clubs` Response Schema
-
-Returns **30 fields** per club:
+**1. Add new interface for discovered social data**
 
 ```typescript
-interface EnrichedClub {
-  // === IDENTIFIERS ===
-  id: string;                          // UUID
-  job_id: string;                      // Enrichment job ID
-  enrichment_row_id: string;           // Source row ID
-  
-  // === BASIC INFO ===
-  club_name: string;                   // Club/business name
-  website_url: string | null;          // Primary website
-  description: string | null;          // AI-generated description (2-3 sentences)
-  
-  // === CONTACT INFO ===
-  email: string | null;                // Primary email
-  phone: string | null;                // Primary phone
-  address: string | null;              // Physical address
-  
-  // === SOCIAL MEDIA ===
-  instagram_handle: string | null;     // Instagram handle (e.g., "@clubname")
-  instagram_url: string | null;        // Full Instagram URL (e.g., "https://instagram.com/clubname")
-  facebook_url: string | null;         // Facebook page URL
-  twitter_handle: string | null;       // Twitter/X handle or URL
-  linkedin_url: string | null;         // LinkedIn company page URL
-  
-  // === INSTAGRAM METRICS ===
-  instagram_followers: number | null;  // Follower count
-  instagram_bio: string | null;        // Profile bio text
-  instagram_profile_pic_url: string | null; // Persisted profile picture URL
-  
-  // === VISUAL BRANDING ===
-  logo_storage_url: string | null;     // Persisted logo URL
-  color_palette: {                     // Brand colors
-    primary?: string;
-    secondary?: string;
-    accent?: string;
-    background?: string;
-    text?: string;
-  } | null;
-  fonts: {                             // Typography
-    primary?: string;
-    heading?: string;
-    list?: string[];
-  } | null;
-  
-  // === AI SYNTHESIS ===
-  attitude: string | null;             // Brand personality/voice analysis
-  aesthetics: string | null;           // Visual style analysis
-  
-  // === RESEARCH DATA (Perplexity) ===
-  perplexity_description: string | null;  // Web-researched business description
-  founder_info: string | null;            // Founder background & history
-  founding_year: string | null;           // Year founded (e.g., "2015")
-  recent_activities: Array<{              // Recent news/events
-    title: string;
-    date?: string;
-  }>;
-  perplexity_citations: string[];         // Source URLs for research
-  
-  // === LEADERSHIP ===
-  key_people: Array<{                     // Owners, executives, key staff
-    name: string;
-    role: string;                         // e.g., "Owner", "CEO", "General Manager"
-    context: string;                      // Background info (1-2 sentences)
-  }>;
-  
-  // === RAW DATA ===
-  raw_branding_data: object | null;       // Full Firecrawl branding response
-  raw_instagram_data: object | null;      // Full Apify Instagram response
-  scraped_content: string | null;         // Website markdown content
-  
-  // === METADATA ===
-  created_at: string;                     // ISO timestamp
-  updated_at: string;                     // ISO timestamp
+interface DiscoveredSocialData {
+  website_url: string | null;
+  instagram_handle: string | null;
+  facebook_url: string | null;
+  twitter_handle: string | null;
+  linkedin_url: string | null;
 }
 ```
 
----
+**2. Add new function: `discoverSocialMedia`**
 
-### Query Parameters for `api-get-clubs`
+This function runs a single Perplexity search with structured JSON output to discover all social media profiles:
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `job_id` | string | Filter by specific job ID |
-| `needs_enrichment` | boolean | Filter clubs missing research data |
-| `limit` | number | Max results (default: 50, max: 200) |
-| `offset` | number | Pagination offset |
+- Uses Perplexity with `response_format: json_schema` for reliable parsing
+- Query: "Find official website and social media accounts for [club_name]"
+- Returns structured data with all discovered URLs
+- Includes regex extraction as fallback from citations
 
-**Example Request:**
-```bash
-curl -X GET \
-  "https://etscplmovnooalqfbzvy.supabase.co/functions/v1/api-get-clubs?job_id=API_ENRICH_123&limit=10" \
-  -H "x-api-key: YOUR_API_KEY"
-```
+**3. Insert STEP 0 before existing Step 1 (line ~132)**
 
-**Example Response:**
-```json
-{
-  "clubs": [
-    {
-      "id": "abc123",
-      "club_name": "Elite Fitness Club",
-      "website_url": "https://elitefitness.com",
-      "instagram_handle": "@elitefitness",
-      "instagram_url": "https://instagram.com/elitefitness",
-      "facebook_url": "https://facebook.com/elitefitness",
-      "twitter_handle": "@elitefitness",
-      "linkedin_url": "https://linkedin.com/company/elite-fitness",
-      "instagram_followers": 15000,
-      "instagram_bio": "Premium fitness experience since 2010",
-      "logo_storage_url": "https://..../logo.png",
-      "key_people": [
-        {
-          "name": "John Smith",
-          "role": "Founder & CEO",
-          "context": "Former Olympic athlete with 20 years in fitness industry"
-        }
-      ],
-      "founding_year": "2010",
-      "perplexity_description": "Elite Fitness Club is a premium gym chain...",
-      "recent_activities": [
-        {"title": "Opened 5th location in downtown", "date": "January 2025"}
-      ]
-    }
-  ],
-  "pagination": {
-    "limit": 10,
-    "offset": 0,
-    "returned": 1
+```typescript
+// ========== STEP 0: Social Media Discovery ==========
+console.log('Step 0: Discovering social media presence...');
+let discoveredSocial: DiscoveredSocialData = {
+  website_url: null,
+  instagram_handle: null,
+  facebook_url: null,
+  twitter_handle: null,
+  linkedin_url: null
+};
+
+if (PERPLEXITY_API_KEY) {
+  discoveredSocial = await discoverSocialMedia(row.club_name, PERPLEXITY_API_KEY);
+  
+  // Enhance input data with discovered values
+  if (!row.website_url || row.website_url === 'https://placeholder.com') {
+    row.website_url = discoveredSocial.website_url || row.website_url;
+  }
+  if (!row.instagram_handle && discoveredSocial.instagram_handle) {
+    row.instagram_handle = discoveredSocial.instagram_handle;
   }
 }
 ```
 
----
-
-### `api-create-enrichment-job` Request
-
-**Single Club:**
-```json
-{
-  "club_name": "Fitness Club",
-  "website_url": "https://example.com",
-  "instagram_handle": "@fitnessclub"
-}
-```
-
-**Bulk Clubs:**
-```json
-{
-  "clubs": [
-    {"club_name": "Club 1", "website_url": "https://club1.com"},
-    {"club_name": "Club 2", "website_url": "https://club2.com", "instagram_handle": "@club2"}
-  ]
-}
-```
-
----
-
-## People Intelligence API
-
-### Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api-create-people-job` | POST | Create person research job |
-| `/api-get-people-status` | GET | Check job status |
-| `/api-get-people` | GET | Retrieve enriched person data |
-| `/api-update-people` | POST | Update person records |
-
----
-
-### `api-get-people` Response Schema
-
-Returns **42 fields** per person. See existing documentation for full schema.
-
----
-
-## Quick Extraction APIs
-
-### `api-extract-logo`
-
-Extract and persist a website logo.
-
-```bash
-POST /api-extract-logo
-{
-  "website_url": "https://example.com"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "logo_url": "https://..../persisted-logo.png"
-}
-```
-
----
-
-### `api-extract-instagram-pfp`
-
-Extract and persist an Instagram profile picture.
-
-```bash
-POST /api-extract-instagram-pfp
-{
-  "instagram_handle": "@username"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "profile_pic_url": "https://..../persisted-pfp.jpg"
-}
-```
-
----
-
-## TypeScript Utilities
-
-### Parse Key People
+**4. Update Step 6 (Store Results) to prioritize discovered social URLs**
 
 ```typescript
-interface KeyPerson {
-  name: string;
-  role: string;
-  context: string;
-}
-
-function parseKeyPeople(keyPeople: unknown): KeyPerson[] {
-  if (!keyPeople) return [];
-  
-  let parsed = keyPeople;
-  if (typeof parsed === 'string') {
-    try {
-      parsed = JSON.parse(parsed);
-    } catch {
-      return [];
-    }
-  }
-  
-  if (!Array.isArray(parsed)) return [];
-  
-  return parsed.filter(
-    (p): p is KeyPerson =>
-      typeof p === 'object' &&
-      p !== null &&
-      typeof p.name === 'string' &&
-      typeof p.role === 'string'
-  );
-}
-```
-
-### Parse Enriched Club
-
-```typescript
-function parseEnrichedClub(raw: any): EnrichedClub {
-  return {
-    ...raw,
-    key_people: parseKeyPeople(raw.key_people),
-    recent_activities: Array.isArray(raw.recent_activities) ? raw.recent_activities : [],
-    color_palette: typeof raw.color_palette === 'object' ? raw.color_palette : {},
-    fonts: typeof raw.fonts === 'object' ? raw.fonts : {},
-    perplexity_citations: Array.isArray(raw.perplexity_citations) ? raw.perplexity_citations : []
-  };
-}
+facebook_url: discoveredSocial.facebook_url || socialMedia.facebook_url || null,
+twitter_handle: discoveredSocial.twitter_handle || socialMedia.twitter_handle || null,
+linkedin_url: discoveredSocial.linkedin_url || socialMedia.linkedin_url || null,
 ```
 
 ---
 
-## Rate Limits
+## Discovery Search Implementation
 
-- Enrichment jobs: 2 second delay between worker calls
-- API calls: Standard Supabase limits apply
+The `discoverSocialMedia` function will:
+
+1. Call Perplexity with a targeted query:
+   ```
+   Find the official website and social media accounts for "[club_name]". 
+   Include: website URL, Instagram, Facebook page, Twitter/X, LinkedIn company page.
+   ```
+
+2. Request structured JSON response with this schema:
+   ```json
+   {
+     "website_url": "https://...",
+     "instagram": "@handle or URL",
+     "facebook": "https://facebook.com/...",
+     "twitter": "@handle or https://x.com/...",
+     "linkedin": "https://linkedin.com/company/..."
+   }
+   ```
+
+3. Also extract URLs directly from Perplexity citations as a fallback
+
+4. Normalize all handles/URLs to consistent format
 
 ---
 
-## Changelog
+## Cost Impact
 
-**2025-02-03**
-- Added social media fields: `instagram_url`, `facebook_url`, `twitter_handle`, `linkedin_url`
-- Total fields per club increased from 26 to 30
+- Adds 1 Perplexity sonar query per club
+- Estimated additional cost: ~$0.005 per club
+- Total pipeline cost: ~$0.034 to ~$0.039 per club
+
+---
+
+## Benefits
+
+1. **Works with club_name only** - No longer requires website_url in input
+2. **Discovers all social profiles** - Facebook, Twitter, LinkedIn found via web search
+3. **Instagram discovery** - Finds Instagram handle if not provided
+4. **Website discovery** - Finds official website if not provided
+5. **More reliable** - Perplexity search is better at finding social profiles than scraping website footers
+
+---
+
+## Files to Modify
+
+| File | Change |
+|------|--------|
+| `supabase/functions/enrichment-worker/index.ts` | Add discoverSocialMedia function, insert Step 0, update Step 6 |
+
+---
+
+## Summary
+
+This plan adds a discovery phase at the start of the pipeline that uses Perplexity to find the club's web presence. The discovered data (website URL, Instagram handle, Facebook, Twitter, LinkedIn) is then fed into the existing pipeline, ensuring we have all social information even when the API request only contains the club name.
