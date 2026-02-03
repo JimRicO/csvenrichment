@@ -377,8 +377,10 @@ serve(async (req) => {
       } else {
         console.log('Step 0: Skipping social discovery (no Perplexity API key)');
       }
-      // ========== STEP 1: Website Scrape (Firecrawl markdown) ==========
+      // ========== STEP 1: Website Scrape (Firecrawl markdown + links) ==========
       console.log('Step 1: Scraping website content...');
+      let socialLinksFromScrape: string[] = [];
+      
       try {
         const scrapeResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
           method: 'POST',
@@ -388,8 +390,8 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             url: row.website_url,
-            formats: ['markdown'],
-            onlyMainContent: true,
+            formats: ['markdown', 'links'],
+            onlyMainContent: false, // Include footer/header for social links
             waitFor: 2000
           }),
         });
@@ -397,8 +399,60 @@ serve(async (req) => {
         if (scrapeResponse.ok) {
           const scrapeData = await scrapeResponse.json();
           scrapedContent = scrapeData?.data?.markdown || '';
-          console.log(`Scraped ${scrapedContent.length} characters of content`);
+          const discoveredLinks: string[] = scrapeData?.data?.links || [];
+          console.log(`Scraped ${scrapedContent.length} characters, ${discoveredLinks.length} links`);
           totalCost += 0.001; // Firecrawl credit
+          
+          // Extract social links from discovered links (footer/header)
+          const socialPatterns = [
+            /instagram\.com/i,
+            /facebook\.com/i,
+            /linkedin\.com/i,
+            /twitter\.com|x\.com/i,
+          ];
+          
+          socialLinksFromScrape = discoveredLinks.filter(link => 
+            socialPatterns.some(pattern => pattern.test(link))
+          );
+          console.log(`Found ${socialLinksFromScrape.length} social links from website`);
+          
+          // Extract Instagram handle from scraped links if not already discovered
+          if (!row.instagram_handle && !discoveredSocial.instagram_handle) {
+            for (const link of socialLinksFromScrape) {
+              const igMatch = link.match(/instagram\.com\/([^\/?]+)/i);
+              if (igMatch && igMatch[1] !== 'p' && igMatch[1] !== 'reel' && igMatch[1] !== 'explore') {
+                row.instagram_handle = `@${igMatch[1]}`;
+                console.log(`Found Instagram from website footer: @${igMatch[1]}`);
+                break;
+              }
+            }
+          }
+          
+          // Enrich discovered social data with footer links
+          if (!discoveredSocial.facebook_url) {
+            const fbLink = socialLinksFromScrape.find(l => /facebook\.com/i.test(l) && !/sharer/i.test(l));
+            if (fbLink) {
+              discoveredSocial.facebook_url = fbLink;
+              console.log(`Found Facebook from website footer: ${fbLink}`);
+            }
+          }
+          if (!discoveredSocial.twitter_handle) {
+            const twLink = socialLinksFromScrape.find(l => /twitter\.com|x\.com/i.test(l));
+            if (twLink) {
+              const twMatch = twLink.match(/(?:twitter\.com|x\.com)\/([^\/?]+)/);
+              if (twMatch && twMatch[1] !== 'i' && twMatch[1] !== 'status' && twMatch[1] !== 'intent' && twMatch[1] !== 'share') {
+                discoveredSocial.twitter_handle = `@${twMatch[1]}`;
+                console.log(`Found Twitter from website footer: @${twMatch[1]}`);
+              }
+            }
+          }
+          if (!discoveredSocial.linkedin_url) {
+            const liLink = socialLinksFromScrape.find(l => /linkedin\.com\/company/i.test(l));
+            if (liLink) {
+              discoveredSocial.linkedin_url = liLink;
+              console.log(`Found LinkedIn from website footer: ${liLink}`);
+            }
+          }
         } else {
           console.error('Website scrape failed:', scrapeResponse.status);
         }
@@ -664,6 +718,12 @@ ${perplexityData.leadership?.content || 'No leadership information found'}
 `;
         }
 
+        // Build social links context from footer discovery
+        let socialLinksContext = '';
+        if (socialLinksFromScrape.length > 0) {
+          socialLinksContext = `\n\nDISCOVERED SOCIAL MEDIA LINKS (from website footer/header):\n${socialLinksFromScrape.join('\n')}`;
+        }
+
         const aiPrompt = `Analyze this club/fitness business based on their website content, Instagram presence, and web research.
 
 WEBSITE CONTENT:
@@ -680,7 +740,7 @@ BRANDING:
 - Color scheme: ${brandingData?.colorScheme || 'unknown'}
 - Primary color: ${colorPalette.primary || 'unknown'}
 - Fonts: ${fonts.map((f: any) => f.family).join(', ') || 'unknown'}
-${perplexityContext}
+${perplexityContext}${socialLinksContext}
 
 Generate the following in JSON format:
 
@@ -704,7 +764,7 @@ Generate the following in JSON format:
    - "context": Brief context about them (1-2 sentences, e.g., background, how long they've been there, relevant experience)
    If no key people found, return empty array.
 
-9. SOCIAL_MEDIA (object): Extract any social media links found. Include:
+9. SOCIAL_MEDIA (object): Extract any social media links found from the DISCOVERED SOCIAL MEDIA LINKS section or website content. Include:
    - "facebook_url": Full Facebook page URL (e.g., "https://facebook.com/clubname") or null
    - "twitter_handle": Twitter/X handle with @ (e.g., "@clubname") or full URL, or null
    - "linkedin_url": Full LinkedIn company page URL or null
