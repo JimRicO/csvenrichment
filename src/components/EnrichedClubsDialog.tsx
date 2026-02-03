@@ -7,7 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   Building2, Globe, Instagram, MapPin, Phone, Mail, Palette, Type, 
-  MessageSquare, Sparkles, Eye, User, Calendar, Activity, Link2, ChevronDown, Users 
+  MessageSquare, Sparkles, Eye, User, Calendar, Activity, Link2, ChevronDown, Users,
+  Facebook, Twitter, Linkedin
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +29,10 @@ interface EnrichedClub {
   club_name: string;
   website_url: string | null;
   instagram_handle: string | null;
+  instagram_url: string | null;
+  facebook_url: string | null;
+  twitter_handle: string | null;
+  linkedin_url: string | null;
   logo_storage_url: string | null;
   instagram_followers: number | null;
   instagram_bio: string | null;
@@ -253,6 +258,51 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
                   </div>
                 )}
 
+                {/* Social Media Links */}
+                {(selectedClub.facebook_url || selectedClub.twitter_handle || selectedClub.linkedin_url) && (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedClub.facebook_url && (
+                      <a
+                        href={selectedClub.facebook_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg neu-subtle hover:bg-primary/10 transition-colors"
+                      >
+                        <Facebook className="h-4 w-4 text-[#1877F2]" />
+                        <span className="text-sm">Facebook</span>
+                      </a>
+                    )}
+                    {selectedClub.twitter_handle && (
+                      <a
+                        href={selectedClub.twitter_handle.startsWith('http') 
+                          ? selectedClub.twitter_handle 
+                          : `https://x.com/${selectedClub.twitter_handle.replace('@', '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg neu-subtle hover:bg-primary/10 transition-colors"
+                      >
+                        <Twitter className="h-4 w-4 text-foreground" />
+                        <span className="text-sm">
+                          {selectedClub.twitter_handle.startsWith('http') 
+                            ? 'X / Twitter' 
+                            : selectedClub.twitter_handle}
+                        </span>
+                      </a>
+                    )}
+                    {selectedClub.linkedin_url && (
+                      <a
+                        href={selectedClub.linkedin_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg neu-subtle hover:bg-primary/10 transition-colors"
+                      >
+                        <Linkedin className="h-4 w-4 text-[#0A66C2]" />
+                        <span className="text-sm">LinkedIn</span>
+                      </a>
+                    )}
+                  </div>
+                )}
+
                 {/* Contact info */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {selectedClub.address && (
@@ -262,16 +312,16 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
                     </div>
                   )}
                   {selectedClub.phone && (
-                    <div className="flex items-center gap-2 p-3 rounded-lg neu-subtle">
+                    <a href={`tel:${selectedClub.phone}`} className="flex items-center gap-2 p-3 rounded-lg neu-subtle hover:bg-primary/10 transition-colors">
                       <Phone className="h-4 w-4 text-primary" />
                       <span className="text-sm">{selectedClub.phone}</span>
-                    </div>
+                    </a>
                   )}
                   {selectedClub.email && (
-                    <div className="flex items-center gap-2 p-3 rounded-lg neu-subtle">
+                    <a href={`mailto:${selectedClub.email}`} className="flex items-center gap-2 p-3 rounded-lg neu-subtle hover:bg-primary/10 transition-colors">
                       <Mail className="h-4 w-4 text-primary" />
                       <span className="text-sm">{selectedClub.email}</span>
-                    </div>
+                    </a>
                   )}
                 </div>
 
