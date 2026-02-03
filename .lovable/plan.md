@@ -1,171 +1,139 @@
 
-# Plan: Add Pre-Pipeline Social Media Discovery Search
 
-## Problem Statement
+# Fix: Instagram Links Not Extracted from Website Footers
 
-The current enrichment pipeline assumes the input includes `website_url` and optionally `instagram_handle`. However:
-- API requests may only contain `club_name`
-- Social media URLs (Facebook, Twitter, LinkedIn) are not discovered reliably
-- The existing Perplexity searches focus on business info, not social discovery
+## Problem Identified
 
-## Solution: Two-Phase Approach
+The `enrichment-worker` is using `onlyMainContent: true` in the Firecrawl scrape request, which explicitly **excludes footers and headers** - exactly where Instagram and other social media links are typically located.
 
-Add a **discovery phase** BEFORE the main pipeline that uses Perplexity to find the club's web presence and social media profiles.
+This was working in the bulk `scraper-worker` because it correctly uses:
+- `onlyMainContent: false` (includes footer/header)
+- `formats: ['markdown', 'links']` (extracts links separately)
 
----
+## Current Code (Broken)
 
-## New Pipeline Flow
+In `supabase/functions/enrichment-worker/index.ts`, lines 382-395:
 
-```text
-┌────────────────────────────────────────────────────────┐
-│  STEP 0 (NEW): Social Media Discovery                  │
-│  Input: club_name only                                 │
-│  Perplexity search for:                                │
-│    - Official website URL                              │
-│    - Instagram handle                                  │
-│    - Facebook page URL                                 │
-│    - Twitter/X handle                                  │
-│    - LinkedIn company page                             │
-│  Output: Discovered URLs and handles                   │
-└────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌────────────────────────────────────────────────────────┐
-│  Merge discovered data with input data                 │
-│  - Use discovered website_url if not provided          │
-│  - Use discovered instagram_handle if not provided     │
-│  - Store all social URLs for later                     │
-└────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌────────────────────────────────────────────────────────┐
-│  EXISTING PIPELINE (Steps 1-6)                         │
-│  Now runs with enhanced input data                     │
-│  Step 1: Website Scrape (uses discovered URL)          │
-│  Step 2: Branding Extraction                           │
-│  Step 3: Instagram Scrape (uses discovered handle)     │
-│  Step 4: Perplexity Research (4 searches)              │
-│  Step 5: Claude AI Analysis                            │
-│  Step 6: Store Results (includes discovered socials)   │
-└────────────────────────────────────────────────────────┘
+```javascript
+const scrapeResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+  method: 'POST',
+  headers: {...},
+  body: JSON.stringify({
+    url: row.website_url,
+    formats: ['markdown'],        // ❌ Missing 'links' format
+    onlyMainContent: true,        // ❌ EXCLUDES footers/headers!
+    waitFor: 2000
+  }),
+});
 ```
 
----
+## Solution
 
-## Technical Changes
+Change the Firecrawl request in Step 1 to:
+1. Set `onlyMainContent: false` to capture full page including footer
+2. Add `'links'` format to extract all URLs separately
+3. Extract social links from the returned links array
+4. Add discovered social links to the content sent to Claude for analysis
+
+## Changes Required
 
 ### File: `supabase/functions/enrichment-worker/index.ts`
 
-**1. Add new interface for discovered social data**
+**1. Update Step 1 Firecrawl request (line ~389-394)**
 
-```typescript
-interface DiscoveredSocialData {
-  website_url: string | null;
-  instagram_handle: string | null;
-  facebook_url: string | null;
-  twitter_handle: string | null;
-  linkedin_url: string | null;
+Change from:
+```javascript
+formats: ['markdown'],
+onlyMainContent: true,
+```
+
+To:
+```javascript
+formats: ['markdown', 'links'],
+onlyMainContent: false,
+```
+
+**2. Capture links from response (after line ~399)**
+
+Add extraction of the links array:
+```javascript
+const discoveredLinks = scrapeData?.data?.links || [];
+```
+
+**3. Extract social links from discovered links (after line ~401)**
+
+Add social link extraction logic:
+```javascript
+const socialPatterns = [
+  /instagram\.com/i,
+  /facebook\.com/i,
+  /linkedin\.com/i,
+  /twitter\.com|x\.com/i,
+];
+
+const socialLinksFromScrape = discoveredLinks.filter(link => 
+  socialPatterns.some(pattern => pattern.test(link))
+);
+
+// Extract Instagram handle from scraped links if not already discovered
+if (!row.instagram_handle && !discoveredSocial.instagram_handle) {
+  for (const link of socialLinksFromScrape) {
+    const igMatch = link.match(/instagram\.com\/([^\/?]+)/i);
+    if (igMatch && igMatch[1] !== 'p' && igMatch[1] !== 'reel') {
+      row.instagram_handle = `@${igMatch[1]}`;
+      console.log(`Found Instagram from website footer: @${igMatch[1]}`);
+      break;
+    }
+  }
+}
+
+// Also enrich discovered social data with footer links
+if (!discoveredSocial.facebook_url) {
+  const fbLink = socialLinksFromScrape.find(l => /facebook\.com/i.test(l));
+  if (fbLink) discoveredSocial.facebook_url = fbLink;
+}
+if (!discoveredSocial.twitter_handle) {
+  const twLink = socialLinksFromScrape.find(l => /twitter\.com|x\.com/i.test(l));
+  if (twLink) {
+    const twMatch = twLink.match(/(?:twitter\.com|x\.com)\/([^\/?]+)/);
+    if (twMatch && twMatch[1] !== 'i' && twMatch[1] !== 'status') {
+      discoveredSocial.twitter_handle = `@${twMatch[1]}`;
+    }
+  }
+}
+if (!discoveredSocial.linkedin_url) {
+  const liLink = socialLinksFromScrape.find(l => /linkedin\.com\/company/i.test(l));
+  if (liLink) discoveredSocial.linkedin_url = liLink;
 }
 ```
 
-**2. Add new function: `discoverSocialMedia`**
+**4. Add social links context to AI prompt (around line ~683)**
 
-This function runs a single Perplexity search with structured JSON output to discover all social media profiles:
-
-- Uses Perplexity with `response_format: json_schema` for reliable parsing
-- Query: "Find official website and social media accounts for [club_name]"
-- Returns structured data with all discovered URLs
-- Includes regex extraction as fallback from citations
-
-**3. Insert STEP 0 before existing Step 1 (line ~132)**
-
-```typescript
-// ========== STEP 0: Social Media Discovery ==========
-console.log('Step 0: Discovering social media presence...');
-let discoveredSocial: DiscoveredSocialData = {
-  website_url: null,
-  instagram_handle: null,
-  facebook_url: null,
-  twitter_handle: null,
-  linkedin_url: null
-};
-
-if (PERPLEXITY_API_KEY) {
-  discoveredSocial = await discoverSocialMedia(row.club_name, PERPLEXITY_API_KEY);
-  
-  // Enhance input data with discovered values
-  if (!row.website_url || row.website_url === 'https://placeholder.com') {
-    row.website_url = discoveredSocial.website_url || row.website_url;
-  }
-  if (!row.instagram_handle && discoveredSocial.instagram_handle) {
-    row.instagram_handle = discoveredSocial.instagram_handle;
-  }
+Append discovered social links to the content sent to Claude:
+```javascript
+let socialLinksContext = '';
+if (socialLinksFromScrape.length > 0) {
+  socialLinksContext = `\n\nDISCOVERED SOCIAL MEDIA LINKS (from website footer):\n${socialLinksFromScrape.join('\n')}`;
 }
 ```
 
-**4. Update Step 6 (Store Results) to prioritize discovered social URLs**
-
-```typescript
-facebook_url: discoveredSocial.facebook_url || socialMedia.facebook_url || null,
-twitter_handle: discoveredSocial.twitter_handle || socialMedia.twitter_handle || null,
-linkedin_url: discoveredSocial.linkedin_url || socialMedia.linkedin_url || null,
-```
+Then include in the AI prompt.
 
 ---
 
-## Discovery Search Implementation
+## Technical Summary
 
-The `discoverSocialMedia` function will:
+| Aspect | Before (Broken) | After (Fixed) |
+|--------|-----------------|---------------|
+| `onlyMainContent` | `true` (excludes footer) | `false` (includes footer) |
+| `formats` | `['markdown']` | `['markdown', 'links']` |
+| Social link extraction | None from website | Extract from links array |
+| Instagram discovery | Only Step 0 (Perplexity) | Step 0 + Website footer |
 
-1. Call Perplexity with a targeted query:
-   ```
-   Find the official website and social media accounts for "[club_name]". 
-   Include: website URL, Instagram, Facebook page, Twitter/X, LinkedIn company page.
-   ```
+## Why This Works
 
-2. Request structured JSON response with this schema:
-   ```json
-   {
-     "website_url": "https://...",
-     "instagram": "@handle or URL",
-     "facebook": "https://facebook.com/...",
-     "twitter": "@handle or https://x.com/...",
-     "linkedin": "https://linkedin.com/company/..."
-   }
-   ```
+1. **Footer capture**: `onlyMainContent: false` ensures Firecrawl returns the entire page HTML including footer/header sections where social links typically reside
+2. **Explicit links**: The `links` format tells Firecrawl to extract all anchor hrefs separately, making it easy to filter for social patterns
+3. **Fallback chain**: Instagram discovery now follows: Input → Step 0 (Perplexity) → Step 1 (Website footer)
+4. **Consistent with scraper-worker**: This matches the approach already proven to work in the bulk website scraper
 
-3. Also extract URLs directly from Perplexity citations as a fallback
-
-4. Normalize all handles/URLs to consistent format
-
----
-
-## Cost Impact
-
-- Adds 1 Perplexity sonar query per club
-- Estimated additional cost: ~$0.005 per club
-- Total pipeline cost: ~$0.034 to ~$0.039 per club
-
----
-
-## Benefits
-
-1. **Works with club_name only** - No longer requires website_url in input
-2. **Discovers all social profiles** - Facebook, Twitter, LinkedIn found via web search
-3. **Instagram discovery** - Finds Instagram handle if not provided
-4. **Website discovery** - Finds official website if not provided
-5. **More reliable** - Perplexity search is better at finding social profiles than scraping website footers
-
----
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `supabase/functions/enrichment-worker/index.ts` | Add discoverSocialMedia function, insert Step 0, update Step 6 |
-
----
-
-## Summary
-
-This plan adds a discovery phase at the start of the pipeline that uses Perplexity to find the club's web presence. The discovered data (website URL, Instagram handle, Facebook, Twitter, LinkedIn) is then fed into the existing pipeline, ensuring we have all social information even when the API request only contains the club name.
