@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, Upload, Loader2, Building2, Globe, Instagram } from "lucide-react";
+import { Sparkles, Upload, Loader2, Building2, Globe, Instagram, Wand2, Facebook, Twitter, Linkedin } from "lucide-react";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import Papa from "papaparse";
 
@@ -16,7 +16,7 @@ interface ClubEnrichmentSectionProps {
 
 interface CsvRow {
   club_name: string;
-  website_url: string;
+  website_url?: string;
   instagram_handle?: string;
 }
 
@@ -36,10 +36,10 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
   const [isUploading, setIsUploading] = useState(false);
 
   const handleSingleSubmit = async () => {
-    if (!clubName.trim() || !websiteUrl.trim()) {
+    if (!clubName.trim()) {
       toast({
         title: "Missing Information",
-        description: "Please provide both club name and website URL",
+        description: "Please provide the club name",
         variant: "destructive",
       });
       return;
@@ -50,7 +50,7 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
       const { data, error } = await supabase.functions.invoke('create-enrichment-job', {
         body: {
           club_name: clubName.trim(),
-          website_url: websiteUrl.trim(),
+          website_url: websiteUrl.trim() || null,
           instagram_handle: instagramHandle.trim() || null,
         },
       });
@@ -94,19 +94,20 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
       skipEmptyLines: true,
       complete: (results) => {
         const rows = results.data as CsvRow[];
-        const validRows = rows.filter(row => row.club_name && row.website_url);
+        const validRows = rows.filter(row => row.club_name);
         setCsvData(validRows);
         
         if (validRows.length === 0) {
           toast({
             title: "Invalid CSV",
-            description: "No valid rows found. Ensure columns: club_name, website_url, instagram_handle (optional)",
+            description: "No valid rows found. Ensure column: club_name (website_url and instagram_handle are optional)",
             variant: "destructive",
           });
         } else {
+          const withWebsite = validRows.filter(r => r.website_url).length;
           toast({
             title: "CSV Loaded",
-            description: `Found ${validRows.length} clubs ready for enrichment`,
+            description: `Found ${validRows.length} clubs (${withWebsite} with website URLs, others will be discovered)`,
           });
         }
       },
@@ -201,6 +202,11 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
           <p className="text-sm text-muted-foreground mt-1">
             Extract comprehensive brand identity, contact data, and AI-generated insights
           </p>
+          {/* Discovery Feature Highlight */}
+          <div className="flex items-center gap-2 mt-2 text-xs text-primary/80">
+            <Wand2 className="h-3.5 w-3.5" />
+            <span>Auto-discovers website, Instagram, Facebook, Twitter/X & LinkedIn from club name</span>
+          </div>
         </div>
       }
       defaultOpen={false}
@@ -213,11 +219,25 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
         </TabsList>
 
         <TabsContent value="single" className="space-y-4">
+          {/* Discovery info banner */}
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+            <div className="flex items-center gap-1.5 text-primary">
+              <Globe className="h-4 w-4" />
+              <Instagram className="h-4 w-4" />
+              <Facebook className="h-4 w-4" />
+              <Twitter className="h-4 w-4" />
+              <Linkedin className="h-4 w-4" />
+            </div>
+            <span className="text-xs text-muted-foreground">
+              Only club name is required — social profiles and website are discovered automatically via AI research
+            </span>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="clubName" className="flex items-center gap-2">
                 <Building2 className="h-4 w-4" />
-                Club Name
+                Club Name <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="clubName"
@@ -227,39 +247,41 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="websiteUrl" className="flex items-center gap-2">
+              <Label htmlFor="websiteUrl" className="flex items-center gap-2 text-muted-foreground">
                 <Globe className="h-4 w-4" />
-                Website URL
+                Website URL <span className="text-xs">(auto-discovered)</span>
               </Label>
               <Input
                 id="websiteUrl"
-                placeholder="e.g., fitnessfirst.com"
+                placeholder="Leave blank to auto-discover"
                 value={websiteUrl}
                 onChange={(e) => setWebsiteUrl(e.target.value)}
+                className="border-dashed"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="instagramHandle" className="flex items-center gap-2">
+              <Label htmlFor="instagramHandle" className="flex items-center gap-2 text-muted-foreground">
                 <Instagram className="h-4 w-4" />
-                Instagram (optional)
+                Instagram <span className="text-xs">(auto-discovered)</span>
               </Label>
               <Input
                 id="instagramHandle"
-                placeholder="e.g., @fitnessfirst"
+                placeholder="Leave blank to auto-discover"
                 value={instagramHandle}
                 onChange={(e) => setInstagramHandle(e.target.value)}
+                className="border-dashed"
               />
             </div>
           </div>
           <Button 
             onClick={handleSingleSubmit} 
-            disabled={isSubmitting || !clubName.trim() || !websiteUrl.trim()}
+            disabled={isSubmitting || !clubName.trim()}
             className="w-full md:w-auto"
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Enriching...
+                Discovering & Enriching...
               </>
             ) : (
               <>
@@ -294,6 +316,10 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
                 </span>
               )}
             </div>
+
+            <p className="text-xs text-muted-foreground">
+              CSV requires only <strong>club_name</strong> column. Optional columns: website_url, instagram_handle
+            </p>
 
             {csvData.length > 0 && (
               <div className="space-y-2">

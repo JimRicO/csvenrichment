@@ -8,7 +8,7 @@ const corsHeaders = {
 
 interface ClubInput {
   club_name: string;
-  website_url: string;
+  website_url?: string;
   instagram_handle?: string;
 }
 
@@ -24,18 +24,18 @@ serve(async (req) => {
     let clubs: ClubInput[] = [];
     
     if (body.rows && Array.isArray(body.rows)) {
-      // Bulk mode: { rows: [{ club_name, website_url, instagram_handle }, ...] }
+      // Bulk mode: { rows: [{ club_name, website_url?, instagram_handle? }, ...] }
       clubs = body.rows;
-    } else if (body.club_name && body.website_url) {
-      // Single club mode: { club_name, website_url, instagram_handle }
+    } else if (body.club_name) {
+      // Single club mode: only club_name is required now
       clubs = [{
         club_name: body.club_name,
-        website_url: body.website_url,
+        website_url: body.website_url || null,
         instagram_handle: body.instagram_handle
       }];
     } else {
       return new Response(
-        JSON.stringify({ error: 'Either provide a single club (club_name, website_url) or bulk rows' }),
+        JSON.stringify({ error: 'Provide club_name (website_url and instagram_handle are optional - will be auto-discovered)' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -47,11 +47,11 @@ serve(async (req) => {
       );
     }
 
-    // Validate inputs
+    // Validate inputs - only club_name is required now
     for (const club of clubs) {
-      if (!club.club_name || !club.website_url) {
+      if (!club.club_name) {
         return new Response(
-          JSON.stringify({ error: 'Each club must have club_name and website_url' }),
+          JSON.stringify({ error: 'Each club must have club_name' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -92,14 +92,20 @@ serve(async (req) => {
 
     console.log(`Created enrichment job: ${jobId}`);
 
-    // Insert all enrichment rows
-    const enrichmentRows = clubs.map(club => ({
-      job_id: jobId,
-      club_name: club.club_name,
-      website_url: club.website_url.startsWith('http') ? club.website_url : `https://${club.website_url}`,
-      instagram_handle: club.instagram_handle || null,
-      status: 'pending'
-    }));
+    // Insert all enrichment rows - website_url uses placeholder if not provided (discovery will find it)
+    const enrichmentRows = clubs.map(club => {
+      let websiteUrl = club.website_url || 'https://placeholder.com';
+      if (websiteUrl !== 'https://placeholder.com' && !websiteUrl.startsWith('http')) {
+        websiteUrl = `https://${websiteUrl}`;
+      }
+      return {
+        job_id: jobId,
+        club_name: club.club_name,
+        website_url: websiteUrl,
+        instagram_handle: club.instagram_handle || null,
+        status: 'pending'
+      };
+    });
 
     const { error: rowsError } = await supabase
       .from('enrichment_rows')
