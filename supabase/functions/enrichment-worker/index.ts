@@ -21,6 +21,14 @@ interface PerplexityResult {
   citations: string[];
 }
 
+interface DiscoveredSocialData {
+  website_url: string | null;
+  instagram_handle: string | null;
+  facebook_url: string | null;
+  twitter_handle: string | null;
+  linkedin_url: string | null;
+}
+
 async function searchPerplexity(query: string, apiKey: string): Promise<PerplexityResult> {
   try {
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
@@ -51,6 +59,174 @@ async function searchPerplexity(query: string, apiKey: string): Promise<Perplexi
   } catch (error) {
     console.error('Perplexity search error:', error);
     return { content: '', citations: [] };
+  }
+}
+
+// ========== SOCIAL MEDIA DISCOVERY FUNCTION ==========
+async function discoverSocialMedia(clubName: string, apiKey: string): Promise<DiscoveredSocialData> {
+  console.log(`Discovering social media for: ${clubName}`);
+  
+  const result: DiscoveredSocialData = {
+    website_url: null,
+    instagram_handle: null,
+    facebook_url: null,
+    twitter_handle: null,
+    linkedin_url: null
+  };
+
+  try {
+    const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'sonar',
+        messages: [
+          { 
+            role: 'system', 
+            content: 'You are a research assistant that finds official websites and social media profiles for businesses. Return ONLY valid JSON, no other text.' 
+          },
+          { 
+            role: 'user', 
+            content: `Find the official website and social media accounts for "${clubName}". 
+            
+Search for their:
+- Official website URL
+- Instagram handle or URL
+- Facebook page URL
+- Twitter/X handle or URL
+- LinkedIn company page URL
+
+Return ONLY this JSON format:
+{
+  "website_url": "https://example.com" or null,
+  "instagram": "@handle" or "https://instagram.com/handle" or null,
+  "facebook": "https://facebook.com/pagename" or null,
+  "twitter": "@handle" or "https://x.com/handle" or null,
+  "linkedin": "https://linkedin.com/company/name" or null
+}`
+          }
+        ],
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'social_discovery',
+            schema: {
+              type: 'object',
+              properties: {
+                website_url: { type: ['string', 'null'] },
+                instagram: { type: ['string', 'null'] },
+                facebook: { type: ['string', 'null'] },
+                twitter: { type: ['string', 'null'] },
+                linkedin: { type: ['string', 'null'] }
+              }
+            }
+          }
+        }
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(`Social discovery API error: ${response.status}`);
+      return result;
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || '';
+    const citations = data.citations || [];
+
+    // Try to parse JSON response
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      // Try to extract JSON from response
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          parsed = JSON.parse(jsonMatch[0]);
+        } catch {
+          console.log('Could not parse social discovery JSON');
+        }
+      }
+    }
+
+    if (parsed) {
+      result.website_url = parsed.website_url || null;
+      
+      // Normalize Instagram handle
+      if (parsed.instagram) {
+        const igMatch = parsed.instagram.match(/instagram\.com\/([^\/?]+)/);
+        if (igMatch) {
+          result.instagram_handle = `@${igMatch[1]}`;
+        } else if (parsed.instagram.startsWith('@')) {
+          result.instagram_handle = parsed.instagram;
+        } else {
+          result.instagram_handle = `@${parsed.instagram}`;
+        }
+      }
+      
+      result.facebook_url = parsed.facebook || null;
+      
+      // Normalize Twitter handle
+      if (parsed.twitter) {
+        const twMatch = parsed.twitter.match(/(?:twitter\.com|x\.com)\/([^\/?]+)/);
+        if (twMatch) {
+          result.twitter_handle = `@${twMatch[1]}`;
+        } else if (parsed.twitter.startsWith('@')) {
+          result.twitter_handle = parsed.twitter;
+        } else {
+          result.twitter_handle = `@${parsed.twitter}`;
+        }
+      }
+      
+      result.linkedin_url = parsed.linkedin || null;
+    }
+
+    // Fallback: Extract URLs directly from citations
+    if (citations.length > 0) {
+      for (const citation of citations) {
+        if (!result.facebook_url && citation.includes('facebook.com/')) {
+          result.facebook_url = citation;
+        }
+        if (!result.linkedin_url && citation.includes('linkedin.com/company/')) {
+          result.linkedin_url = citation;
+        }
+        if (!result.instagram_handle && citation.includes('instagram.com/')) {
+          const igMatch = citation.match(/instagram\.com\/([^\/?]+)/);
+          if (igMatch) {
+            result.instagram_handle = `@${igMatch[1]}`;
+          }
+        }
+        if (!result.twitter_handle && (citation.includes('twitter.com/') || citation.includes('x.com/'))) {
+          const twMatch = citation.match(/(?:twitter\.com|x\.com)\/([^\/?]+)/);
+          if (twMatch) {
+            result.twitter_handle = `@${twMatch[1]}`;
+          }
+        }
+        // Try to get website from non-social citations
+        if (!result.website_url && 
+            !citation.includes('facebook.com') && 
+            !citation.includes('instagram.com') && 
+            !citation.includes('twitter.com') && 
+            !citation.includes('x.com') && 
+            !citation.includes('linkedin.com') &&
+            !citation.includes('yelp.com') &&
+            !citation.includes('tripadvisor.com') &&
+            citation.startsWith('https://')) {
+          result.website_url = citation;
+        }
+      }
+    }
+
+    console.log(`Social discovery results: website=${result.website_url}, instagram=${result.instagram_handle}, facebook=${result.facebook_url}, twitter=${result.twitter_handle}, linkedin=${result.linkedin_url}`);
+    return result;
+
+  } catch (error) {
+    console.error('Social discovery error:', error);
+    return result;
   }
 }
 
@@ -128,8 +304,37 @@ serve(async (req) => {
     let instagramData: any = null;
     let aiAnalysis: any = null;
     let perplexityData: { description: PerplexityResult; founder: PerplexityResult; news: PerplexityResult; leadership: PerplexityResult } | null = null;
+    
+    // Initialize discovered social data
+    let discoveredSocial: DiscoveredSocialData = {
+      website_url: null,
+      instagram_handle: null,
+      facebook_url: null,
+      twitter_handle: null,
+      linkedin_url: null
+    };
 
     try {
+      // ========== STEP 0: Social Media Discovery ==========
+      console.log('Step 0: Discovering social media presence...');
+      if (PERPLEXITY_API_KEY) {
+        discoveredSocial = await discoverSocialMedia(row.club_name, PERPLEXITY_API_KEY);
+        totalCost += 0.005; // Perplexity sonar query
+        
+        // Enhance input data with discovered values
+        if (!row.website_url || row.website_url === 'https://placeholder.com' || row.website_url === '') {
+          if (discoveredSocial.website_url) {
+            console.log(`Using discovered website URL: ${discoveredSocial.website_url}`);
+            row.website_url = discoveredSocial.website_url;
+          }
+        }
+        if (!row.instagram_handle && discoveredSocial.instagram_handle) {
+          console.log(`Using discovered Instagram handle: ${discoveredSocial.instagram_handle}`);
+          row.instagram_handle = discoveredSocial.instagram_handle;
+        }
+      } else {
+        console.log('Step 0: Skipping social discovery (no Perplexity API key)');
+      }
       // ========== STEP 1: Website Scrape (Firecrawl markdown) ==========
       console.log('Step 1: Scraping website content...');
       try {
@@ -549,9 +754,9 @@ Return ONLY valid JSON in this exact format:
           address,
           phone,
           email,
-          facebook_url: socialMedia.facebook_url || null,
-          twitter_handle: socialMedia.twitter_handle || null,
-          linkedin_url: socialMedia.linkedin_url || null,
+          facebook_url: discoveredSocial.facebook_url || socialMedia.facebook_url || null,
+          twitter_handle: discoveredSocial.twitter_handle || socialMedia.twitter_handle || null,
+          linkedin_url: discoveredSocial.linkedin_url || socialMedia.linkedin_url || null,
           color_palette: brandingData?.colors || {},
           fonts: {
             primary: brandingData?.typography?.fontFamilies?.primary || null,
