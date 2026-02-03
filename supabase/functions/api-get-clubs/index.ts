@@ -39,16 +39,19 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Build query
+    // Build query - return ALL enriched_clubs fields for external systems
     let query = supabase
       .from('enriched_clubs')
       .select(`
         id,
+        job_id,
+        enrichment_row_id,
         club_name,
         website_url,
         instagram_handle,
         instagram_followers,
         instagram_bio,
+        instagram_profile_pic_url,
         description,
         email,
         phone,
@@ -63,6 +66,10 @@ serve(async (req) => {
         founding_year,
         recent_activities,
         perplexity_citations,
+        key_people,
+        raw_branding_data,
+        raw_instagram_data,
+        scraped_content,
         created_at,
         updated_at
       `);
