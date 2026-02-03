@@ -228,8 +228,8 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
                   </div>
                 </div>
 
-                {/* Instagram section */}
-                {selectedClub.instagram_handle && (
+                {/* Instagram section - show if handle OR url exists */}
+                {(selectedClub.instagram_handle || selectedClub.instagram_url) && (
                   <div className="p-4 rounded-xl neu-pressed">
                     <div className="flex items-center gap-3">
                       {selectedClub.instagram_profile_pic_url ? (
@@ -243,14 +243,28 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
                           <Instagram className="h-6 w-6 text-white" />
                         </div>
                       )}
-                      <div>
-                        <p className="font-medium">{selectedClub.instagram_handle}</p>
+                      <div className="flex-1 min-w-0">
+                        {selectedClub.instagram_handle ? (
+                          <p className="font-medium">{selectedClub.instagram_handle}</p>
+                        ) : selectedClub.instagram_url ? (
+                          <a 
+                            href={selectedClub.instagram_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-primary hover:underline truncate block"
+                          >
+                            {selectedClub.instagram_url.replace(/^https?:\/\/(www\.)?instagram\.com\//, '@').replace(/\/$/, '')}
+                          </a>
+                        ) : null}
                         {selectedClub.instagram_followers && (
                           <p className="text-sm text-muted-foreground">
                             {selectedClub.instagram_followers.toLocaleString()} followers
                           </p>
                         )}
                       </div>
+                      {selectedClub.instagram_url && !selectedClub.instagram_handle && (
+                        <Badge variant="outline" className="text-xs">Discovered</Badge>
+                      )}
                     </div>
                     {selectedClub.instagram_bio && (
                       <p className="mt-3 text-sm text-muted-foreground">{selectedClub.instagram_bio}</p>
