@@ -457,6 +457,12 @@ Generate the following in JSON format:
    - "context": Brief context about them (1-2 sentences, e.g., background, how long they've been there, relevant experience)
    If no key people found, return empty array.
 
+9. SOCIAL_MEDIA (object): Extract any social media links found. Include:
+   - "facebook_url": Full Facebook page URL (e.g., "https://facebook.com/clubname") or null
+   - "twitter_handle": Twitter/X handle with @ (e.g., "@clubname") or full URL, or null
+   - "linkedin_url": Full LinkedIn company page URL or null
+   If none found, return object with null values.
+
 Return ONLY valid JSON in this exact format:
 {
   "description": "...",
@@ -466,7 +472,8 @@ Return ONLY valid JSON in this exact format:
   "founder_info": "..." or null,
   "founding_year": "..." or null,
   "recent_activities": [{"title": "...", "date": "..."}] or [],
-  "key_people": [{"name": "...", "role": "...", "context": "..."}] or []
+  "key_people": [{"name": "...", "role": "...", "context": "..."}] or [],
+  "social_media": {"facebook_url": null, "twitter_handle": null, "linkedin_url": null}
 }`;
 
         const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
@@ -516,6 +523,16 @@ Return ONLY valid JSON in this exact format:
       const phoneMatch = scrapedContent.match(/\+?[\d\s()-]{10,}/);
       if (phoneMatch) phone = phoneMatch[0].trim();
 
+      // Build Instagram URL from handle
+      let instagramUrl: string | null = null;
+      if (instagramHandle) {
+        const cleanHandle = instagramHandle.replace('@', '');
+        instagramUrl = `https://instagram.com/${cleanHandle}`;
+      }
+
+      // Extract social media from AI analysis
+      const socialMedia = aiAnalysis?.social_media || {};
+
       const { error: insertError } = await supabase
         .from('enriched_clubs')
         .insert({
@@ -524,6 +541,7 @@ Return ONLY valid JSON in this exact format:
           club_name: row.club_name,
           website_url: row.website_url,
           instagram_handle: instagramHandle,
+          instagram_url: instagramUrl,
           logo_storage_url: logoStorageUrl,
           instagram_followers: instagramFollowers,
           instagram_bio: instagramBio,
@@ -531,6 +549,9 @@ Return ONLY valid JSON in this exact format:
           address,
           phone,
           email,
+          facebook_url: socialMedia.facebook_url || null,
+          twitter_handle: socialMedia.twitter_handle || null,
+          linkedin_url: socialMedia.linkedin_url || null,
           color_palette: brandingData?.colors || {},
           fonts: {
             primary: brandingData?.typography?.fontFamilies?.primary || null,

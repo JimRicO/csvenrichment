@@ -64,6 +64,7 @@ export type Database = {
           description: string | null
           email: string | null
           enrichment_row_id: string
+          facebook_url: string | null
           fonts: Json | null
           founder_info: string | null
           founding_year: string | null
@@ -72,8 +73,10 @@ export type Database = {
           instagram_followers: number | null
           instagram_handle: string | null
           instagram_profile_pic_url: string | null
+          instagram_url: string | null
           job_id: string
           key_people: Json | null
+          linkedin_url: string | null
           logo_storage_url: string | null
           perplexity_citations: Json | null
           perplexity_description: string | null
@@ -82,6 +85,7 @@ export type Database = {
           raw_instagram_data: Json | null
           recent_activities: Json | null
           scraped_content: string | null
+          twitter_handle: string | null
           updated_at: string
           website_url: string | null
         }
@@ -95,6 +99,7 @@ export type Database = {
           description?: string | null
           email?: string | null
           enrichment_row_id: string
+          facebook_url?: string | null
           fonts?: Json | null
           founder_info?: string | null
           founding_year?: string | null
@@ -103,8 +108,10 @@ export type Database = {
           instagram_followers?: number | null
           instagram_handle?: string | null
           instagram_profile_pic_url?: string | null
+          instagram_url?: string | null
           job_id: string
           key_people?: Json | null
+          linkedin_url?: string | null
           logo_storage_url?: string | null
           perplexity_citations?: Json | null
           perplexity_description?: string | null
@@ -113,6 +120,7 @@ export type Database = {
           raw_instagram_data?: Json | null
           recent_activities?: Json | null
           scraped_content?: string | null
+          twitter_handle?: string | null
           updated_at?: string
           website_url?: string | null
         }
@@ -126,6 +134,7 @@ export type Database = {
           description?: string | null
           email?: string | null
           enrichment_row_id?: string
+          facebook_url?: string | null
           fonts?: Json | null
           founder_info?: string | null
           founding_year?: string | null
@@ -134,8 +143,10 @@ export type Database = {
           instagram_followers?: number | null
           instagram_handle?: string | null
           instagram_profile_pic_url?: string | null
+          instagram_url?: string | null
           job_id?: string
           key_people?: Json | null
+          linkedin_url?: string | null
           logo_storage_url?: string | null
           perplexity_citations?: Json | null
           perplexity_description?: string | null
@@ -144,6 +155,7 @@ export type Database = {
           raw_instagram_data?: Json | null
           recent_activities?: Json | null
           scraped_content?: string | null
+          twitter_handle?: string | null
           updated_at?: string
           website_url?: string | null
         }
