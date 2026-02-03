@@ -119,20 +119,10 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
         </DialogHeader>
 
         <div className="flex h-[70vh]">
-          {/* Club list sidebar */}
-          <div className="w-64 border-r border-border/50 p-4">
-            <ScrollArea className="h-full">
-              {isLoading ? (
-                <div className="space-y-2">
-                  {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-12 w-full" />
-                  ))}
-                </div>
-              ) : clubs.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No enriched clubs yet
-                </p>
-              ) : (
+          {/* Club list sidebar - only show when multiple clubs */}
+          {!isLoading && clubs.length > 1 && (
+            <div className="w-64 border-r border-border/50 p-4">
+              <ScrollArea className="h-full">
                 <div className="space-y-1">
                   {clubs.map((club) => (
                     <button
@@ -162,13 +152,26 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
                     </button>
                   ))}
                 </div>
-              )}
-            </ScrollArea>
-          </div>
+              </ScrollArea>
+            </div>
+          )}
 
           {/* Club details */}
           <ScrollArea className="flex-1 p-6">
-            {selectedClub ? (
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="space-y-4 w-full max-w-md">
+                  <Skeleton className="h-20 w-20 rounded-xl" />
+                  <Skeleton className="h-8 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
+                  <Skeleton className="h-32 w-full" />
+                </div>
+              </div>
+            ) : clubs.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                No enriched clubs yet
+              </div>
+            ) : selectedClub ? (
               <div className="space-y-6">
                 {/* Header with logo */}
                 <div className="flex items-start gap-4">
