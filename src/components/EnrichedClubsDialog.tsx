@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
   Building2, Globe, Instagram, MapPin, Phone, Mail, Palette, Type, 
-  MessageSquare, Sparkles, Eye, User, Calendar, Activity, Link2, ChevronDown 
+  MessageSquare, Sparkles, Eye, User, Calendar, Activity, Link2, ChevronDown, Users 
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +15,12 @@ interface RecentActivity {
   title: string;
   date?: string;
   source?: string;
+}
+
+interface KeyPerson {
+  name: string;
+  role: string;
+  context?: string;
 }
 
 interface EnrichedClub {
@@ -39,6 +45,7 @@ interface EnrichedClub {
   founding_year: string | null;
   recent_activities: RecentActivity[];
   perplexity_citations: string[];
+  key_people: KeyPerson[];
   created_at: string;
 }
 
@@ -78,6 +85,9 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
             : []),
           perplexity_citations: (Array.isArray(club.perplexity_citations) 
             ? club.perplexity_citations as unknown as string[] 
+            : []),
+          key_people: (Array.isArray(club.key_people) 
+            ? club.key_people as unknown as KeyPerson[] 
             : [])
         })) as EnrichedClub[];
         
@@ -349,6 +359,34 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
                       Founder & Background
                     </h3>
                     <p className="text-sm p-4 rounded-xl neu-pressed">{selectedClub.founder_info}</p>
+                  </div>
+                )}
+
+                {/* Key People */}
+                {selectedClub.key_people && selectedClub.key_people.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium flex items-center gap-2">
+                      <Users className="h-4 w-4 text-primary" />
+                      Key People
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {selectedClub.key_people.map((person, idx) => (
+                        <div key={idx} className="p-3 rounded-lg neu-subtle">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                              <User className="h-4 w-4 text-primary" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{person.name}</p>
+                              <p className="text-xs text-primary">{person.role}</p>
+                            </div>
+                          </div>
+                          {person.context && (
+                            <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{person.context}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 

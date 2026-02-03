@@ -127,7 +127,7 @@ serve(async (req) => {
     let brandingData: any = null;
     let instagramData: any = null;
     let aiAnalysis: any = null;
-    let perplexityData: { description: PerplexityResult; founder: PerplexityResult; news: PerplexityResult } | null = null;
+    let perplexityData: { description: PerplexityResult; founder: PerplexityResult; news: PerplexityResult; leadership: PerplexityResult } | null = null;
 
     try {
       // ========== STEP 1: Website Scrape (Firecrawl markdown) ==========
@@ -353,28 +353,31 @@ serve(async (req) => {
       if (PERPLEXITY_API_KEY) {
         console.log('Step 4: Running Perplexity web searches...');
         try {
-          // Run 3 parallel searches for speed
-          const [descriptionResult, founderResult, newsResult] = await Promise.all([
+          // Run 4 parallel searches for speed
+          const [descriptionResult, founderResult, newsResult, leadershipResult] = await Promise.all([
             searchPerplexity(`What is ${row.club_name}? Provide a brief description of this business/club.`, PERPLEXITY_API_KEY),
             searchPerplexity(`${row.club_name} founder history background origin story. Who founded it and when?`, PERPLEXITY_API_KEY),
-            searchPerplexity(`${row.club_name} recent news events activities 2025 2024. What have they done recently?`, PERPLEXITY_API_KEY)
+            searchPerplexity(`${row.club_name} recent news events activities 2025 2024. What have they done recently?`, PERPLEXITY_API_KEY),
+            searchPerplexity(`${row.club_name} owner CEO management team leadership key people principal director. Who runs or owns it?`, PERPLEXITY_API_KEY)
           ]);
 
           perplexityData = {
             description: descriptionResult,
             founder: founderResult,
-            news: newsResult
+            news: newsResult,
+            leadership: leadershipResult
           };
 
           // Collect all unique citations
           allCitations = [...new Set([
             ...descriptionResult.citations,
             ...founderResult.citations,
-            ...newsResult.citations
+            ...newsResult.citations,
+            ...leadershipResult.citations
           ])];
 
           console.log(`Perplexity searches completed. Found ${allCitations.length} citations.`);
-          totalCost += 0.02; // ~$0.005-0.01 per search x 3
+          totalCost += 0.025; // ~$0.005-0.01 per search x 4
         } catch (perplexityError) {
           console.error('Perplexity search error:', perplexityError);
         }
@@ -408,6 +411,9 @@ ${perplexityData.founder.content || 'No founder information found'}
 
 Recent News & Activities (from web search):
 ${perplexityData.news.content || 'No recent news found'}
+
+Leadership & Key People (from web search):
+${perplexityData.leadership?.content || 'No leadership information found'}
 `;
         }
 
@@ -445,6 +451,12 @@ Generate the following in JSON format:
 
 7. RECENT_ACTIVITIES (array): Up to 5 recent activities, events, or news items. Each should have a "title" (brief description) and optional "date" (if mentioned). If none found, return empty array.
 
+8. KEY_PEOPLE (array): Key individuals associated with the business - owners, principals, co-owners, CEO, directors, general managers, head coaches, or other leadership. For each person include:
+   - "name": Full name
+   - "role": Their position/title (e.g., "Owner", "CEO", "Co-Founder", "General Manager", "Head Coach")
+   - "context": Brief context about them (1-2 sentences, e.g., background, how long they've been there, relevant experience)
+   If no key people found, return empty array.
+
 Return ONLY valid JSON in this exact format:
 {
   "description": "...",
@@ -453,7 +465,8 @@ Return ONLY valid JSON in this exact format:
   "perplexity_description": "..." or null,
   "founder_info": "..." or null,
   "founding_year": "..." or null,
-  "recent_activities": [{"title": "...", "date": "..."}] or []
+  "recent_activities": [{"title": "...", "date": "..."}] or [],
+  "key_people": [{"name": "...", "role": "...", "context": "..."}] or []
 }`;
 
         const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
@@ -531,6 +544,7 @@ Return ONLY valid JSON in this exact format:
           founder_info: aiAnalysis?.founder_info || null,
           founding_year: aiAnalysis?.founding_year || null,
           recent_activities: aiAnalysis?.recent_activities || [],
+          key_people: aiAnalysis?.key_people || [],
           perplexity_citations: allCitations,
           raw_branding_data: brandingData || {},
           raw_instagram_data: instagramData || {},

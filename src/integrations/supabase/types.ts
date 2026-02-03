@@ -73,6 +73,7 @@ export type Database = {
           instagram_handle: string | null
           instagram_profile_pic_url: string | null
           job_id: string
+          key_people: Json | null
           logo_storage_url: string | null
           perplexity_citations: Json | null
           perplexity_description: string | null
@@ -103,6 +104,7 @@ export type Database = {
           instagram_handle?: string | null
           instagram_profile_pic_url?: string | null
           job_id: string
+          key_people?: Json | null
           logo_storage_url?: string | null
           perplexity_citations?: Json | null
           perplexity_description?: string | null
@@ -133,6 +135,7 @@ export type Database = {
           instagram_handle?: string | null
           instagram_profile_pic_url?: string | null
           job_id?: string
+          key_people?: Json | null
           logo_storage_url?: string | null
           perplexity_citations?: Json | null
           perplexity_description?: string | null
