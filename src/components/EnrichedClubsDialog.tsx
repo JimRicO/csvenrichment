@@ -31,7 +31,13 @@ interface KeyPerson {
 
 interface VisualDNAData {
   color_palette?: string[];
-  photography_style?: string;
+  photography_style?: string | {
+    primary_style?: string;
+    secondary_style?: string | null;
+    lighting?: string;
+    saturation?: string;
+    contrast?: string;
+  };
   composition_patterns?: string[];
   branding_elements?: {
     logo_visible?: boolean;

@@ -16,7 +16,13 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
  
  interface VisualDNA {
    color_palette?: string[];
-   photography_style?: string;
+  photography_style?: string | {
+    primary_style?: string;
+    secondary_style?: string | null;
+    lighting?: string;
+    saturation?: string;
+    contrast?: string;
+  };
    composition_patterns?: string[];
    branding_elements?: {
      logo_visible?: boolean;
@@ -549,14 +555,44 @@ const PostingFrequencyBreakdown = ({ details }: {
        )}
  
        {/* Section 3: Photography Style */}
-       {(visualDna?.photography_style || visualDna?.filter_style) && (
+      {(visualDna?.photography_style || visualDna?.filter_style || visualDna?.quality_assessment?.image_quality) && (
          <div>
            <SectionHeader icon={Camera} title="Photography Style" />
            <div className="flex flex-wrap gap-2">
-             {visualDna.photography_style && (
-               <Badge variant="default" className="text-sm capitalize">
-                 {visualDna.photography_style}
-               </Badge>
+            {visualDna?.photography_style && (
+              typeof visualDna.photography_style === 'string' ? (
+                <Badge variant="default" className="text-sm capitalize">
+                  {visualDna.photography_style}
+                </Badge>
+              ) : (
+                <>
+                  {visualDna.photography_style.primary_style && (
+                    <Badge variant="default" className="text-sm capitalize">
+                      {visualDna.photography_style.primary_style}
+                    </Badge>
+                  )}
+                  {visualDna.photography_style.secondary_style && (
+                    <Badge variant="secondary" className="text-sm capitalize">
+                      {visualDna.photography_style.secondary_style}
+                    </Badge>
+                  )}
+                  {visualDna.photography_style.lighting && (
+                    <Badge variant="outline" className="text-sm capitalize">
+                      {visualDna.photography_style.lighting} lighting
+                    </Badge>
+                  )}
+                  {visualDna.photography_style.saturation && (
+                    <Badge variant="outline" className="text-sm capitalize">
+                      {visualDna.photography_style.saturation} saturation
+                    </Badge>
+                  )}
+                  {visualDna.photography_style.contrast && (
+                    <Badge variant="outline" className="text-sm capitalize">
+                      {visualDna.photography_style.contrast} contrast
+                    </Badge>
+                  )}
+                </>
+              )
              )}
              {visualDna.filter_style && (
                <Badge variant="secondary" className="text-sm capitalize">
