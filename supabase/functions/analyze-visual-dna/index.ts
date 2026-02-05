@@ -94,8 +94,31 @@ interface ScoreFactor {
   weight: number;
 }
 
+interface PostingFrequencyWindow {
+  posts: number;
+  per_week: number;
+}
+
+interface PostingFrequencyDetails {
+  last_30_days: PostingFrequencyWindow;
+  last_90_days: PostingFrequencyWindow;
+  last_365_days: PostingFrequencyWindow;
+  all_time: PostingFrequencyWindow & { first_post: string | null; last_post: string | null };
+  trend: 'accelerating' | 'steady' | 'declining' | 'dormant';
+  last_post_date: string | null;
+  days_since_last_post: number | null;
+  longest_gap_days: number | null;
+}
+
+interface FrequencyScoreFactor {
+  value: string;
+  score: number;
+  weight: number;
+  details: PostingFrequencyDetails;
+}
+
 interface ScoreFactors {
-  posting_frequency: ScoreFactor;
+  posting_frequency: FrequencyScoreFactor;
   content_quality: ScoreFactor;
   brand_consistency: ScoreFactor;
   engagement_rate: ScoreFactor;
@@ -824,16 +847,29 @@ async function uploadImageToStorage(
    followersCount: number
 ): { score: number; category: string; factors: ScoreFactors } {
    
-   // 1. Posting Frequency (30% weight)
-   // Assume posts span ~90 days, calculate posts per week
-   const postsPerWeek = posts.length / 13; // ~90 days / 7
+   // 1. Posting Frequency (30% weight) - Multi-window analysis
+   const now = new Date();
+   const frequencyDetails = calculatePostingFrequency(posts, now);
+   
+   // Use last 90 days frequency as primary input for scoring
+   const postsPerWeek = frequencyDetails.last_90_days.per_week;
    let frequencyScore = 0;
-  let frequencyValue = `${postsPerWeek.toFixed(1)}/week`;
-   if (postsPerWeek >= 5) frequencyScore = 100;
+   
+   // If dormant (no posts in 30 days), heavily penalize
+   if (frequencyDetails.trend === 'dormant') {
+     frequencyScore = 5;
+   } else if (postsPerWeek >= 5) frequencyScore = 100;
    else if (postsPerWeek >= 3) frequencyScore = 75;
    else if (postsPerWeek >= 2) frequencyScore = 50;
    else if (postsPerWeek >= 1) frequencyScore = 30;
    else if (postsPerWeek >= 0.5) frequencyScore = 15;
+   else frequencyScore = 5;
+   
+   // Build display value showing 90-day stats with trend
+   const trendArrow = frequencyDetails.trend === 'accelerating' ? '↑' : 
+                      frequencyDetails.trend === 'declining' ? '↓' : 
+                      frequencyDetails.trend === 'dormant' ? '⏸' : '→';
+   const frequencyValue = `${postsPerWeek.toFixed(2)}/wk (${frequencyDetails.last_90_days.posts} in 90d) ${trendArrow}`;
    
    // 2. Content Quality (25% weight)
    let qualityScore = 55; // default to mixed
@@ -900,7 +936,12 @@ async function uploadImageToStorage(
    else category = 'Invisible';
    
   const factors: ScoreFactors = {
-    posting_frequency: { value: frequencyValue, score: frequencyScore, weight: 30 },
+    posting_frequency: { 
+      value: frequencyValue, 
+      score: frequencyScore, 
+      weight: 30,
+      details: frequencyDetails
+    },
     content_quality: { value: qualityValue, score: qualityScore, weight: 25 },
     brand_consistency: { value: `${consistencyValue}/10`, score: consistencyScore, weight: 20 },
     engagement_rate: { value: `${engagementValue.toFixed(1)}%`, score: engagementScore, weight: 15 },
@@ -910,6 +951,92 @@ async function uploadImageToStorage(
   return { score: finalScore, category, factors };
  }
  
+ // Calculate posting frequency across multiple time windows
+ function calculatePostingFrequency(posts: Post[], now: Date): PostingFrequencyDetails {
+   // Parse timestamps and sort by date descending
+   const postsWithDates = posts
+     .map(p => ({ ...p, date: new Date(p.timestamp) }))
+     .filter(p => !isNaN(p.date.getTime()))
+     .sort((a, b) => b.date.getTime() - a.date.getTime());
+   
+   if (postsWithDates.length === 0) {
+     return {
+       last_30_days: { posts: 0, per_week: 0 },
+       last_90_days: { posts: 0, per_week: 0 },
+       last_365_days: { posts: 0, per_week: 0 },
+       all_time: { posts: 0, per_week: 0, first_post: null, last_post: null },
+       trend: 'dormant',
+       last_post_date: null,
+       days_since_last_post: null,
+       longest_gap_days: null
+     };
+   }
+   
+   const lastPost = postsWithDates[0].date;
+   const firstPost = postsWithDates[postsWithDates.length - 1].date;
+   
+   // Calculate days since last post
+   const daysSinceLastPost = Math.floor((now.getTime() - lastPost.getTime()) / (1000 * 60 * 60 * 24));
+   
+   // Define window cutoffs
+   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+   const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+   const yearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+   
+   // Count posts in each window
+   const postsLast30 = postsWithDates.filter(p => p.date >= thirtyDaysAgo).length;
+   const postsLast90 = postsWithDates.filter(p => p.date >= ninetyDaysAgo).length;
+   const postsLast365 = postsWithDates.filter(p => p.date >= yearAgo).length;
+   const postsAllTime = postsWithDates.length;
+   
+   // Calculate posts per week for each window
+   const perWeek30 = postsLast30 / (30 / 7);
+   const perWeek90 = postsLast90 / (90 / 7);
+   const perWeek365 = postsLast365 / (365 / 7);
+   
+   // Calculate all-time per week based on actual span
+   const totalDays = Math.max(1, Math.floor((lastPost.getTime() - firstPost.getTime()) / (1000 * 60 * 60 * 24)));
+   const perWeekAllTime = postsAllTime / Math.max(1, totalDays / 7);
+   
+   // Calculate longest gap between consecutive posts
+   let longestGap = 0;
+   for (let i = 0; i < postsWithDates.length - 1; i++) {
+     const gap = Math.floor((postsWithDates[i].date.getTime() - postsWithDates[i + 1].date.getTime()) / (1000 * 60 * 60 * 24));
+     longestGap = Math.max(longestGap, gap);
+   }
+   
+   // Determine trend by comparing 30-day rate to 90-day rate
+   let trend: 'accelerating' | 'steady' | 'declining' | 'dormant';
+   
+   if (daysSinceLastPost > 30) {
+     trend = 'dormant';
+   } else if (perWeek90 === 0) {
+     // No posts in 90 days but some in 30 days = accelerating (just started)
+     trend = perWeek30 > 0 ? 'accelerating' : 'dormant';
+   } else {
+     const ratio = perWeek30 / perWeek90;
+     if (ratio > 1.2) trend = 'accelerating';
+     else if (ratio < 0.8) trend = 'declining';
+     else trend = 'steady';
+   }
+   
+   return {
+     last_30_days: { posts: postsLast30, per_week: Number(perWeek30.toFixed(2)) },
+     last_90_days: { posts: postsLast90, per_week: Number(perWeek90.toFixed(2)) },
+     last_365_days: { posts: postsLast365, per_week: Number(perWeek365.toFixed(2)) },
+     all_time: { 
+       posts: postsAllTime, 
+       per_week: Number(perWeekAllTime.toFixed(2)),
+       first_post: firstPost.toISOString().split('T')[0],
+       last_post: lastPost.toISOString().split('T')[0]
+     },
+     trend,
+     last_post_date: lastPost.toISOString().split('T')[0],
+     days_since_last_post: daysSinceLastPost,
+     longest_gap_days: longestGap
+   };
+ }
+
  async function scrapeInstagramWithApify(
    handle: string,
    supabase: any,

@@ -73,7 +73,21 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
   mediaUrls?: string[];
   /** Score breakdown factors from the analysis */
   scoreFactors?: {
-    posting_frequency?: { value: string; score: number; weight: number };
+    posting_frequency?: { 
+      value: string; 
+      score: number; 
+      weight: number;
+      details?: {
+        last_30_days?: { posts: number; per_week: number };
+        last_90_days?: { posts: number; per_week: number };
+        last_365_days?: { posts: number; per_week: number };
+        all_time?: { posts: number; per_week: number; first_post: string | null; last_post: string | null };
+        trend?: 'accelerating' | 'steady' | 'declining' | 'dormant';
+        last_post_date?: string | null;
+        days_since_last_post?: number | null;
+        longest_gap_days?: number | null;
+      };
+    };
     content_quality?: { value: string; score: number; weight: number };
     brand_consistency?: { value: string; score: number; weight: number };
     engagement_rate?: { value: string; score: number; weight: number };
@@ -99,20 +113,138 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
    </h4>
  );
  
+const getTrendIcon = (trend?: string) => {
+  switch (trend) {
+    case 'accelerating': return { icon: '↑', color: 'text-green-500', label: 'Accelerating' };
+    case 'declining': return { icon: '↓', color: 'text-orange-500', label: 'Declining' };
+    case 'dormant': return { icon: '⏸', color: 'text-red-500', label: 'Dormant' };
+    case 'steady': return { icon: '→', color: 'text-blue-500', label: 'Steady' };
+    default: return { icon: '—', color: 'text-muted-foreground', label: 'Unknown' };
+  }
+};
+
+const PostingFrequencyBreakdown = ({ details }: { 
+  details?: {
+    last_30_days?: { posts: number; per_week: number };
+    last_90_days?: { posts: number; per_week: number };
+    last_365_days?: { posts: number; per_week: number };
+    all_time?: { posts: number; per_week: number; first_post: string | null; last_post: string | null };
+    trend?: 'accelerating' | 'steady' | 'declining' | 'dormant';
+    last_post_date?: string | null;
+    days_since_last_post?: number | null;
+    longest_gap_days?: number | null;
+  };
+}) => {
+  if (!details) return null;
+  
+  const trendInfo = getTrendIcon(details.trend);
+  
+  return (
+    <div className="mt-3 p-3 bg-muted/20 rounded-lg space-y-3">
+      <h6 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Posting Frequency Analysis</h6>
+      
+      {/* Frequency Timeline Table */}
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="flex items-center justify-between p-2 bg-muted/30 rounded">
+          <span className="text-muted-foreground">Last 30 days</span>
+          <span className="font-mono font-medium">
+            {details.last_30_days?.posts ?? 0} posts ({details.last_30_days?.per_week?.toFixed(2) ?? '0.00'}/wk)
+          </span>
+        </div>
+        <div className="flex items-center justify-between p-2 bg-primary/10 rounded border border-primary/20">
+          <span className="text-muted-foreground">Last 90 days</span>
+          <span className="font-mono font-medium text-primary">
+            {details.last_90_days?.posts ?? 0} posts ({details.last_90_days?.per_week?.toFixed(2) ?? '0.00'}/wk)
+          </span>
+        </div>
+        <div className="flex items-center justify-between p-2 bg-muted/30 rounded">
+          <span className="text-muted-foreground">Last 12 months</span>
+          <span className="font-mono font-medium">
+            {details.last_365_days?.posts ?? 0} posts ({details.last_365_days?.per_week?.toFixed(2) ?? '0.00'}/wk)
+          </span>
+        </div>
+        <div className="flex items-center justify-between p-2 bg-muted/30 rounded">
+          <span className="text-muted-foreground">All time</span>
+          <span className="font-mono font-medium">
+            {details.all_time?.posts ?? 0} posts ({details.all_time?.per_week?.toFixed(2) ?? '0.00'}/wk)
+          </span>
+        </div>
+      </div>
+      
+      {/* Key Metrics Row */}
+      <div className="flex flex-wrap gap-3 pt-2 border-t border-border/30">
+        <div className="flex items-center gap-1.5">
+          <span className={`text-lg font-bold ${trendInfo.color}`}>{trendInfo.icon}</span>
+          <span className="text-sm">
+            <span className="text-muted-foreground">Trend:</span>{' '}
+            <span className={`font-medium ${trendInfo.color}`}>{trendInfo.label}</span>
+          </span>
+        </div>
+        
+        {details.days_since_last_post !== null && details.days_since_last_post !== undefined && (
+          <div className="text-sm">
+            <span className="text-muted-foreground">Last post:</span>{' '}
+            <span className={cn(
+              "font-medium",
+              details.days_since_last_post > 30 ? "text-red-500" : 
+              details.days_since_last_post > 14 ? "text-orange-500" : "text-foreground"
+            )}>
+              {details.days_since_last_post === 0 ? 'Today' : 
+               details.days_since_last_post === 1 ? 'Yesterday' : 
+               `${details.days_since_last_post} days ago`}
+            </span>
+          </div>
+        )}
+        
+        {details.longest_gap_days !== null && details.longest_gap_days !== undefined && details.longest_gap_days > 0 && (
+          <div className="text-sm">
+            <span className="text-muted-foreground">Longest gap:</span>{' '}
+            <span className={cn(
+              "font-medium",
+              details.longest_gap_days > 45 ? "text-red-500" : 
+              details.longest_gap_days > 21 ? "text-orange-500" : "text-foreground"
+            )}>
+              {details.longest_gap_days} days
+            </span>
+          </div>
+        )}
+      </div>
+      
+      {/* Sales Insight Summary */}
+      {(details.last_30_days || details.last_90_days || details.longest_gap_days) && (
+        <div className="text-xs text-muted-foreground italic border-t border-border/30 pt-2">
+          {details.last_30_days && details.last_30_days.posts < 4 && (
+            <p>• Posted only {details.last_30_days.posts} time{details.last_30_days.posts !== 1 ? 's' : ''} this month</p>
+          )}
+          {details.last_90_days && details.last_90_days.per_week < 1 && (
+            <p>• Averaging less than 1 post per week</p>
+          )}
+          {details.longest_gap_days && details.longest_gap_days > 21 && (
+            <p>• Went silent for {details.longest_gap_days} days straight</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
  const ScoreFactorRow = ({ 
    label, 
    value, 
    score, 
    weight,
-   maxScore = 100 
+  maxScore = 100,
+  children
  }: { 
    label: string; 
    value: string; 
    score: number; 
    weight: string;
    maxScore?: number;
+  children?: React.ReactNode;
  }) => (
-   <div className="flex items-center justify-between py-2 border-b border-border/20 last:border-0">
+  <div className="py-2 border-b border-border/20 last:border-0">
+    <div className="flex items-center justify-between">
      <div className="flex items-center gap-2">
        <span className="text-sm text-foreground">{label}</span>
        <span className="text-xs text-muted-foreground">({weight})</span>
@@ -128,6 +260,8 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
        <span className="text-xs font-mono text-muted-foreground w-8">{score}</span>
      </div>
    </div>
+    {children}
+  </div>
  );
  
  const ContentMixChart = ({ mix }: { mix: Record<string, number> }) => {
@@ -357,7 +491,9 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
              value={scoreFactors?.posting_frequency?.value ?? "—"} 
              score={scoreFactors?.posting_frequency?.score ?? 0} 
              weight={`${scoreFactors?.posting_frequency?.weight ?? 30}%`} 
-           />
+           >
+             <PostingFrequencyBreakdown details={scoreFactors?.posting_frequency?.details} />
+           </ScoreFactorRow>
            <ScoreFactorRow 
              label="Content Quality" 
              value={scoreFactors?.content_quality?.value ?? "—"} 
