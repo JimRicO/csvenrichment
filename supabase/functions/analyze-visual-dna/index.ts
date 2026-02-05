@@ -16,10 +16,10 @@
 // Model names
 // NOTE: These providers return 404 if a model ID is not available for your API key.
 // Keep a primary + fallback so the pipeline still runs if a newer model isn't enabled.
-const CLAUDE_MODEL_PRIMARY = 'claude-sonnet-4-5-20250514';
-const CLAUDE_MODEL_FALLBACK = 'claude-3-5-sonnet-20241022';
+const CLAUDE_MODEL_PRIMARY = 'claude-sonnet-4-5-20250929';
+const CLAUDE_MODEL_FALLBACK = 'claude-sonnet-4-5-20250929';
 
-const GEMINI_MODEL_PRIMARY = 'gemini-2.5-flash-preview-04-17';
+const GEMINI_MODEL_PRIMARY = 'gemini-2.0-flash';
 const GEMINI_MODEL_FALLBACK = 'gemini-2.0-flash';
 
  // Target max width for resized images (keeps payload manageable)
