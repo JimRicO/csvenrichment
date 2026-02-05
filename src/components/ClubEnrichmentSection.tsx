@@ -46,6 +46,10 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
   const [reportClubId, setReportClubId] = useState<string | null>(null);
   const [lastProof, setLastProof] = useState<any | null>(null);
 
+  // Direct Instagram analysis state
+  const [directInstagramHandle, setDirectInstagramHandle] = useState("");
+  const [isAnalyzingDirect, setIsAnalyzingDirect] = useState(false);
+
   const fetchExistingClubs = async () => {
     setIsLoadingClubs(true);
     try {
@@ -109,6 +113,52 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
       });
     } finally {
       setAnalyzingClubId(null);
+    }
+  };
+
+  const handleDirectVisualDna = async () => {
+    const handle = directInstagramHandle.trim().replace('@', '');
+    if (!handle) {
+      toast({
+        title: "Missing Instagram Handle",
+        description: "Please enter an Instagram handle to analyze",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsAnalyzingDirect(true);
+    
+    toast({
+      title: "Step 1/5: Scraping Instagram",
+      description: `Fetching fresh posts for @${handle}...`,
+    });
+
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-visual-dna', {
+        body: { instagram_handle: handle },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "✓ Visual DNA Complete",
+        description: `@${handle}: ${data.invisibility_score}/100 (${data.invisibility_category}) • ${data.images_analyzed || 0}/12 images analyzed`,
+      });
+
+      setLastProof(data);
+      setReportClubId(null); // No club ID for direct analysis
+      setReportOpen(true);
+      setDirectInstagramHandle("");
+    } catch (err) {
+      console.error('Direct Visual DNA error:', err);
+      toast({
+        title: "Analysis Failed",
+        description: err instanceof Error ? err.message : "Failed to analyze visual DNA.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzingDirect(false);
     }
   };
 
@@ -499,82 +549,122 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
         </div>
 
         {/* Expandable clubs list */}
-        {showVisualDnaSection && (
+        {showVisualDnaSection && existingClubs.length > 0 && (
           <div className="mt-4 space-y-2">
-            {existingClubs.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground text-sm neu-pressed rounded-lg">
-                No enriched clubs with Instagram handles found. Run enrichment first.
-              </div>
-            ) : (
-              <div className="rounded-lg neu-pressed p-3 max-h-80 overflow-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border/50">
-                      <th className="text-left py-2 px-3">Club Name</th>
-                      <th className="text-left py-2 px-3">Instagram</th>
-                      <th className="text-left py-2 px-3">Score</th>
-                      <th className="text-right py-2 px-3">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {existingClubs.map((club) => (
-                      <tr key={club.id} className="border-b border-border/30 last:border-0">
-                        <td className="py-2 px-3 font-medium">{club.club_name}</td>
-                        <td className="py-2 px-3 text-muted-foreground">
-                          @{club.instagram_handle?.replace('@', '')}
-                        </td>
-                        <td className="py-2 px-3">
-                          {club.invisibility_score !== null ? (
-                            <Badge className={`text-xs ${getScoreBadgeColor(club.invisibility_category)}`}>
-                              {club.invisibility_score}/100 • {club.invisibility_category}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">Not analyzed</span>
-                          )}
-                        </td>
-                        <td className="py-2 px-3 text-right">
-                          <div className="inline-flex items-center gap-2">
-                            {(club.visual_dna_analyzed_at || club.invisibility_score !== null) && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  setLastProof(null);
-                                  setReportClubId(club.id);
-                                  setReportOpen(true);
-                                }}
-                              >
-                                View
-                              </Button>
-                            )}
+            <div className="rounded-lg neu-pressed p-3 max-h-80 overflow-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border/50">
+                    <th className="text-left py-2 px-3">Club Name</th>
+                    <th className="text-left py-2 px-3">Instagram</th>
+                    <th className="text-left py-2 px-3">Score</th>
+                    <th className="text-right py-2 px-3">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {existingClubs.map((club) => (
+                    <tr key={club.id} className="border-b border-border/30 last:border-0">
+                      <td className="py-2 px-3 font-medium">{club.club_name}</td>
+                      <td className="py-2 px-3 text-muted-foreground">
+                        @{club.instagram_handle?.replace('@', '')}
+                      </td>
+                      <td className="py-2 px-3">
+                        {club.invisibility_score !== null ? (
+                          <Badge className={`text-xs ${getScoreBadgeColor(club.invisibility_category)}`}>
+                            {club.invisibility_score}/100 • {club.invisibility_category}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">Not analyzed</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-3 text-right">
+                        <div className="inline-flex items-center gap-2">
+                          {(club.visual_dna_analyzed_at || club.invisibility_score !== null) && (
                             <Button
                               size="sm"
-                              variant={club.invisibility_score !== null ? "outline" : "default"}
-                              onClick={() => handleAnalyzeVisualDna(club.id, club.club_name)}
-                              disabled={analyzingClubId === club.id}
+                              variant="ghost"
+                              onClick={() => {
+                                setLastProof(null);
+                                setReportClubId(club.id);
+                                setReportOpen(true);
+                              }}
                             >
-                              {analyzingClubId === club.id ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : club.invisibility_score !== null ? (
-                                <>
-                                  <RefreshCw className="h-3 w-3 mr-1" />
-                                  Re-analyze
-                                </>
-                              ) : (
-                                <>
-                                  <Dna className="h-3 w-3 mr-1" />
-                                  Analyze
-                                </>
-                              )}
+                              View
                             </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          )}
+                          <Button
+                            size="sm"
+                            variant={club.invisibility_score !== null ? "outline" : "default"}
+                            onClick={() => handleAnalyzeVisualDna(club.id, club.club_name)}
+                            disabled={analyzingClubId === club.id}
+                          >
+                            {analyzingClubId === club.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : club.invisibility_score !== null ? (
+                              <>
+                                <RefreshCw className="h-3 w-3 mr-1" />
+                                Re-analyze
+                              </>
+                            ) : (
+                              <>
+                                <Dna className="h-3 w-3 mr-1" />
+                                Analyze
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Direct Instagram Handle Input */}
+        {showVisualDnaSection && (
+          <div className="mt-4 p-4 rounded-lg neu-pressed">
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <Label htmlFor="directInstagram" className="text-xs text-muted-foreground mb-1.5 block">
+                  Quick Analysis — Enter any Instagram handle
+                </Label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="directInstagram"
+                      placeholder="@instagram_handle"
+                      value={directInstagramHandle}
+                      onChange={(e) => setDirectInstagramHandle(e.target.value)}
+                      className="pl-9"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !isAnalyzingDirect) {
+                          handleDirectVisualDna();
+                        }
+                      }}
+                    />
+                  </div>
+                  <Button
+                    onClick={handleDirectVisualDna}
+                    disabled={isAnalyzingDirect || !directInstagramHandle.trim()}
+                  >
+                    {isAnalyzingDirect ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <Dna className="h-4 w-4 mr-2" />
+                        Analyze
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
-            )}
+            </div>
           </div>
         )}
       </div>
