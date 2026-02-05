@@ -17,11 +17,16 @@
 // Model names
 // NOTE: These providers return 404 if a model ID is not available for your API key.
 // Keep a primary + fallback so the pipeline still runs if a newer model isn't enabled.
-const CLAUDE_MODEL_PRIMARY = 'claude-sonnet-4-5-20250929';
-const CLAUDE_MODEL_FALLBACK = 'claude-sonnet-4-20250514';
+const CLAUDE_MODEL_PRIMARY = 'claude-sonnet-4-5-20250514';
+const CLAUDE_MODEL_FALLBACK = 'claude-3-5-sonnet-20241022';
 
-const GEMINI_MODEL_PRIMARY = 'gemini-2.5-flash';
+const GEMINI_MODEL_PRIMARY = 'gemini-2.5-flash-preview-04-17';
 const GEMINI_MODEL_FALLBACK = 'gemini-2.0-flash';
+
+// Max image size in bytes (800KB to stay well under 1MB limit)
+const MAX_IMAGE_SIZE_BYTES = 800 * 1024;
+// Max images to send to Gemini (reduced from 12 to avoid payload issues)
+const MAX_IMAGES_FOR_GEMINI = 6;
 
  interface Post {
    id: string;
@@ -111,6 +116,49 @@ const GEMINI_MODEL_FALLBACK = 'gemini-2.0-flash';
    return btoa(result);
  }
  
+// Check if base64 string is too large and needs to be skipped
+function isImageTooLarge(base64String: string): boolean {
+  // Base64 is ~33% larger than original, so estimate original size
+  const estimatedOriginalSize = (base64String.length * 3) / 4;
+  return estimatedOriginalSize > MAX_IMAGE_SIZE_BYTES;
+}
+
+// Extract JSON from a response that may contain markdown, thinking blocks, or preamble
+function extractJsonFromResponse(response: string): unknown {
+  if (!response) {
+    throw new Error("Empty response");
+  }
+
+  let cleaned = response.trim();
+  
+  // Remove markdown code blocks
+  cleaned = cleaned
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .trim();
+  
+  // Find JSON object boundaries
+  const jsonStart = cleaned.indexOf("{");
+  const jsonEnd = cleaned.lastIndexOf("}");
+  
+  if (jsonStart === -1 || jsonEnd === -1) {
+    throw new Error("No JSON object found in response");
+  }
+  
+  cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+  
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {
+    // Try fixing common JSON issues
+    cleaned = cleaned
+      .replace(/,\s*}/g, "}")  // trailing commas in objects
+      .replace(/,\s*]/g, "]")  // trailing commas in arrays
+      .replace(/[\x00-\x1F\x7F]/g, ""); // control characters
+    return JSON.parse(cleaned);
+  }
+}
+
  async function fetchImageAsBase64(url: string): Promise<string | null> {
    try {
      const response = await fetch(url, {
@@ -132,15 +180,17 @@ const GEMINI_MODEL_FALLBACK = 'gemini-2.0-flash';
    }
  }
  
- async function analyzeVisualWithGemini(posts: Post[], apiKey: string): Promise<{ visualDna: VisualDNA | null; imagesAnalyzed: number }> {
+async function analyzeVisualWithGemini(posts: Post[], apiKey: string): Promise<{ visualDna: VisualDNA | null; imagesAnalyzed: number; error?: string }> {
    console.log('Starting Gemini visual analysis with', posts.length, 'posts');
    
    // Build image parts for multimodal request
    const imageParts: any[] = [];
    let imagesFetched = 0;
    let imagesFailed = 0;
+  let imagesSkippedTooLarge = 0;
    
-   for (const post of posts.slice(0, 12)) {
+  // Limit to MAX_IMAGES_FOR_GEMINI to avoid payload issues
+  for (const post of posts.slice(0, MAX_IMAGES_FOR_GEMINI)) {
      // Use the displayUrl directly - these are fresh URLs from Apify
      const imageUrl = post.displayUrl;
      if (!imageUrl) {
@@ -152,25 +202,31 @@ const GEMINI_MODEL_FALLBACK = 'gemini-2.0-flash';
      console.log('Fetching image:', imageUrl.substring(0, 80) + '...');
      const base64Image = await fetchImageAsBase64(imageUrl);
      if (base64Image) {
-       imagesFetched++;
-       console.log('Successfully fetched image, base64 length:', base64Image.length);
-       imageParts.push({
-         inline_data: {
-           mime_type: "image/jpeg",
-           data: base64Image
-         }
-       });
+      // Check if image is too large
+      if (isImageTooLarge(base64Image)) {
+        console.log('Image too large, skipping. Base64 length:', base64Image.length);
+        imagesSkippedTooLarge++;
+      } else {
+        imagesFetched++;
+        console.log('Successfully fetched image, base64 length:', base64Image.length);
+        imageParts.push({
+          inline_data: {
+            mime_type: "image/jpeg",
+            data: base64Image
+          }
+        });
+      }
      } else {
        imagesFailed++;
        console.log('Failed to fetch image for post:', post.id);
      }
    }
    
-   console.log(`Image fetch results: ${imagesFetched} fetched, ${imagesFailed} failed, ${imageParts.length} ready for analysis`);
+  console.log(`Image fetch results: ${imagesFetched} fetched, ${imagesFailed} failed, ${imagesSkippedTooLarge} too large, ${imageParts.length} ready for analysis`);
  
    if (imageParts.length < 4) {
      console.error('Not enough valid images for analysis:', imageParts.length);
-     return { visualDna: null, imagesAnalyzed: imageParts.length };
+    return { visualDna: null, imagesAnalyzed: imageParts.length, error: `Only ${imageParts.length} valid images (need 4+)` };
    }
    
    console.log('Sending', imageParts.length, 'images to Gemini');
@@ -240,29 +296,67 @@ const GEMINI_MODEL_FALLBACK = 'gemini-2.0-flash';
      
      if (!response.ok) {
        const error = await response.text();
-       console.error('Gemini API error:', response.status, error);
-       return { visualDna: null, imagesAnalyzed: imageParts.length };
+       console.error('=== GEMINI API ERROR ===');
+       console.error('Status Code:', response.status);
+       console.error('Response Body:', error);
+       return { visualDna: null, imagesAnalyzed: imageParts.length, error: `Gemini API error ${response.status}: ${error.substring(0, 200)}` };
      }
      
-     const data = await response.json();
+     // Read response as text first for debugging
+     const responseText = await response.text();
+     console.log('=== GEMINI RAW RESPONSE ===');
+     console.log('Status Code:', response.status);
+     console.log('Response Length:', responseText.length);
+     console.log('Response Preview (first 500 chars):', responseText.substring(0, 500));
+     
+     // Parse the response JSON
+     let data;
+     try {
+       data = JSON.parse(responseText);
+     } catch (parseError) {
+       console.error('Failed to parse Gemini response as JSON:', parseError);
+       console.error('Full response:', responseText);
+       return { visualDna: null, imagesAnalyzed: imageParts.length, error: 'Gemini response is not valid JSON' };
+     }
+     
+     // Check for finish reason issues
+     const finishReason = data.candidates?.[0]?.finishReason;
      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
      
+     console.log('Finish Reason:', finishReason);
+     console.log('Has Text:', !!text);
+     
      if (!text) {
-       console.error('No text in Gemini response');
-       return { visualDna: null, imagesAnalyzed: imageParts.length };
+       if (finishReason === 'MAX_TOKENS') {
+         console.error('Gemini response empty due to token limit');
+         return { visualDna: null, imagesAnalyzed: imageParts.length, error: 'Gemini hit token limit - try fewer images' };
+       }
+       if (finishReason === 'SAFETY') {
+         console.error('Gemini blocked response for safety reasons');
+         return { visualDna: null, imagesAnalyzed: imageParts.length, error: 'Gemini blocked response for safety' };
+       }
+       console.error('No text in Gemini response. Full response:', JSON.stringify(data, null, 2));
+       return { visualDna: null, imagesAnalyzed: imageParts.length, error: `No text in response (finishReason: ${finishReason})` };
      }
      
-     // Clean up response (remove markdown if present)
-     let cleanText = text.trim();
-     if (cleanText.startsWith('```')) {
-       cleanText = cleanText.replace(/^```json?\n?/, '').replace(/\n?```$/, '');
+     console.log('Gemini text response (first 300 chars):', text.substring(0, 300));
+     
+     // Extract JSON from response (handles markdown, thinking blocks, preamble)
+     try {
+       const visualDna = extractJsonFromResponse(text) as VisualDNA;
+       console.log('Successfully parsed Visual DNA:', Object.keys(visualDna));
+       return { visualDna, imagesAnalyzed: imageParts.length };
+     } catch (jsonError) {
+       console.error('Failed to extract JSON from Gemini text:', jsonError);
+       console.error('Full text response:', text);
+       return { visualDna: null, imagesAnalyzed: imageParts.length, error: `Failed to parse JSON: ${jsonError instanceof Error ? jsonError.message : 'Unknown parse error'}` };
      }
      
-     console.log('Gemini response:', cleanText.substring(0, 200));
-     return { visualDna: JSON.parse(cleanText) as VisualDNA, imagesAnalyzed: imageParts.length };
    } catch (error) {
-     console.error('Gemini analysis failed:', error);
-     return { visualDna: null, imagesAnalyzed: imageParts.length };
+     console.error('=== GEMINI EXCEPTION ===');
+     console.error('Error:', error);
+     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+     return { visualDna: null, imagesAnalyzed: imageParts.length, error: `Gemini exception: ${errorMessage}` };
    }
  }
  
@@ -822,8 +916,11 @@ const GEMINI_MODEL_FALLBACK = 'gemini-2.0-flash';
       currentStep = 'analyzing_images';
       console.log(`Step 2: Analyzing ${posts.length} images with Gemini...`);
       const geminiResult = await analyzeVisualWithGemini(posts, GEMINI_API_KEY);
-      const { visualDna, imagesAnalyzed } = geminiResult;
+     const { visualDna, imagesAnalyzed, error: geminiError } = geminiResult;
       console.log(`Gemini result: ${imagesAnalyzed} images analyzed, visualDna: ${visualDna ? 'SUCCESS' : 'FAILED'}`);
+     if (geminiError) {
+       console.log('Gemini error details:', geminiError);
+     }
  
       // Step 3: Voice analysis with Claude
       currentStep = 'analyzing_captions';
@@ -844,18 +941,10 @@ const GEMINI_MODEL_FALLBACK = 'gemini-2.0-flash';
       currentStep = 'calculating_score';
       console.log('Step 5: Calculating invisibility score...');
       
-      // Only calculate if we have visual analysis results
-      if (!visualDna) {
-        console.error('Cannot calculate score: visual analysis failed');
-        return new Response(
-          JSON.stringify({ 
-            error: 'Visual analysis failed - could not analyze images', 
-            code: 'VISUAL_ANALYSIS_FAILED',
-            images_analyzed: imagesAnalyzed,
-            step: currentStep
-          }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+     // Calculate score even if visual analysis failed (will use defaults)
+     if (!visualDna) {
+       console.warn('Visual analysis failed, calculating partial score with voice data only');
+       console.warn('Gemini error was:', geminiError);
       }
  
      const { score: invisibilityScore, category: invisibilityCategory } = calculateInvisibilityScore(
@@ -866,6 +955,9 @@ const GEMINI_MODEL_FALLBACK = 'gemini-2.0-flash';
      );
  
      console.log('Invisibility Score:', invisibilityScore, invisibilityCategory);
+     if (!visualDna) {
+       console.log('Note: Score calculated without visual analysis (using defaults)');
+     }
  
       // Step 6: Update database
       currentStep = 'saving_results';
@@ -927,7 +1019,9 @@ const GEMINI_MODEL_FALLBACK = 'gemini-2.0-flash';
          processing_time_ms: processingTime,
          has_visual_dna: !!visualDna,
          has_voice_dna: !!voiceDna,
-         has_ctlt_matches: !!ctltMatches
+         has_ctlt_matches: !!ctltMatches,
+         visual_analysis_error: geminiError || null,
+         partial_score: !visualDna
        }),
        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
      );
