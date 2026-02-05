@@ -840,7 +840,7 @@ Return ONLY valid JSON in this exact format:
       // Extract social media from AI analysis
       const socialMedia = aiAnalysis?.social_media || {};
 
-      const { error: insertError } = await supabase
+      const { data: insertedClub, error: insertError } = await supabase
         .from('enriched_clubs')
         .insert({
           job_id: row.job_id,
@@ -877,11 +877,105 @@ Return ONLY valid JSON in this exact format:
           raw_branding_data: brandingData || {},
           raw_instagram_data: instagramData || {},
           scraped_content: scrapedContent.substring(0, 50000) // Limit storage
-        });
+        })
+        .select('id')
+        .single();
 
       if (insertError) {
         console.error('Failed to insert enriched club:', insertError);
         throw insertError;
+      }
+
+      // ========== STEP 6: Visual DNA Analysis ==========
+      // Only run if the club has an Instagram handle
+      if (instagramHandle && insertedClub?.id) {
+        console.log('Step 6: Running Visual DNA analysis...');
+        try {
+          // Create visual_dna_jobs entry
+          const visualDnaJobId = `vdna_auto_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+          await supabase
+            .from('visual_dna_jobs')
+            .insert({
+              id: visualDnaJobId,
+              status: 'processing',
+              total_clubs: 1,
+              processed_clubs: 0,
+              failed_clubs: 0
+            });
+
+          // Create visual_dna_rows entry
+          const { data: vdnaRow } = await supabase
+            .from('visual_dna_rows')
+            .insert({
+              job_id: visualDnaJobId,
+              enriched_club_id: insertedClub.id,
+              club_name: row.club_name,
+              status: 'processing'
+            })
+            .select('id')
+            .single();
+
+          // Call analyze-visual-dna edge function
+          const visualDnaResponse = await fetch(
+            `${supabaseUrl}/functions/v1/analyze-visual-dna`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${supabaseKey}`,
+              },
+              body: JSON.stringify({
+                enriched_club_id: insertedClub.id,
+                visual_dna_row_id: vdnaRow?.id
+              }),
+            }
+          );
+
+          if (visualDnaResponse.ok) {
+            const vdnaResult = await visualDnaResponse.json();
+            console.log(`Visual DNA complete: score=${vdnaResult.invisibility_score}, category=${vdnaResult.invisibility_category}`);
+            totalCost += 0.01; // Approximate Visual DNA cost
+
+            // Update job status
+            await supabase
+              .from('visual_dna_jobs')
+              .update({ 
+                status: 'completed', 
+                processed_clubs: 1,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', visualDnaJobId);
+          } else {
+            const errorText = await visualDnaResponse.text();
+            console.error('Visual DNA analysis failed:', errorText);
+
+            // Update job status as failed
+            await supabase
+              .from('visual_dna_jobs')
+              .update({ 
+                status: 'completed', 
+                failed_clubs: 1,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', visualDnaJobId);
+
+            // Update row status as failed
+            if (vdnaRow?.id) {
+              await supabase
+                .from('visual_dna_rows')
+                .update({ 
+                  status: 'failed',
+                  error_message: errorText.substring(0, 500)
+                })
+                .eq('id', vdnaRow.id);
+            }
+          }
+        } catch (vdnaError) {
+          console.error('Visual DNA analysis error:', vdnaError);
+          // Don't fail the main enrichment if Visual DNA fails
+        }
+      } else {
+        console.log('Step 6: Skipping Visual DNA (no Instagram handle)');
       }
 
       // Mark row as completed
