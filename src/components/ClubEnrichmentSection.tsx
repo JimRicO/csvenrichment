@@ -5,9 +5,11 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, Upload, Loader2, Building2, Globe, Instagram, Wand2, Facebook, Twitter, Linkedin } from "lucide-react";
+import { Sparkles, Upload, Loader2, Building2, Globe, Instagram, Wand2, Facebook, Twitter, Linkedin, Dna, RefreshCw } from "lucide-react";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import Papa from "papaparse";
+import { Badge } from "@/components/ui/badge";
+import VisualDNAReportDialog from "@/components/VisualDNAReportDialog";
 
 interface ClubEnrichmentSectionProps {
   onJobCreated: (jobId: string, projectId: string) => void;
@@ -33,6 +35,95 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
   const [csvData, setCsvData] = useState<CsvRow[]>([]);
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Visual DNA state
+  const [existingClubs, setExistingClubs] = useState<any[]>([]);
+  const [isLoadingClubs, setIsLoadingClubs] = useState(false);
+  const [analyzingClubId, setAnalyzingClubId] = useState<string | null>(null);
+  const [showVisualDnaSection, setShowVisualDnaSection] = useState(false);
+
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportClubId, setReportClubId] = useState<string | null>(null);
+  const [lastProof, setLastProof] = useState<any | null>(null);
+
+  const fetchExistingClubs = async () => {
+    setIsLoadingClubs(true);
+    try {
+      const { data, error } = await supabase
+        .from('enriched_clubs')
+        .select('id, club_name, instagram_handle, invisibility_score, invisibility_category, visual_dna_analyzed_at')
+        .not('instagram_handle', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setExistingClubs(data || []);
+    } catch (err) {
+      console.error('Error fetching clubs:', err);
+      toast({
+        title: "Error",
+        description: "Failed to load existing clubs",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingClubs(false);
+    }
+  };
+
+  const handleOpenVisualDna = async () => {
+    setShowVisualDnaSection(true);
+    await fetchExistingClubs();
+  };
+
+  const handleAnalyzeVisualDna = async (clubId: string, clubName: string) => {
+    setAnalyzingClubId(clubId);
+    
+    toast({
+      title: "Step 1/5: Scraping Instagram",
+      description: `Fetching fresh posts for ${clubName}...`,
+    });
+
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-visual-dna', {
+        body: { enriched_club_id: clubId },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "✓ Visual DNA Complete",
+        description: `${clubName}: ${data.invisibility_score}/100 (${data.invisibility_category}) • ${data.images_analyzed || 0}/12 images analyzed`,
+      });
+
+      setLastProof(data);
+      setReportClubId(clubId);
+      setReportOpen(true);
+
+      await fetchExistingClubs();
+    } catch (err) {
+      console.error('Visual DNA error:', err);
+      toast({
+        title: "Analysis Failed",
+        description: err instanceof Error ? err.message : "Failed to analyze visual DNA.",
+        variant: "destructive",
+      });
+    } finally {
+      setAnalyzingClubId(null);
+    }
+  };
+
+  const getScoreBadgeColor = (category: string | null) => {
+    switch (category) {
+      case 'Excellent': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+      case 'Strong':
+      case 'Good': return 'bg-green-500/20 text-green-400 border-green-500/30';
+      case 'Average': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+      case 'Struggling':
+      case 'Below Average': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+      case 'Invisible': return 'bg-red-500/20 text-red-400 border-red-500/30';
+      default: return 'bg-muted text-muted-foreground';
+    }
+  };
 
   const handleSingleSubmit = async () => {
     if (!clubName.trim()) {
@@ -211,6 +302,19 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
       defaultOpen={false}
       contentClassName="p-6 pt-0"
     >
+      <VisualDNAReportDialog
+        open={reportOpen}
+        onOpenChange={(o) => {
+          setReportOpen(o);
+          if (!o) {
+            setReportClubId(null);
+            setLastProof(null);
+          }
+        }}
+        clubId={reportClubId}
+        proof={lastProof}
+      />
+
       <Tabs defaultValue="single" className="w-full">
         <TabsList className="grid w-full grid-cols-2 mb-4">
           <TabsTrigger value="single">Single Club</TabsTrigger>
@@ -366,6 +470,114 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Visual DNA Button Section */}
+      <div className="mt-6 pt-6 border-t border-border/50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Dna className="h-5 w-5 text-primary" />
+            <div>
+              <h3 className="text-sm font-medium">Visual DNA Analysis</h3>
+              <p className="text-xs text-muted-foreground">Analyze Instagram presence and generate Invisibility Scores</p>
+            </div>
+          </div>
+          <Button
+            variant={showVisualDnaSection ? "outline" : "default"}
+            size="sm"
+            onClick={handleOpenVisualDna}
+            disabled={isLoadingClubs}
+          >
+            {isLoadingClubs ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <>
+                <Dna className="h-4 w-4 mr-2" />
+                {showVisualDnaSection ? 'Refresh Clubs' : 'Analyze Visual DNA'}
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* Expandable clubs list */}
+        {showVisualDnaSection && (
+          <div className="mt-4 space-y-2">
+            {existingClubs.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground text-sm neu-pressed rounded-lg">
+                No enriched clubs with Instagram handles found. Run enrichment first.
+              </div>
+            ) : (
+              <div className="rounded-lg neu-pressed p-3 max-h-80 overflow-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border/50">
+                      <th className="text-left py-2 px-3">Club Name</th>
+                      <th className="text-left py-2 px-3">Instagram</th>
+                      <th className="text-left py-2 px-3">Score</th>
+                      <th className="text-right py-2 px-3">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {existingClubs.map((club) => (
+                      <tr key={club.id} className="border-b border-border/30 last:border-0">
+                        <td className="py-2 px-3 font-medium">{club.club_name}</td>
+                        <td className="py-2 px-3 text-muted-foreground">
+                          @{club.instagram_handle?.replace('@', '')}
+                        </td>
+                        <td className="py-2 px-3">
+                          {club.invisibility_score !== null ? (
+                            <Badge className={`text-xs ${getScoreBadgeColor(club.invisibility_category)}`}>
+                              {club.invisibility_score}/100 • {club.invisibility_category}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">Not analyzed</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-right">
+                          <div className="inline-flex items-center gap-2">
+                            {(club.visual_dna_analyzed_at || club.invisibility_score !== null) && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setLastProof(null);
+                                  setReportClubId(club.id);
+                                  setReportOpen(true);
+                                }}
+                              >
+                                View
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant={club.invisibility_score !== null ? "outline" : "default"}
+                              onClick={() => handleAnalyzeVisualDna(club.id, club.club_name)}
+                              disabled={analyzingClubId === club.id}
+                            >
+                              {analyzingClubId === club.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : club.invisibility_score !== null ? (
+                                <>
+                                  <RefreshCw className="h-3 w-3 mr-1" />
+                                  Re-analyze
+                                </>
+                              ) : (
+                                <>
+                                  <Dna className="h-3 w-3 mr-1" />
+                                  Analyze
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </CollapsibleCard>
   );
 };
