@@ -69,8 +69,8 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
     
     // Show initial toast
     toast({
-      title: "Analyzing Visual DNA",
-      description: `Starting analysis for ${clubName}... This may take 30-60 seconds.`,
+      title: "Step 1/5: Scraping Instagram",
+      description: `Fetching fresh posts for ${clubName}...`,
     });
 
     try {
@@ -80,11 +80,10 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
 
       if (error) throw error;
 
-      const imagesMsg = data.images_analyzed ? `${data.images_analyzed} images analyzed` : '';
-      
+      // Success toast with full details
       toast({
-        title: "Visual DNA Complete",
-        description: `${clubName}: Score ${data.invisibility_score}/100 (${data.invisibility_category}). ${imagesMsg}`,
+        title: "✓ Visual DNA Complete",
+        description: `${clubName}: ${data.invisibility_score}/100 (${data.invisibility_category}) • ${data.images_analyzed || 0} images analyzed in ${Math.round((data.processing_time_ms || 0) / 1000)}s`,
       });
 
       // Refresh the list
