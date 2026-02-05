@@ -105,3 +105,6 @@ verify_jwt = false
  
  [functions.analyze-visual-dna]
  verify_jwt = false
+ 
+ [functions.api-analyze-visual-dna]
+ verify_jwt = false
