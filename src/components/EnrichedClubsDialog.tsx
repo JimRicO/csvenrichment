@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import VisualDNASection from "./VisualDNASection";
+ import VisualDNACard from "./VisualDNACard";
 import { 
   Building2, Globe, Instagram, MapPin, Phone, Mail, Palette, Type, 
   MessageSquare, Sparkles, Eye, User, Calendar, Activity, Link2, ChevronDown, Users,
@@ -703,14 +704,36 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
                 )}
 
                 {/* Visual DNA Section */}
-                <VisualDNASection
-                  visualDna={selectedClub.visual_dna}
-                  voiceDna={selectedClub.voice_dna}
-                  ctltMatches={selectedClub.ctlt_matches}
-                  invisibilityScore={selectedClub.invisibility_score}
-                  invisibilityCategory={selectedClub.invisibility_category}
-                  analyzedAt={selectedClub.visual_dna_analyzed_at}
-                />
+                 {/* Show full VisualDNACard when data exists, otherwise show VisualDNASection with empty state/analyze button */}
+                 {selectedClub.visual_dna || selectedClub.voice_dna || selectedClub.invisibility_score !== null ? (
+                   <div className="space-y-2">
+                     <h3 className="text-sm font-medium flex items-center gap-2">
+                       <Dna className="h-4 w-4 text-primary" />
+                       Visual DNA Analysis
+                     </h3>
+                     <VisualDNACard
+                       visualDna={selectedClub.visual_dna}
+                       voiceDna={selectedClub.voice_dna}
+                       ctltMatches={selectedClub.ctlt_matches}
+                       invisibilityScore={selectedClub.invisibility_score}
+                       invisibilityCategory={selectedClub.invisibility_category}
+                       analyzedAt={selectedClub.visual_dna_analyzed_at}
+                     />
+                   </div>
+                 ) : (
+                   <VisualDNASection
+                     visualDna={null}
+                     voiceDna={null}
+                     ctltMatches={null}
+                     invisibilityScore={null}
+                     invisibilityCategory={null}
+                     analyzedAt={null}
+                     showEmptyState={true}
+                     instagramHandle={selectedClub.instagram_handle}
+                     onAnalyze={() => handleAnalyzeVisualDNA(selectedClub)}
+                     isAnalyzing={analyzingClubId === selectedClub.id}
+                   />
+                 )}
               </div>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
