@@ -510,7 +510,7 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
                           {analyzingClubId === club.id ? (
                             <>
                               <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                              Analyzing...
+                              Scraping & Analyzing...
                             </>
                           ) : club.invisibility_score !== null ? (
                             <>

@@ -14,8 +14,9 @@
    "Documentary", "Fashion Editorial", "Sports Action", "Lifestyle Casual", "Studio Portrait"
  ];
  
-// Use correct Claude model name
-const CLAUDE_MODEL = 'claude-3-5-sonnet-20241022';
+// Model names
+const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+const GEMINI_MODEL = 'gemini-2.0-flash';
 
  interface Post {
    id: string;
@@ -25,7 +26,6 @@ const CLAUDE_MODEL = 'claude-3-5-sonnet-20241022';
    likesCount: number;
    commentsCount: number;
    displayUrl: string;
-  persistedImageUrl?: string;
    alt?: string;
  }
  
@@ -76,75 +76,96 @@ const CLAUDE_MODEL = 'claude-3-5-sonnet-20241022';
    enhancement_suggestion: string;
  }
  
+ // Clean base64 string to ensure it's valid
+ function cleanBase64(base64String: string): string {
+   if (!base64String) return "";
+   let cleaned = base64String.trim();
+ 
+   // Remove data URL prefix if present
+   if (cleaned.includes(",") && cleaned.startsWith("data:")) {
+     cleaned = cleaned.split(",")[1];
+   }
+ 
+   // Remove whitespace/newlines
+   cleaned = cleaned.replace(/\s/g, "");
+ 
+   return cleaned;
+ }
+ 
+ // Convert array buffer to base64 in chunks to avoid stack overflow
+ function arrayBufferToBase64(buffer: ArrayBuffer): string {
+   const bytes = new Uint8Array(buffer);
+   const chunkSize = 8192;
+   let result = '';
+   
+   for (let i = 0; i < bytes.length; i += chunkSize) {
+     const chunk = bytes.slice(i, i + chunkSize);
+     result += String.fromCharCode.apply(null, Array.from(chunk));
+   }
+   
+   return btoa(result);
+ }
+ 
  async function fetchImageAsBase64(url: string): Promise<string | null> {
    try {
      const response = await fetch(url, {
        headers: {
          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
          'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+         'Referer': 'https://www.instagram.com/'
        }
      });
      if (!response.ok) return null;
      
      const buffer = await response.arrayBuffer();
-     const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
-     return base64;
+     // Use chunk-based conversion to avoid stack overflow on large images
+     const base64 = arrayBufferToBase64(buffer);
+     return cleanBase64(base64);
    } catch (error) {
      console.error('Failed to fetch image:', url, error);
      return null;
    }
  }
  
-async function analyzeVisualWithGemini(posts: Post[], apiKey: string, supabaseUrl: string): Promise<{ visualDna: VisualDNA | null; imagesAnalyzed: number }> {
+ async function analyzeVisualWithGemini(posts: Post[], apiKey: string): Promise<{ visualDna: VisualDNA | null; imagesAnalyzed: number }> {
    console.log('Starting Gemini visual analysis with', posts.length, 'posts');
    
    // Build image parts for multimodal request
    const imageParts: any[] = [];
-  let imagesFetched = 0;
-  let imagesFailed = 0;
+   let imagesFetched = 0;
+   let imagesFailed = 0;
    
    for (const post of posts.slice(0, 12)) {
-    // Prefer persisted storage URL over CDN URL
-    const imageUrl = post.persistedImageUrl || post.displayUrl;
-    if (!imageUrl) {
-      console.log('Post has no image URL:', post.id);
-      continue;
-    }
+     // Use the displayUrl directly - these are fresh URLs from Apify
+     const imageUrl = post.displayUrl;
+     if (!imageUrl) {
+       console.log('Post has no image URL:', post.id);
+       imagesFailed++;
+       continue;
+     }
      
-    console.log('Fetching image:', imageUrl.substring(0, 100));
-    const base64Image = await fetchImageAsBase64(imageUrl);
+     console.log('Fetching image:', imageUrl.substring(0, 80) + '...');
+     const base64Image = await fetchImageAsBase64(imageUrl);
      if (base64Image) {
-      imagesFetched++;
+       imagesFetched++;
+       console.log('Successfully fetched image, base64 length:', base64Image.length);
        imageParts.push({
          inline_data: {
            mime_type: "image/jpeg",
            data: base64Image
          }
        });
-    } else {
-      imagesFailed++;
-      console.log('Failed to fetch image, trying CDN fallback for post:', post.id);
-      // Try CDN URL as fallback if we used storage URL
-      if (post.persistedImageUrl && post.displayUrl) {
-        const fallbackBase64 = await fetchImageAsBase64(post.displayUrl);
-        if (fallbackBase64) {
-          imagesFetched++;
-          imageParts.push({
-            inline_data: {
-              mime_type: "image/jpeg",
-              data: fallbackBase64
-            }
-          });
-        }
-      }
+     } else {
+       imagesFailed++;
+       console.log('Failed to fetch image for post:', post.id);
      }
    }
    
-  console.log(`Image fetch results: ${imagesFetched} fetched, ${imagesFailed} failed, ${imageParts.length} ready for analysis`);
-  
+   console.log(`Image fetch results: ${imagesFetched} fetched, ${imagesFailed} failed, ${imageParts.length} ready for analysis`);
+ 
    if (imageParts.length < 4) {
      console.error('Not enough valid images for analysis:', imageParts.length);
-    return { visualDna: null, imagesAnalyzed: imageParts.length };
+     return { visualDna: null, imagesAnalyzed: imageParts.length };
    }
    
    console.log('Sending', imageParts.length, 'images to Gemini');
@@ -181,7 +202,7 @@ async function analyzeVisualWithGemini(posts: Post[], apiKey: string, supabaseUr
  Extract dominant colors as hex codes (5-8 colors). Percentages in content_mix should sum to 100.`;
  
    try {
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent', {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
        method: 'POST',
        headers: {
          'Content-Type': 'application/json',
@@ -204,7 +225,7 @@ async function analyzeVisualWithGemini(posts: Post[], apiKey: string, supabaseUr
      if (!response.ok) {
        const error = await response.text();
        console.error('Gemini API error:', response.status, error);
-        return { visualDna: null, imagesAnalyzed: imageParts.length };
+       return { visualDna: null, imagesAnalyzed: imageParts.length };
      }
      
      const data = await response.json();
@@ -212,7 +233,7 @@ async function analyzeVisualWithGemini(posts: Post[], apiKey: string, supabaseUr
      
      if (!text) {
        console.error('No text in Gemini response');
-      return { visualDna: null, imagesAnalyzed: imageParts.length };
+       return { visualDna: null, imagesAnalyzed: imageParts.length };
      }
      
      // Clean up response (remove markdown if present)
@@ -222,10 +243,10 @@ async function analyzeVisualWithGemini(posts: Post[], apiKey: string, supabaseUr
      }
      
      console.log('Gemini response:', cleanText.substring(0, 200));
-    return { visualDna: JSON.parse(cleanText) as VisualDNA, imagesAnalyzed: imageParts.length };
+     return { visualDna: JSON.parse(cleanText) as VisualDNA, imagesAnalyzed: imageParts.length };
    } catch (error) {
      console.error('Gemini analysis failed:', error);
-    return { visualDna: null, imagesAnalyzed: imageParts.length };
+     return { visualDna: null, imagesAnalyzed: imageParts.length };
    }
  }
  
@@ -540,12 +561,85 @@ async function analyzeVisualWithGemini(posts: Post[], apiKey: string, supabaseUr
    }
  }
  
+  // Update instagram_company_data with fresh scrape data
+  async function updateInstagramCompanyData(
+    supabase: any,
+    enrichedClubId: string,
+    profileData: any,
+    instagramUrl: string
+  ): Promise<void> {
+    try {
+      const instagramCompanyData = {
+        job_id: `vdna_${enrichedClubId}_${Date.now()}`,
+        scraped_row_id: `vdna_row_${enrichedClubId}_${Date.now()}`,
+        instagram_url: instagramUrl,
+        username: profileData.username || '',
+        full_name: profileData.fullName || null,
+        biography: profileData.biography || null,
+        external_url: profileData.externalUrl || null,
+        followers_count: profileData.followersCount || 0,
+        posts_count: profileData.postsCount || 0,
+        is_business_account: profileData.isBusinessAccount || false,
+        verified: profileData.verified || false,
+        profile_pic_storage_url: profileData.profilePicUrlHD || profileData.profilePicUrl || null,
+        related_profiles: profileData.relatedProfiles ? 
+          profileData.relatedProfiles.map((p: any) => ({
+            username: p.username,
+            full_name: p.fullName
+          })) : [],
+        latest_posts: (profileData.latestPosts || []).slice(0, 12).map((post: any) => ({
+          id: post.id,
+          type: post.type,
+          timestamp: post.timestamp,
+          caption: post.caption,
+          likesCount: post.likesCount,
+          commentsCount: post.commentsCount,
+          displayUrl: post.displayUrl,
+          alt: post.alt,
+          locationName: post.locationName
+        })),
+        raw_apify_data: profileData,
+        scraped_at: new Date().toISOString()
+      };
+ 
+      // First check if we already have data for this username
+      const { data: existing } = await supabase
+        .from('instagram_company_data')
+        .select('id')
+        .ilike('username', profileData.username)
+        .limit(1)
+        .single();
+ 
+      if (existing) {
+        // Update existing record
+        await supabase
+          .from('instagram_company_data')
+          .update({
+            ...instagramCompanyData,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id);
+        console.log('Updated existing instagram_company_data record');
+      } else {
+        // Insert new record
+        await supabase
+          .from('instagram_company_data')
+          .insert(instagramCompanyData);
+        console.log('Inserted new instagram_company_data record');
+      }
+    } catch (error) {
+      console.error('Failed to update instagram_company_data:', error);
+      // Don't throw - this is not critical for the analysis
+    }
+  }
+ 
  serve(async (req) => {
    if (req.method === 'OPTIONS') {
      return new Response(null, { headers: corsHeaders });
    }
  
    const startTime = Date.now();
+    let currentStep = 'initializing';
  
    try {
      const { enriched_club_id, visual_dna_row_id } = await req.json();
@@ -600,113 +694,66 @@ async function analyzeVisualWithGemini(posts: Post[], apiKey: string, supabaseUr
      }
  
      const username = club.instagram_handle.replace('@', '').toLowerCase();
-     console.log('Looking up Instagram data for:', username);
+      console.log('===== VISUAL DNA ANALYSIS START =====');
+      console.log('Club:', club.club_name, '| Instagram:', username);
  
-      // Get Supabase URL for constructing storage URLs
-      const storageBaseUrl = `${supabaseUrl}/storage/v1/object/public`;
-
-     // Check for existing Instagram data
-     let instagramData: any = null;
+      // ALWAYS perform a fresh Instagram scrape to get valid image URLs
      let posts: Post[] = [];
      let followersCount = club.instagram_followers || 0;
+      let profileData: any = null;
  
-     const { data: existingData } = await supabase
-       .from('instagram_company_data')
-       .select('*')
-       .ilike('username', username)
-       .order('scraped_at', { ascending: false })
-       .limit(1)
-       .single();
+      if (!APIFY_API_TOKEN) {
+        return new Response(
+          JSON.stringify({ error: 'APIFY_API_TOKEN not configured', code: 'CONFIG_ERROR' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
  
-      // Also check raw_apify_data for posts
-      const rawData = existingData?.raw_apify_data as any;
-      const latestPosts = existingData?.latest_posts || rawData?.latestPosts || [];
+      // Step 1: Fresh Instagram scrape
+      currentStep = 'scraping_instagram';
+      console.log('Step 1: Scraping Instagram fresh...');
+      const scrapeResult = await scrapeInstagramWithApify(username, supabase, APIFY_API_TOKEN);
       
-      console.log('Instagram data check:', {
-        hasExistingData: !!existingData,
-        latestPostsCount: latestPosts?.length || 0,
-        rawApifyDataKeys: rawData ? Object.keys(rawData) : [],
-        samplePostFields: latestPosts?.[0] ? Object.keys(latestPosts[0]) : []
-      });
-
-      if (existingData && Array.isArray(latestPosts) && latestPosts.length >= 4) {
-       console.log('Using existing Instagram data, posts:', existingData.latest_posts.length);
-       instagramData = existingData;
-        
-        // Transform posts and add persisted image URLs
-        posts = latestPosts.map((p: any, index: number) => {
-          // Build persisted storage URL
-          const persistedImageUrl = `${storageBaseUrl}/instagram-post-images/${existingData.scraped_row_id}/post_${index}.jpg`;
-          
-          return {
-            id: p.id || p.shortCode || String(index),
-            type: p.type || 'Image',
-            timestamp: p.timestamp || '',
-            caption: p.caption || '',
-            likesCount: p.likesCount || 0,
-            commentsCount: p.commentsCount || 0,
-            displayUrl: p.displayUrl || '',
-            persistedImageUrl,
-            alt: p.alt
-          };
-        });
-        
-        console.log('Transformed posts with storage URLs:', posts.slice(0, 2).map(p => ({
-          id: p.id,
-          hasDisplayUrl: !!p.displayUrl,
-          persistedUrl: p.persistedImageUrl
-        })));
-        
-       followersCount = existingData.followers_count || followersCount;
-     } else if (APIFY_API_TOKEN) {
-       // Scrape Instagram
-       console.log('No existing data found, scraping Instagram...');
-       const scrapeResult = await scrapeInstagramWithApify(username, supabase, APIFY_API_TOKEN);
-       
-       if (!scrapeResult.success) {
-         // Update visual_dna_row to failed if provided
-         if (visual_dna_row_id) {
-           await supabase
-             .from('visual_dna_rows')
-             .update({ 
-               status: 'failed', 
-               error_message: scrapeResult.error,
-               updated_at: new Date().toISOString()
-             })
-             .eq('id', visual_dna_row_id);
-         }
-         
-         return new Response(
-           JSON.stringify({ error: scrapeResult.error, code: 'SCRAPE_FAILED' }),
-           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-         );
+      if (!scrapeResult.success) {
+        console.error('Instagram scrape failed:', scrapeResult.error);
+        if (visual_dna_row_id) {
+          await supabase
+            .from('visual_dna_rows')
+            .update({ 
+              status: 'failed', 
+              error_message: scrapeResult.error,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', visual_dna_row_id);
        }
-       
-       const profileData = scrapeResult.data;
-       followersCount = profileData.followersCount || followersCount;
-       
-       // Transform posts
-       posts = (profileData.latestPosts || []).map((p: any) => ({
-         id: p.id,
-         type: p.type,
-         timestamp: p.timestamp,
-         caption: p.caption || '',
-         likesCount: p.likesCount || 0,
-         commentsCount: p.commentsCount || 0,
-         displayUrl: p.displayUrl,
-         alt: p.alt
-       }));
-       
-       console.log('Scraped', posts.length, 'posts');
-     } else {
+        
        return new Response(
-         JSON.stringify({ error: 'No Instagram data available and APIFY_API_TOKEN not configured', code: 'NO_DATA' }),
-         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: scrapeResult.error, code: 'SCRAPE_FAILED', step: currentStep }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
        );
      }
+      
+      profileData = scrapeResult.data;
+      followersCount = profileData.followersCount || followersCount;
+      
+      // Transform posts - use fresh displayUrl from Apify
+      posts = (profileData.latestPosts || []).slice(0, 12).map((p: any) => ({
+        id: p.id || p.shortCode,
+        type: p.type,
+        timestamp: p.timestamp,
+        caption: p.caption || '',
+        likesCount: p.likesCount || 0,
+        commentsCount: p.commentsCount || 0,
+        displayUrl: p.displayUrl,
+        alt: p.alt
+      }));
+      
+      console.log(`Scraped ${posts.length} posts, ${followersCount} followers`);
+      console.log('Sample post URLs:', posts.slice(0, 2).map(p => p.displayUrl?.substring(0, 60) + '...'));
  
      // Check minimum posts
      if (posts.length < 4) {
+        console.error('Not enough posts:', posts.length);
        if (visual_dna_row_id) {
          await supabase
            .from('visual_dna_rows')
@@ -720,28 +767,51 @@ async function analyzeVisualWithGemini(posts: Post[], apiKey: string, supabaseUr
        }
        
        return new Response(
-         JSON.stringify({ error: 'Not enough posts for analysis (minimum 4 required)', code: 'INSUFFICIENT_POSTS' }),
+          JSON.stringify({ error: 'Not enough posts for analysis (minimum 4 required)', code: 'INSUFFICIENT_POSTS', posts_found: posts.length }),
          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
        );
      }
  
-     // Run AI analyses in parallel
-     console.log('Running AI analyses...');
-      const [geminiResult, voiceDna] = await Promise.all([
-        analyzeVisualWithGemini(posts, GEMINI_API_KEY, supabaseUrl),
-       analyzeVoiceWithClaude(posts, ANTHROPIC_API_KEY)
-     ]);
- 
+      // Step 2: Visual analysis with Gemini
+      currentStep = 'analyzing_images';
+      console.log(`Step 2: Analyzing ${posts.length} images with Gemini...`);
+      const geminiResult = await analyzeVisualWithGemini(posts, GEMINI_API_KEY);
       const { visualDna, imagesAnalyzed } = geminiResult;
-      console.log(`Gemini analyzed ${imagesAnalyzed} images, result: ${visualDna ? 'success' : 'failed'}`);
+      console.log(`Gemini result: ${imagesAnalyzed} images analyzed, visualDna: ${visualDna ? 'SUCCESS' : 'FAILED'}`);
+ 
+      // Step 3: Voice analysis with Claude
+      currentStep = 'analyzing_captions';
+      console.log('Step 3: Analyzing captions with Claude...');
+      const voiceDna = await analyzeVoiceWithClaude(posts, ANTHROPIC_API_KEY);
+      console.log(`Claude result: voiceDna: ${voiceDna ? 'SUCCESS' : 'FAILED'}`);
 
-     // CTLT matching (depends on visual DNA)
+      // Step 4: CTLT matching (depends on visual DNA)
+      currentStep = 'matching_styles';
      let ctltMatches: CTLTMatches | null = null;
      if (visualDna) {
+        console.log('Step 4: Matching CTLT styles...');
        ctltMatches = await matchCTLTStylesWithClaude(visualDna, ANTHROPIC_API_KEY);
+        console.log(`CTLT result: ${ctltMatches ? 'SUCCESS' : 'FAILED'}`);
      }
  
-     // Calculate invisibility score
+      // Step 5: Calculate invisibility score
+      currentStep = 'calculating_score';
+      console.log('Step 5: Calculating invisibility score...');
+      
+      // Only calculate if we have visual analysis results
+      if (!visualDna) {
+        console.error('Cannot calculate score: visual analysis failed');
+        return new Response(
+          JSON.stringify({ 
+            error: 'Visual analysis failed - could not analyze images', 
+            code: 'VISUAL_ANALYSIS_FAILED',
+            images_analyzed: imagesAnalyzed,
+            step: currentStep
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+ 
      const { score: invisibilityScore, category: invisibilityCategory } = calculateInvisibilityScore(
        posts,
        visualDna,
@@ -750,19 +820,16 @@ async function analyzeVisualWithGemini(posts: Post[], apiKey: string, supabaseUr
      );
  
      console.log('Invisibility Score:', invisibilityScore, invisibilityCategory);
-      console.log('Analysis summary:', {
-        postsFound: posts.length,
-        imagesAnalyzed,
-        hasVisualDna: !!visualDna,
-        hasVoiceDna: !!voiceDna,
-        hasCTLT: !!ctltMatches
-      });
  
-     // Update enriched_clubs with results
+      // Step 6: Update database
+      currentStep = 'saving_results';
+      console.log('Step 6: Saving results...');
+ 
      const updateData: any = {
        invisibility_score: invisibilityScore,
        invisibility_category: invisibilityCategory,
-       visual_dna_analyzed_at: new Date().toISOString()
+        visual_dna_analyzed_at: new Date().toISOString(),
+        instagram_followers: followersCount
      };
  
      if (visualDna) updateData.visual_dna = visualDna;
@@ -778,6 +845,14 @@ async function analyzeVisualWithGemini(posts: Post[], apiKey: string, supabaseUr
        console.error('Failed to update enriched_clubs:', updateError);
      }
  
+      // Update instagram_company_data with fresh data
+      await updateInstagramCompanyData(
+        supabase,
+        enriched_club_id,
+        profileData,
+        `https://instagram.com/${username}`
+      );
+ 
      // Update visual_dna_row if provided
      const processingTime = Date.now() - startTime;
      if (visual_dna_row_id) {
@@ -792,7 +867,8 @@ async function analyzeVisualWithGemini(posts: Post[], apiKey: string, supabaseUr
          .eq('id', visual_dna_row_id);
      }
  
-     console.log('Visual DNA analysis complete in', processingTime, 'ms');
+      console.log('===== VISUAL DNA ANALYSIS COMPLETE =====');
+      console.log(`Total time: ${processingTime}ms | Images: ${imagesAnalyzed} | Score: ${invisibilityScore}`);
  
      return new Response(
        JSON.stringify({
@@ -813,7 +889,7 @@ async function analyzeVisualWithGemini(posts: Post[], apiKey: string, supabaseUr
    } catch (error) {
      console.error('Visual DNA analysis error:', error);
      return new Response(
-       JSON.stringify({ error: error instanceof Error ? error.message : 'Analysis failed', code: 'INTERNAL_ERROR' }),
+        JSON.stringify({ error: error instanceof Error ? error.message : 'Analysis failed', code: 'INTERNAL_ERROR', step: currentStep }),
        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
      );
    }
