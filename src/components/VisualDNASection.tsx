@@ -8,7 +8,13 @@
  
  interface VisualDNA {
    color_palette?: string[];
-   photography_style?: string;
+  photography_style?: string | {
+    primary_style?: string;
+    secondary_style?: string | null;
+    lighting?: string;
+    saturation?: string;
+    contrast?: string;
+  };
    composition_patterns?: string[];
    branding_elements?: {
      logo_visible?: boolean;
@@ -378,10 +384,25 @@ const ScoreFactorRow = ({ label, value, score, maxScore = 100 }: { label: string
                  Style & Composition
                </h4>
                <div className="flex flex-wrap gap-1.5">
-                 {visualDna.photography_style && (
+               {visualDna?.photography_style && (
+                typeof visualDna.photography_style === 'string' ? (
                   <Badge variant="default" className="text-xs capitalize">
-                     {visualDna.photography_style}
-                   </Badge>
+                    {visualDna.photography_style}
+                  </Badge>
+                ) : (
+                  <>
+                    {visualDna.photography_style.primary_style && (
+                      <Badge variant="default" className="text-xs capitalize">
+                        {visualDna.photography_style.primary_style}
+                      </Badge>
+                    )}
+                    {visualDna.photography_style.lighting && (
+                      <Badge variant="outline" className="text-xs capitalize">
+                        {visualDna.photography_style.lighting}
+                      </Badge>
+                    )}
+                  </>
+                )
                  )}
                  {visualDna.filter_style && (
                    <Badge variant="outline" className="text-xs capitalize">
