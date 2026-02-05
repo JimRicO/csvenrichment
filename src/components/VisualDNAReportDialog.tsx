@@ -54,6 +54,7 @@ type EnrichedClubRow = {
   invisibility_score: number | null;
   invisibility_category: string | null;
   visual_dna_analyzed_at: string | null;
+  visual_dna_media_urls: string[] | null;
 };
 
 type VisualDnaRow = {
@@ -104,7 +105,7 @@ export default function VisualDNAReportDialog({
             supabase
               .from("enriched_clubs")
               .select(
-                "id, club_name, instagram_handle, visual_dna, voice_dna, ctlt_matches, invisibility_score, invisibility_category, visual_dna_analyzed_at"
+                "id, club_name, instagram_handle, visual_dna, voice_dna, ctlt_matches, invisibility_score, invisibility_category, visual_dna_analyzed_at, visual_dna_media_urls"
               )
               .eq("id", clubId)
               .single(),
@@ -136,14 +137,21 @@ export default function VisualDNAReportDialog({
   const proofDetails = proof?.download_details ?? [];
 
   // Extract media URLs for the gallery from the proof download_details
+  // First priority: persisted storage URLs from database
+  // Fallback: temporary CDN URLs from proof (only available immediately after analysis)
   const mediaUrls = useMemo(() => {
+    // Use persisted storage URLs from database if available
+    if (club?.visual_dna_media_urls && Array.isArray(club.visual_dna_media_urls) && club.visual_dna_media_urls.length > 0) {
+      return club.visual_dna_media_urls;
+    }
+    // Fallback to proof download details (temporary CDN URLs)
     if (proofDetails.length > 0) {
       return proofDetails
         .filter((d) => d.success && d.url)
         .map((d) => d.url);
     }
     return [];
-  }, [proofDetails]);
+  }, [club?.visual_dna_media_urls, proofDetails]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -92,6 +92,7 @@ export type Database = {
           updated_at: string
           visual_dna: Json | null
           visual_dna_analyzed_at: string | null
+          visual_dna_media_urls: Json | null
           voice_dna: Json | null
           website_url: string | null
         }
@@ -133,6 +134,7 @@ export type Database = {
           updated_at?: string
           visual_dna?: Json | null
           visual_dna_analyzed_at?: string | null
+          visual_dna_media_urls?: Json | null
           voice_dna?: Json | null
           website_url?: string | null
         }
@@ -174,6 +176,7 @@ export type Database = {
           updated_at?: string
           visual_dna?: Json | null
           visual_dna_analyzed_at?: string | null
+          visual_dna_media_urls?: Json | null
           voice_dna?: Json | null
           website_url?: string | null
         }
