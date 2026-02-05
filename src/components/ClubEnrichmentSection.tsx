@@ -1,14 +1,14 @@
 import { useState, useRef } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, Upload, Loader2, Building2, Globe, Instagram, Wand2, Facebook, Twitter, Linkedin } from "lucide-react";
+import { Sparkles, Upload, Loader2, Building2, Globe, Instagram, Wand2, Facebook, Twitter, Linkedin, Eye, RefreshCw } from "lucide-react";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import Papa from "papaparse";
+import { Badge } from "@/components/ui/badge";
 
 interface ClubEnrichmentSectionProps {
   onJobCreated: (jobId: string, projectId: string) => void;
@@ -34,6 +34,74 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
   const [csvData, setCsvData] = useState<CsvRow[]>([]);
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Visual DNA state
+  const [existingClubs, setExistingClubs] = useState<any[]>([]);
+  const [isLoadingClubs, setIsLoadingClubs] = useState(false);
+  const [analyzingClubId, setAnalyzingClubId] = useState<string | null>(null);
+
+  const fetchExistingClubs = async () => {
+    setIsLoadingClubs(true);
+    try {
+      const { data, error } = await supabase
+        .from('enriched_clubs')
+        .select('id, club_name, instagram_handle, invisibility_score, invisibility_category, visual_dna_analyzed_at')
+        .not('instagram_handle', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setExistingClubs(data || []);
+    } catch (err) {
+      console.error('Error fetching clubs:', err);
+      toast({
+        title: "Error",
+        description: "Failed to load existing clubs",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingClubs(false);
+    }
+  };
+
+  const handleAnalyzeVisualDna = async (clubId: string, clubName: string) => {
+    setAnalyzingClubId(clubId);
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-visual-dna', {
+        body: { enriched_club_id: clubId },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Visual DNA Complete",
+        description: `${clubName}: Score ${data.invisibility_score}/100 (${data.invisibility_category})`,
+      });
+
+      // Refresh the list
+      await fetchExistingClubs();
+    } catch (err) {
+      console.error('Visual DNA error:', err);
+      toast({
+        title: "Analysis Failed",
+        description: err instanceof Error ? err.message : "Failed to analyze visual DNA",
+        variant: "destructive",
+      });
+    } finally {
+      setAnalyzingClubId(null);
+    }
+  };
+
+  const getScoreBadgeColor = (category: string | null) => {
+    switch (category) {
+      case 'Excellent': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+      case 'Good': return 'bg-green-500/20 text-green-400 border-green-500/30';
+      case 'Average': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+      case 'Below Average': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+      case 'Invisible': return 'bg-red-500/20 text-red-400 border-red-500/30';
+      default: return 'bg-muted text-muted-foreground';
+    }
+  };
 
   const handleSingleSubmit = async () => {
     if (!clubName.trim()) {
@@ -213,9 +281,13 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
       contentClassName="p-6 pt-0"
     >
       <Tabs defaultValue="single" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-4">
+        <TabsList className="grid w-full grid-cols-3 mb-4">
           <TabsTrigger value="single">Single Club</TabsTrigger>
           <TabsTrigger value="bulk">Bulk Upload</TabsTrigger>
+          <TabsTrigger value="visual-dna" onClick={fetchExistingClubs}>
+            <Eye className="h-4 w-4 mr-1.5" />
+            Visual DNA
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="single" className="space-y-4">
@@ -365,6 +437,91 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
               )}
             </Button>
           </div>
+        </TabsContent>
+
+        <TabsContent value="visual-dna" className="space-y-4">
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+            <Eye className="h-4 w-4 text-primary" />
+            <span className="text-xs text-muted-foreground">
+              Run Visual DNA analysis on existing enriched clubs to generate Invisibility Scores and style matching
+            </span>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={fetchExistingClubs}
+              disabled={isLoadingClubs}
+              className="ml-auto"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoadingClubs ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+
+          {isLoadingClubs ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : existingClubs.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              No enriched clubs with Instagram handles found. Run enrichment first.
+            </div>
+          ) : (
+            <div className="rounded-lg neu-pressed p-3 max-h-80 overflow-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border/50">
+                    <th className="text-left py-2 px-3">Club Name</th>
+                    <th className="text-left py-2 px-3">Instagram</th>
+                    <th className="text-left py-2 px-3">Score</th>
+                    <th className="text-right py-2 px-3">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {existingClubs.map((club) => (
+                    <tr key={club.id} className="border-b border-border/30">
+                      <td className="py-2 px-3 font-medium">{club.club_name}</td>
+                      <td className="py-2 px-3 text-muted-foreground">
+                        @{club.instagram_handle?.replace('@', '')}
+                      </td>
+                      <td className="py-2 px-3">
+                        {club.invisibility_score !== null ? (
+                          <Badge className={`text-xs ${getScoreBadgeColor(club.invisibility_category)}`}>
+                            {club.invisibility_score}/100 • {club.invisibility_category}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">Not analyzed</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-3 text-right">
+                        <Button
+                          size="sm"
+                          variant={club.invisibility_score !== null ? "outline" : "default"}
+                          onClick={() => handleAnalyzeVisualDna(club.id, club.club_name)}
+                          disabled={analyzingClubId === club.id}
+                        >
+                          {analyzingClubId === club.id ? (
+                            <>
+                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                              Analyzing...
+                            </>
+                          ) : club.invisibility_score !== null ? (
+                            <>
+                              <RefreshCw className="h-3 w-3 mr-1" />
+                              Re-analyze
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="h-3 w-3 mr-1" />
+                              Analyze
+                            </>
+                          )}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </CollapsibleCard>
