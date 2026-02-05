@@ -74,6 +74,11 @@ serve(async (req) => {
         raw_branding_data,
         raw_instagram_data,
         scraped_content,
+        visual_dna,
+        voice_dna,
+        ctlt_matches,
+        invisibility_score,
+        invisibility_category,
         created_at,
         updated_at
       `);
