@@ -88,6 +88,20 @@ const VISUAL_DNA_BUCKET = 'instagram-post-images';
    enhancement_suggestion: string;
  }
  
+interface ScoreFactor {
+  value: string;
+  score: number;
+  weight: number;
+}
+
+interface ScoreFactors {
+  posting_frequency: ScoreFactor;
+  content_quality: ScoreFactor;
+  brand_consistency: ScoreFactor;
+  engagement_rate: ScoreFactor;
+  caption_effort: ScoreFactor;
+}
+
  // Clean base64 string to ensure it's valid
  function cleanBase64(base64String: string): string {
    if (!base64String) return "";
@@ -240,32 +254,53 @@ function extractJsonFromResponse(response: string): unknown {
  
  Return ONLY valid JSON (no markdown, no code blocks) with this exact structure:
  {
-   "color_palette": ["#hex1", "#hex2", ...],
-   "photography_style": "cinematic|bright|moody|natural|minimal|saturated",
-   "composition_patterns": ["close-up", "wide", "overhead", "action", "portrait"],
+  "color_palette": {
+    "dominant_colors": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"],
+    "accent_colors": ["#hex1", "#hex2"],
+    "overall_temperature": "warm|cool|neutral"
+  },
+  "photography_style": {
+    "primary_style": "cinematic|bright|moody|natural|editorial|minimal|saturated",
+    "secondary_style": "string or null",
+    "lighting": "natural|studio|mixed|dramatic",
+    "saturation": "high|medium|low",
+    "contrast": "high|medium|low"
+  },
+  "composition": {
+    "primary_shot_type": "close-up|medium|wide|overhead|mixed",
+    "action_vs_lifestyle_ratio": "mostly action|balanced|mostly lifestyle",
+    "people_presence": "always|mostly|sometimes|rarely|never",
+    "court_visibility": "always|mostly|sometimes|rarely"
+  },
    "branding_elements": {
      "logo_visible": true/false,
-     "watermarks": true/false,
-     "text_overlays": true/false
+    "logo_placement": "top-left|top-right|bottom-left|bottom-right|center|varies|none",
+    "watermark": true/false,
+    "text_overlays": "frequent|occasional|rare|never",
+    "branded_templates": true/false
    },
    "content_mix": {
-     "action": 0-100,
-     "lifestyle": 0-100,
-     "events": 0-100,
-     "coaching": 0-100,
-     "facility": 0-100,
-     "community": 0-100,
-     "promotional": 0-100
+    "action_pct": 0-100,
+    "lifestyle_pct": 0-100,
+    "events_pct": 0-100,
+    "coaching_pct": 0-100,
+    "facility_pct": 0-100,
+    "community_pct": 0-100,
+    "promotional_pct": 0-100
    },
    "quality_assessment": {
      "image_quality": "professional|semi-professional|phone-camera|mixed",
-     "consistency": 1-10,
+    "consistency_score": 1-10,
      "brand_coherence": 1-10
    },
-   "filter_style": "warm|cool|high-contrast|natural|vintage"
+  "filter_editing": {
+    "editing_style": "heavily edited|lightly edited|raw|mixed",
+    "filter_type": "warm|cool|high-contrast|muted|saturated|none",
+    "grain_texture": true/false
+  }
  }
  
- Extract dominant colors as hex codes (5-8 colors). Percentages in content_mix should sum to 100.`;
+Extract 5 dominant colors and 2 accent colors as hex codes. Percentages in content_mix should sum to 100.`;
  
    const tryGemini = async (modelId: string) => {
      return await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`, {
@@ -787,64 +822,73 @@ async function uploadImageToStorage(
    visualDna: VisualDNA | null,
    voiceDna: VoiceDNA | null,
    followersCount: number
- ): { score: number; category: string } {
-   let totalScore = 0;
+): { score: number; category: string; factors: ScoreFactors } {
    
    // 1. Posting Frequency (30% weight)
    // Assume posts span ~90 days, calculate posts per week
    const postsPerWeek = posts.length / 13; // ~90 days / 7
    let frequencyScore = 0;
+  let frequencyValue = `${postsPerWeek.toFixed(1)}/week`;
    if (postsPerWeek >= 5) frequencyScore = 100;
    else if (postsPerWeek >= 3) frequencyScore = 75;
    else if (postsPerWeek >= 2) frequencyScore = 50;
    else if (postsPerWeek >= 1) frequencyScore = 30;
    else if (postsPerWeek >= 0.5) frequencyScore = 15;
-   totalScore += frequencyScore * 0.30;
    
    // 2. Content Quality (25% weight)
    let qualityScore = 55; // default to mixed
+  let qualityValue = 'mixed';
    if (visualDna?.quality_assessment?.image_quality) {
-     const quality = visualDna.quality_assessment.image_quality.toLowerCase();
+    qualityValue = visualDna.quality_assessment.image_quality.toLowerCase();
+    const quality = qualityValue;
      if (quality === 'professional') qualityScore = 100;
      else if (quality === 'semi-professional') qualityScore = 70;
      else if (quality === 'phone-camera') qualityScore = 40;
      else qualityScore = 55;
    }
-   totalScore += qualityScore * 0.25;
    
    // 3. Brand Consistency (20% weight)
    let consistencyScore = 50; // default
+  let consistencyValue = 5;
    if (visualDna?.quality_assessment?.brand_coherence) {
+    consistencyValue = visualDna.quality_assessment.brand_coherence;
      consistencyScore = visualDna.quality_assessment.brand_coherence * 10;
    }
-   totalScore += consistencyScore * 0.20;
    
    // 4. Engagement Rate (15% weight)
    let engagementScore = 30; // default
+  let engagementValue = 0;
    if (followersCount > 0 && posts.length > 0) {
      const avgLikes = posts.reduce((sum, p) => sum + (p.likesCount || 0), 0) / posts.length;
      const avgComments = posts.reduce((sum, p) => sum + (p.commentsCount || 0), 0) / posts.length;
-     const engagementRate = ((avgLikes + avgComments) / followersCount) * 100;
+    engagementValue = ((avgLikes + avgComments) / followersCount) * 100;
      
-     if (engagementRate >= 5) engagementScore = 100;
-     else if (engagementRate >= 3) engagementScore = 80;
-     else if (engagementRate >= 1.5) engagementScore = 60;
-     else if (engagementRate >= 0.5) engagementScore = 30;
+    if (engagementValue >= 5) engagementScore = 100;
+    else if (engagementValue >= 3) engagementScore = 80;
+    else if (engagementValue >= 1.5) engagementScore = 60;
+    else if (engagementValue >= 0.5) engagementScore = 30;
      else engagementScore = 10;
    }
-   totalScore += engagementScore * 0.15;
    
    // 5. Caption Effort (10% weight)
    let captionScore = 50; // default
+  let captionValue = 'medium';
    if (voiceDna?.average_length) {
-     const length = voiceDna.average_length.toLowerCase();
+    captionValue = voiceDna.average_length.toLowerCase();
+    const length = captionValue;
      if (length === 'long') captionScore = 100;
      else if (length === 'medium') captionScore = 70;
      else captionScore = 30;
    }
-   totalScore += captionScore * 0.10;
    
-   // Round to integer
+  // Calculate weighted total: multiply each score by its weight and sum
+  const totalScore = 
+    (frequencyScore * 0.30) +
+    (qualityScore * 0.25) +
+    (consistencyScore * 0.20) +
+    (engagementScore * 0.15) +
+    (captionScore * 0.10);
+  
    const finalScore = Math.round(totalScore);
    
    // Determine category
@@ -855,7 +899,15 @@ async function uploadImageToStorage(
    else if (finalScore >= 20) category = 'Struggling';
    else category = 'Invisible';
    
-   return { score: finalScore, category };
+  const factors: ScoreFactors = {
+    posting_frequency: { value: frequencyValue, score: frequencyScore, weight: 30 },
+    content_quality: { value: qualityValue, score: qualityScore, weight: 25 },
+    brand_consistency: { value: `${consistencyValue}/10`, score: consistencyScore, weight: 20 },
+    engagement_rate: { value: `${engagementValue.toFixed(1)}%`, score: engagementScore, weight: 15 },
+    caption_effort: { value: captionValue, score: captionScore, weight: 10 }
+  };
+  
+  return { score: finalScore, category, factors };
  }
  
  async function scrapeInstagramWithApify(
@@ -1236,14 +1288,14 @@ async function uploadImageToStorage(
        console.warn('Gemini error was:', geminiError);
       }
  
-     const { score: invisibilityScore, category: invisibilityCategory } = calculateInvisibilityScore(
+     const { score: invisibilityScore, category: invisibilityCategory, factors: scoreFactors } = calculateInvisibilityScore(
        posts,
        visualDna,
        voiceDna,
        followersCount
      );
  
-     console.log('Invisibility Score:', invisibilityScore, invisibilityCategory);
+     console.log('Invisibility Score:', invisibilityScore, invisibilityCategory, scoreFactors);
      if (!visualDna) {
        console.log('Note: Score calculated without visual analysis (using defaults)');
      }
@@ -1256,7 +1308,8 @@ async function uploadImageToStorage(
        invisibility_score: invisibilityScore,
        invisibility_category: invisibilityCategory,
         visual_dna_analyzed_at: new Date().toISOString(),
-        instagram_followers: followersCount
+        instagram_followers: followersCount,
+        score_factors: scoreFactors
      };
  
      if (visualDna) updateData.visual_dna = visualDna;
