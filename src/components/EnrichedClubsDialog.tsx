@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import VisualDNASection from "./VisualDNASection";
  import VisualDNACard from "./VisualDNACard";
+import { useLatestVisualDnaRow } from "@/hooks/useLatestVisualDnaRow";
 import { 
   Building2, Globe, Instagram, MapPin, Phone, Mail, Palette, Type, 
   MessageSquare, Sparkles, Eye, User, Calendar, Activity, Link2, ChevronDown, Users,
@@ -124,6 +125,8 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
   const [selectedClub, setSelectedClub] = useState<EnrichedClub | null>(null);
   const [citationsOpen, setCitationsOpen] = useState(false);
   const [analyzingClubId, setAnalyzingClubId] = useState<string | null>(null);
+
+  const { postsAnalyzed: selectedPostsAnalyzed } = useLatestVisualDnaRow(selectedClub?.id ?? null, open);
 
   useEffect(() => {
     if (!open) return;
@@ -277,7 +280,7 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
 
       toast({
         title: "Visual DNA Analysis Complete",
-        description: `Score: ${data.invisibility_score} (${data.invisibility_category}) • ${data.posts_analyzed} posts analyzed`,
+        description: `Score: ${data.invisibility_score} (${data.invisibility_category}) • ${data.images_analyzed ?? data.posts_found ?? 0}/12 images analyzed`,
       });
 
     } catch (err) {
@@ -718,6 +721,7 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
                        invisibilityScore={selectedClub.invisibility_score}
                        invisibilityCategory={selectedClub.invisibility_category}
                        analyzedAt={selectedClub.visual_dna_analyzed_at}
+                        postsAnalyzed={selectedPostsAnalyzed}
                      />
                    </div>
                  ) : (
