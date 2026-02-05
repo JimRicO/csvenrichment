@@ -9,6 +9,7 @@ import { Sparkles, Upload, Loader2, Building2, Globe, Instagram, Wand2, Facebook
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
 import Papa from "papaparse";
 import { Badge } from "@/components/ui/badge";
+import VisualDNAReportDialog from "@/components/VisualDNAReportDialog";
 
 interface ClubEnrichmentSectionProps {
   onJobCreated: (jobId: string, projectId: string) => void;
@@ -39,6 +40,10 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
   const [existingClubs, setExistingClubs] = useState<any[]>([]);
   const [isLoadingClubs, setIsLoadingClubs] = useState(false);
   const [analyzingClubId, setAnalyzingClubId] = useState<string | null>(null);
+
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportClubId, setReportClubId] = useState<string | null>(null);
+  const [lastProof, setLastProof] = useState<any | null>(null);
 
   const fetchExistingClubs = async () => {
     setIsLoadingClubs(true);
@@ -83,8 +88,13 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
       // Success toast with full details
       toast({
         title: "✓ Visual DNA Complete",
-        description: `${clubName}: ${data.invisibility_score}/100 (${data.invisibility_category}) • ${data.images_analyzed || 0} images analyzed in ${Math.round((data.processing_time_ms || 0) / 1000)}s`,
+        description: `${clubName}: ${data.invisibility_score}/100 (${data.invisibility_category}) • ${data.images_analyzed || 0}/12 images analyzed in ${Math.round((data.processing_time_ms || 0) / 1000)}s`,
       });
+
+      // Open the full report immediately so the user can see the card
+      setLastProof(data);
+      setReportClubId(clubId);
+      setReportOpen(true);
 
       // Refresh the list
       await fetchExistingClubs();
@@ -103,8 +113,10 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
   const getScoreBadgeColor = (category: string | null) => {
     switch (category) {
       case 'Excellent': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+      case 'Strong':
       case 'Good': return 'bg-green-500/20 text-green-400 border-green-500/30';
       case 'Average': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+      case 'Struggling':
       case 'Below Average': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
       case 'Invisible': return 'bg-red-500/20 text-red-400 border-red-500/30';
       default: return 'bg-muted text-muted-foreground';
@@ -288,6 +300,19 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
       defaultOpen={false}
       contentClassName="p-6 pt-0"
     >
+      <VisualDNAReportDialog
+        open={reportOpen}
+        onOpenChange={(o) => {
+          setReportOpen(o);
+          if (!o) {
+            setReportClubId(null);
+            setLastProof(null);
+          }
+        }}
+        clubId={reportClubId}
+        proof={lastProof}
+      />
+
       <Tabs defaultValue="single" className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-4">
           <TabsTrigger value="single">Single Club</TabsTrigger>
@@ -500,29 +525,45 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
                         )}
                       </td>
                       <td className="py-2 px-3 text-right">
-                        <Button
-                          size="sm"
-                          variant={club.invisibility_score !== null ? "outline" : "default"}
-                          onClick={() => handleAnalyzeVisualDna(club.id, club.club_name)}
-                          disabled={analyzingClubId === club.id}
-                        >
-                          {analyzingClubId === club.id ? (
-                            <>
-                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                              Scraping & Analyzing...
-                            </>
-                          ) : club.invisibility_score !== null ? (
-                            <>
-                              <RefreshCw className="h-3 w-3 mr-1" />
-                              Re-analyze
-                            </>
-                          ) : (
-                            <>
-                              <Eye className="h-3 w-3 mr-1" />
-                              Analyze
-                            </>
+                        <div className="inline-flex items-center gap-2">
+                          {(club.visual_dna_analyzed_at || club.invisibility_score !== null) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setLastProof(null);
+                                setReportClubId(club.id);
+                                setReportOpen(true);
+                              }}
+                            >
+                              View report
+                            </Button>
                           )}
-                        </Button>
+
+                          <Button
+                            size="sm"
+                            variant={club.invisibility_score !== null ? "outline" : "default"}
+                            onClick={() => handleAnalyzeVisualDna(club.id, club.club_name)}
+                            disabled={analyzingClubId === club.id}
+                          >
+                            {analyzingClubId === club.id ? (
+                              <>
+                                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                Scraping & Analyzing...
+                              </>
+                            ) : club.invisibility_score !== null ? (
+                              <>
+                                <RefreshCw className="h-3 w-3 mr-1" />
+                                Re-analyze
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="h-3 w-3 mr-1" />
+                                Analyze
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
