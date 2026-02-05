@@ -27,6 +27,9 @@ const GEMINI_MODEL_FALLBACK = 'gemini-2.0-flash';
  // All 12 images will be analyzed
  const MAX_IMAGES_FOR_ANALYSIS = 12;
 
+// Storage bucket for persisting visual DNA images
+const VISUAL_DNA_BUCKET = 'instagram-post-images';
+
  interface Post {
    id: string;
    type: string;
@@ -172,7 +175,7 @@ function extractJsonFromResponse(response: string): unknown {
  async function fetchAndResizeImage(
    url: string,
    maxWidth: number
- ): Promise<{ base64: string; mimeType: string } | null> {
+): Promise<{ base64: string; mimeType: string; buffer: ArrayBuffer } | null> {
    try {
      const response = await fetch(url, {
        headers: {
@@ -195,7 +198,7 @@ function extractJsonFromResponse(response: string): unknown {
      const base64 = arrayBufferToBase64(buffer);
      const cleanedBase64 = cleanBase64(base64);
      
-     return { base64: cleanedBase64, mimeType };
+    return { base64: cleanedBase64, mimeType, buffer };
    } catch (error) {
      console.error('Failed to fetch image:', url, error);
      return null;
@@ -411,8 +414,45 @@ function extractJsonFromResponse(response: string): unknown {
    base64Length?: number;
    mimeType?: string;
    error?: string;
+  buffer?: ArrayBuffer;
  }
  
+// Upload image buffer to Supabase storage and return the public URL
+async function uploadImageToStorage(
+  supabase: any,
+  imageBuffer: ArrayBuffer,
+  clubId: string,
+  imageIndex: number,
+  mimeType: string
+): Promise<string | null> {
+  try {
+    const ext = mimeType.includes('png') ? 'png' : mimeType.includes('webp') ? 'webp' : 'jpg';
+    const fileName = `visual-dna/${clubId}/${Date.now()}_${imageIndex}.${ext}`;
+    
+    const { data, error } = await supabase.storage
+      .from(VISUAL_DNA_BUCKET)
+      .upload(fileName, imageBuffer, {
+        contentType: mimeType,
+        upsert: true
+      });
+    
+    if (error) {
+      console.error(`Failed to upload image ${imageIndex} to storage:`, error);
+      return null;
+    }
+    
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from(VISUAL_DNA_BUCKET)
+      .getPublicUrl(fileName);
+    
+    return urlData?.publicUrl || null;
+  } catch (err) {
+    console.error(`Exception uploading image ${imageIndex}:`, err);
+    return null;
+  }
+}
+
   async function analyzeVisualWithGemini(posts: Post[], apiKey: string): Promise<{ visualDna: VisualDNA | null; imagesAnalyzed: number; error?: string; downloadResults: ImageDownloadResult[] }> {
     console.log('========================================');
     console.log('STARTING GEMINI VISUAL ANALYSIS');
@@ -467,7 +507,8 @@ function extractJsonFromResponse(response: string): unknown {
           success: true,
           sizeBytes: estimatedSizeBytes,
           base64Length: imageResult.base64.length,
-          mimeType: imageResult.mimeType
+          mimeType: imageResult.mimeType,
+          buffer: imageResult.buffer
         });
         
         imageParts.push({
@@ -1144,6 +1185,32 @@ function extractJsonFromResponse(response: string): unknown {
       console.log(`\nGemini result: ${imagesAnalyzed} images analyzed, visualDna: ${visualDna ? '✅ SUCCESS' : '❌ FAILED'}`);
       if (geminiError) console.log('Gemini error details:', geminiError);
  
+      // Step 2.5: Upload successfully downloaded images to persistent storage
+      console.log('\n💾 Step 2.5: PERSISTING IMAGES TO STORAGE');
+      const storageUrls: string[] = [];
+      const successfulDownloads = downloadResults.filter(r => r.success && r.buffer);
+      
+      for (let i = 0; i < successfulDownloads.length; i++) {
+        const result = successfulDownloads[i];
+        if (result.buffer && result.mimeType) {
+          console.log(`   Uploading image ${i + 1}/${successfulDownloads.length} to storage...`);
+          const storageUrl = await uploadImageToStorage(
+            supabase,
+            result.buffer,
+            enriched_club_id,
+            result.index,
+            result.mimeType
+          );
+          if (storageUrl) {
+            storageUrls.push(storageUrl);
+            console.log(`   ✅ Uploaded: ${storageUrl.substring(0, 60)}...`);
+          } else {
+            console.log(`   ❌ Failed to upload image ${result.index}`);
+          }
+        }
+      }
+      console.log(`   📦 Total persisted: ${storageUrls.length} images`);
+
       // Step 3: Voice analysis with Claude
       currentStep = 'analyzing_captions';
        console.log('\n🎤 Step 3: VOICE ANALYSIS WITH CLAUDE');
@@ -1195,6 +1262,7 @@ function extractJsonFromResponse(response: string): unknown {
      if (visualDna) updateData.visual_dna = visualDna;
      if (voiceDna) updateData.voice_dna = voiceDna;
      if (ctltMatches) updateData.ctlt_matches = ctltMatches;
+     if (storageUrls.length > 0) updateData.visual_dna_media_urls = storageUrls;
  
      const { error: updateError } = await supabase
        .from('enriched_clubs')
