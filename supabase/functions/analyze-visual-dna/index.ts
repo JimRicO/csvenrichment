@@ -14,6 +14,9 @@
    "Documentary", "Fashion Editorial", "Sports Action", "Lifestyle Casual", "Studio Portrait"
  ];
  
+// Use correct Claude model name
+const CLAUDE_MODEL = 'claude-3-5-sonnet-20241022';
+
  interface Post {
    id: string;
    type: string;
@@ -22,6 +25,7 @@
    likesCount: number;
    commentsCount: number;
    displayUrl: string;
+  persistedImageUrl?: string;
    alt?: string;
  }
  
@@ -91,29 +95,56 @@
    }
  }
  
- async function analyzeVisualWithGemini(posts: Post[], apiKey: string): Promise<VisualDNA | null> {
+async function analyzeVisualWithGemini(posts: Post[], apiKey: string, supabaseUrl: string): Promise<{ visualDna: VisualDNA | null; imagesAnalyzed: number }> {
    console.log('Starting Gemini visual analysis with', posts.length, 'posts');
    
    // Build image parts for multimodal request
    const imageParts: any[] = [];
+  let imagesFetched = 0;
+  let imagesFailed = 0;
    
    for (const post of posts.slice(0, 12)) {
-     if (!post.displayUrl) continue;
+    // Prefer persisted storage URL over CDN URL
+    const imageUrl = post.persistedImageUrl || post.displayUrl;
+    if (!imageUrl) {
+      console.log('Post has no image URL:', post.id);
+      continue;
+    }
      
-     const base64Image = await fetchImageAsBase64(post.displayUrl);
+    console.log('Fetching image:', imageUrl.substring(0, 100));
+    const base64Image = await fetchImageAsBase64(imageUrl);
      if (base64Image) {
+      imagesFetched++;
        imageParts.push({
          inline_data: {
            mime_type: "image/jpeg",
            data: base64Image
          }
        });
+    } else {
+      imagesFailed++;
+      console.log('Failed to fetch image, trying CDN fallback for post:', post.id);
+      // Try CDN URL as fallback if we used storage URL
+      if (post.persistedImageUrl && post.displayUrl) {
+        const fallbackBase64 = await fetchImageAsBase64(post.displayUrl);
+        if (fallbackBase64) {
+          imagesFetched++;
+          imageParts.push({
+            inline_data: {
+              mime_type: "image/jpeg",
+              data: fallbackBase64
+            }
+          });
+        }
+      }
      }
    }
    
+  console.log(`Image fetch results: ${imagesFetched} fetched, ${imagesFailed} failed, ${imageParts.length} ready for analysis`);
+  
    if (imageParts.length < 4) {
      console.error('Not enough valid images for analysis:', imageParts.length);
-     return null;
+    return { visualDna: null, imagesAnalyzed: imageParts.length };
    }
    
    console.log('Sending', imageParts.length, 'images to Gemini');
@@ -150,7 +181,7 @@
  Extract dominant colors as hex codes (5-8 colors). Percentages in content_mix should sum to 100.`;
  
    try {
-     const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', {
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent', {
        method: 'POST',
        headers: {
          'Content-Type': 'application/json',
@@ -173,7 +204,7 @@
      if (!response.ok) {
        const error = await response.text();
        console.error('Gemini API error:', response.status, error);
-       return null;
+        return { visualDna: null, imagesAnalyzed: imageParts.length };
      }
      
      const data = await response.json();
@@ -181,7 +212,7 @@
      
      if (!text) {
        console.error('No text in Gemini response');
-       return null;
+      return { visualDna: null, imagesAnalyzed: imageParts.length };
      }
      
      // Clean up response (remove markdown if present)
@@ -191,10 +222,10 @@
      }
      
      console.log('Gemini response:', cleanText.substring(0, 200));
-     return JSON.parse(cleanText) as VisualDNA;
+    return { visualDna: JSON.parse(cleanText) as VisualDNA, imagesAnalyzed: imageParts.length };
    } catch (error) {
      console.error('Gemini analysis failed:', error);
-     return null;
+    return { visualDna: null, imagesAnalyzed: imageParts.length };
    }
  }
  
@@ -242,7 +273,7 @@
          'anthropic-version': '2023-06-01'
        },
        body: JSON.stringify({
-         model: 'claude-sonnet-4-5-20241022',
+          model: CLAUDE_MODEL,
          max_tokens: 2000,
          messages: [{ role: 'user', content: prompt }]
        })
@@ -310,7 +341,7 @@
          'anthropic-version': '2023-06-01'
        },
        body: JSON.stringify({
-         model: 'claude-sonnet-4-5-20241022',
+          model: CLAUDE_MODEL,
          max_tokens: 2000,
          messages: [{ role: 'user', content: prompt }]
        })
@@ -571,6 +602,9 @@
      const username = club.instagram_handle.replace('@', '').toLowerCase();
      console.log('Looking up Instagram data for:', username);
  
+      // Get Supabase URL for constructing storage URLs
+      const storageBaseUrl = `${supabaseUrl}/storage/v1/object/public`;
+
      // Check for existing Instagram data
      let instagramData: any = null;
      let posts: Post[] = [];
@@ -584,10 +618,45 @@
        .limit(1)
        .single();
  
-     if (existingData && existingData.latest_posts && Array.isArray(existingData.latest_posts) && existingData.latest_posts.length >= 4) {
+      // Also check raw_apify_data for posts
+      const rawData = existingData?.raw_apify_data as any;
+      const latestPosts = existingData?.latest_posts || rawData?.latestPosts || [];
+      
+      console.log('Instagram data check:', {
+        hasExistingData: !!existingData,
+        latestPostsCount: latestPosts?.length || 0,
+        rawApifyDataKeys: rawData ? Object.keys(rawData) : [],
+        samplePostFields: latestPosts?.[0] ? Object.keys(latestPosts[0]) : []
+      });
+
+      if (existingData && Array.isArray(latestPosts) && latestPosts.length >= 4) {
        console.log('Using existing Instagram data, posts:', existingData.latest_posts.length);
        instagramData = existingData;
-       posts = existingData.latest_posts as Post[];
+        
+        // Transform posts and add persisted image URLs
+        posts = latestPosts.map((p: any, index: number) => {
+          // Build persisted storage URL
+          const persistedImageUrl = `${storageBaseUrl}/instagram-post-images/${existingData.scraped_row_id}/post_${index}.jpg`;
+          
+          return {
+            id: p.id || p.shortCode || String(index),
+            type: p.type || 'Image',
+            timestamp: p.timestamp || '',
+            caption: p.caption || '',
+            likesCount: p.likesCount || 0,
+            commentsCount: p.commentsCount || 0,
+            displayUrl: p.displayUrl || '',
+            persistedImageUrl,
+            alt: p.alt
+          };
+        });
+        
+        console.log('Transformed posts with storage URLs:', posts.slice(0, 2).map(p => ({
+          id: p.id,
+          hasDisplayUrl: !!p.displayUrl,
+          persistedUrl: p.persistedImageUrl
+        })));
+        
        followersCount = existingData.followers_count || followersCount;
      } else if (APIFY_API_TOKEN) {
        // Scrape Instagram
@@ -658,11 +727,14 @@
  
      // Run AI analyses in parallel
      console.log('Running AI analyses...');
-     const [visualDna, voiceDna] = await Promise.all([
-       analyzeVisualWithGemini(posts, GEMINI_API_KEY),
+      const [geminiResult, voiceDna] = await Promise.all([
+        analyzeVisualWithGemini(posts, GEMINI_API_KEY, supabaseUrl),
        analyzeVoiceWithClaude(posts, ANTHROPIC_API_KEY)
      ]);
  
+      const { visualDna, imagesAnalyzed } = geminiResult;
+      console.log(`Gemini analyzed ${imagesAnalyzed} images, result: ${visualDna ? 'success' : 'failed'}`);
+
      // CTLT matching (depends on visual DNA)
      let ctltMatches: CTLTMatches | null = null;
      if (visualDna) {
@@ -678,6 +750,13 @@
      );
  
      console.log('Invisibility Score:', invisibilityScore, invisibilityCategory);
+      console.log('Analysis summary:', {
+        postsFound: posts.length,
+        imagesAnalyzed,
+        hasVisualDna: !!visualDna,
+        hasVoiceDna: !!voiceDna,
+        hasCTLT: !!ctltMatches
+      });
  
      // Update enriched_clubs with results
      const updateData: any = {
@@ -706,7 +785,7 @@
          .from('visual_dna_rows')
          .update({ 
            status: 'completed',
-           posts_analyzed: posts.length,
+            posts_analyzed: imagesAnalyzed,
            processing_time_ms: processingTime,
            updated_at: new Date().toISOString()
          })
@@ -721,7 +800,8 @@
          club_id: enriched_club_id,
          invisibility_score: invisibilityScore,
          invisibility_category: invisibilityCategory,
-         posts_analyzed: posts.length,
+          posts_found: posts.length,
+          images_analyzed: imagesAnalyzed,
          processing_time_ms: processingTime,
          has_visual_dna: !!visualDna,
          has_voice_dna: !!voiceDna,
