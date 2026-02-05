@@ -285,9 +285,26 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
     <CollapsibleCard
       header={
         <div className="p-6">
-          <div className="flex items-center gap-2 text-lg font-semibold">
-            <Sparkles className="h-5 w-5 text-primary" />
-            Club Intelligence Enrichment
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-lg font-semibold">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Club Intelligence Enrichment
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenVisualDna}
+              disabled={isLoadingClubs}
+            >
+              {isLoadingClubs ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  <Dna className="h-4 w-4 mr-2" />
+                  Analyze Visual DNA
+                </>
+              )}
+            </Button>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
             Extract comprehensive brand identity, contact data, and AI-generated insights
@@ -473,29 +490,12 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
 
       {/* Visual DNA Button Section */}
       <div className="mt-6 pt-6 border-t border-border/50">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Dna className="h-5 w-5 text-primary" />
-            <div>
-              <h3 className="text-sm font-medium">Visual DNA Analysis</h3>
-              <p className="text-xs text-muted-foreground">Analyze Instagram presence and generate Invisibility Scores</p>
-            </div>
+        <div className="flex items-center gap-3 mb-4">
+          <Dna className="h-5 w-5 text-primary" />
+          <div>
+            <h3 className="text-sm font-medium">Visual DNA Analysis</h3>
+            <p className="text-xs text-muted-foreground">Analyze Instagram presence and generate Invisibility Scores</p>
           </div>
-          <Button
-            variant={showVisualDnaSection ? "outline" : "default"}
-            size="sm"
-            onClick={handleOpenVisualDna}
-            disabled={isLoadingClubs}
-          >
-            {isLoadingClubs ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <>
-                <Dna className="h-4 w-4 mr-2" />
-                {showVisualDnaSection ? 'Refresh Clubs' : 'Analyze Visual DNA'}
-              </>
-            )}
-          </Button>
         </div>
 
         {/* Expandable clubs list */}
