@@ -318,10 +318,32 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[85vh] p-0">
         <DialogHeader className="p-6 pb-0">
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            Enriched Clubs
-          </DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Enriched Clubs
+            </DialogTitle>
+            {selectedClub && selectedClub.instagram_handle && (
+              <Button
+                size="sm"
+                variant={selectedClub.visual_dna_analyzed_at ? "outline" : "default"}
+                onClick={() => handleAnalyzeVisualDNA(selectedClub)}
+                disabled={analyzingClubId === selectedClub.id}
+              >
+                {analyzingClubId === selectedClub.id ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <Dna className="h-4 w-4 mr-2" />
+                    {selectedClub.visual_dna_analyzed_at ? 'Re-analyze Visual DNA' : 'Analyze Visual DNA'}
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
         <div className="flex h-[70vh]">
