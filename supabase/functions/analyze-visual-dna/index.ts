@@ -1,4 +1,3 @@
- import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
  import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
  
  const corsHeaders = {
@@ -403,56 +402,116 @@ function extractJsonFromResponse(response: string): unknown {
    };
  }
  
- async function analyzeVisualWithGemini(posts: Post[], apiKey: string): Promise<{ visualDna: VisualDNA | null; imagesAnalyzed: number; error?: string }> {
-   console.log('Starting Gemini visual analysis with', posts.length, 'posts (analyzing ALL images)');
-   
-   // Build image parts for multimodal request - fetch ALL images
-   const imageParts: any[] = [];
-   let imagesFetched = 0;
-   let imagesFailed = 0;
-   
-   // Process ALL posts (up to MAX_IMAGES_FOR_ANALYSIS = 12)
-   for (const post of posts.slice(0, MAX_IMAGES_FOR_ANALYSIS)) {
-     // Use the displayUrl directly - these are fresh URLs from Apify
-     const imageUrl = post.displayUrl;
-     if (!imageUrl) {
-       console.log('Post has no image URL:', post.id);
-       imagesFailed++;
-       continue;
-     }
-     
-     console.log('Fetching image:', imageUrl.substring(0, 80) + '...');
-     const imageResult = await fetchAndResizeImage(imageUrl, TARGET_IMAGE_WIDTH);
-     
-     if (imageResult) {
-       imagesFetched++;
-       console.log('Successfully fetched image, base64 length:', imageResult.base64.length);
-       imageParts.push({
-         inline_data: {
-           mime_type: imageResult.mimeType,
-           data: imageResult.base64
-         }
-       });
-     } else {
-       imagesFailed++;
-       console.log('Failed to fetch image for post:', post.id);
-     }
-   }
-   
-   console.log(`Image fetch results: ${imagesFetched} fetched, ${imagesFailed} failed, ${imageParts.length} ready for analysis`);
+ // Progress logging interface
+ interface ImageDownloadResult {
+   index: number;
+   url: string;
+   success: boolean;
+   sizeBytes?: number;
+   base64Length?: number;
+   mimeType?: string;
+   error?: string;
+ }
+ 
+  async function analyzeVisualWithGemini(posts: Post[], apiKey: string): Promise<{ visualDna: VisualDNA | null; imagesAnalyzed: number; error?: string; downloadResults: ImageDownloadResult[] }> {
+    console.log('========================================');
+    console.log('STARTING GEMINI VISUAL ANALYSIS');
+    console.log(`Total posts to analyze: ${posts.length} (max ${MAX_IMAGES_FOR_ANALYSIS})`);
+    console.log('========================================');
+    
+    // Build image parts for multimodal request - fetch ALL images
+    const imageParts: any[] = [];
+    const downloadResults: ImageDownloadResult[] = [];
+    let imagesFetched = 0;
+    let imagesFailed = 0;
+    
+    // Process ALL posts (up to MAX_IMAGES_FOR_ANALYSIS = 12)
+    const postsToProcess = posts.slice(0, MAX_IMAGES_FOR_ANALYSIS);
+    const totalImages = postsToProcess.length;
+    
+    for (let i = 0; i < postsToProcess.length; i++) {
+      const post = postsToProcess[i];
+      const imageUrl = post.displayUrl;
+      const imageNum = i + 1;
+      
+      console.log(`\n📥 Downloading image ${imageNum}/${totalImages}...`);
+      console.log(`   URL: ${imageUrl ? imageUrl.substring(0, 100) + '...' : 'NO URL'}`);
+      
+      if (!imageUrl) {
+        console.log(`   ❌ FAILED: No URL provided for post ${post.id}`);
+        imagesFailed++;
+        downloadResults.push({
+          index: imageNum,
+          url: 'NO_URL',
+          success: false,
+          error: 'Post has no displayUrl'
+        });
+        continue;
+      }
+      
+      const startFetch = Date.now();
+      const imageResult = await fetchAndResizeImage(imageUrl, TARGET_IMAGE_WIDTH);
+      const fetchTime = Date.now() - startFetch;
+      
+      if (imageResult) {
+        imagesFetched++;
+        const estimatedSizeBytes = Math.round((imageResult.base64.length * 3) / 4);
+        console.log(`   ✅ SUCCESS: Downloaded in ${fetchTime}ms`);
+        console.log(`      Size: ~${Math.round(estimatedSizeBytes / 1024)}KB`);
+        console.log(`      Base64 length: ${imageResult.base64.length} chars`);
+        console.log(`      MIME type: ${imageResult.mimeType}`);
+        
+        downloadResults.push({
+          index: imageNum,
+          url: imageUrl.substring(0, 80),
+          success: true,
+          sizeBytes: estimatedSizeBytes,
+          base64Length: imageResult.base64.length,
+          mimeType: imageResult.mimeType
+        });
+        
+        imageParts.push({
+          inline_data: {
+            mime_type: imageResult.mimeType,
+            data: imageResult.base64
+          }
+        });
+      } else {
+        imagesFailed++;
+        console.log(`   ❌ FAILED: Could not fetch/process image in ${fetchTime}ms`);
+        downloadResults.push({
+          index: imageNum,
+          url: imageUrl.substring(0, 80),
+          success: false,
+          error: 'Fetch or processing failed'
+        });
+      }
+    }
+    
+    console.log('\n========================================');
+    console.log(`IMAGE DOWNLOAD SUMMARY`);
+    console.log(`✅ Success: ${imagesFetched}/${totalImages}`);
+    console.log(`❌ Failed: ${imagesFailed}/${totalImages}`);
+    console.log(`Ready for Gemini: ${imageParts.length} images`);
+    console.log('========================================\n');
  
    if (imageParts.length < 4) {
      console.error('Not enough valid images for analysis:', imageParts.length);
-     return { visualDna: null, imagesAnalyzed: imageParts.length, error: `Only ${imageParts.length} valid images (need 4+)` };
+      return { visualDna: null, imagesAnalyzed: imageParts.length, error: `Only ${imageParts.length} valid images (need 4+)`, downloadResults };
    }
    
    // Try sending all images in a single request first
-   console.log(`Attempting single request with all ${imageParts.length} images...`);
+    console.log('========================================');
+    console.log(`🚀 SENDING ${imageParts.length} IMAGES TO GEMINI...`);
+    console.log('========================================');
    const singleResult = await sendBatchToGemini(imageParts, apiKey);
    
    if (singleResult.visualDna) {
-     console.log('Single batch succeeded!');
-     return { visualDna: singleResult.visualDna, imagesAnalyzed: imageParts.length };
+      console.log('✅ GEMINI ANALYZED ALL IMAGES SUCCESSFULLY');
+      console.log(`   Color palette: ${singleResult.visualDna.color_palette?.length || 0} colors`);
+      console.log(`   Style: ${singleResult.visualDna.photography_style}`);
+      console.log(`   Quality: ${singleResult.visualDna.quality_assessment?.image_quality}`);
+      return { visualDna: singleResult.visualDna, imagesAnalyzed: imageParts.length, downloadResults };
    }
    
    // Check if the error suggests payload/size issues
@@ -462,53 +521,60 @@ function extractJsonFromResponse(response: string): unknown {
    
    if (!isPayloadError) {
      // Not a payload issue, return the error
-     console.log('Single batch failed with non-payload error:', singleResult.error);
-     return { visualDna: null, imagesAnalyzed: imageParts.length, error: singleResult.error };
+      console.log('❌ GEMINI FAILED:', singleResult.error);
+      return { visualDna: null, imagesAnalyzed: imageParts.length, error: singleResult.error, downloadResults };
    }
    
    // Payload too large - split into 2 batches of 6
-   console.log('Single batch failed due to payload size, splitting into 2 batches of 6...');
+    console.log('⚠️ Payload too large, splitting into 2 batches of 6...');
    
    const midpoint = Math.ceil(imageParts.length / 2);
    const batch1Parts = imageParts.slice(0, midpoint);
    const batch2Parts = imageParts.slice(midpoint);
    
-   console.log(`Batch 1: ${batch1Parts.length} images, Batch 2: ${batch2Parts.length} images`);
+    console.log(`   Batch 1: ${batch1Parts.length} images`);
+    console.log(`   Batch 2: ${batch2Parts.length} images`);
    
    // Run both batches
+    console.log('\n🚀 Sending Batch 1 to Gemini...');
    const batch1Result = await sendBatchToGemini(batch1Parts, apiKey, 1, 2);
    
    if (!batch1Result.visualDna) {
-     console.error('Batch 1 failed:', batch1Result.error);
-     return { visualDna: null, imagesAnalyzed: imageParts.length, error: `Batch processing failed: ${batch1Result.error}` };
+      console.error('❌ Batch 1 failed:', batch1Result.error);
+      return { visualDna: null, imagesAnalyzed: imageParts.length, error: `Batch processing failed: ${batch1Result.error}`, downloadResults };
    }
+    console.log('✅ Batch 1 succeeded');
    
+    console.log('\n🚀 Sending Batch 2 to Gemini...');
    const batch2Result = await sendBatchToGemini(batch2Parts, apiKey, 2, 2);
    
    if (!batch2Result.visualDna) {
-     console.error('Batch 2 failed:', batch2Result.error);
+      console.error('⚠️ Batch 2 failed:', batch2Result.error);
      // Return batch 1 results if batch 2 fails
      console.log('Using batch 1 results only since batch 2 failed');
-     return { visualDna: batch1Result.visualDna, imagesAnalyzed: batch1Parts.length, error: `Partial analysis: ${batch2Result.error}` };
+      return { visualDna: batch1Result.visualDna, imagesAnalyzed: batch1Parts.length, error: `Partial analysis: ${batch2Result.error}`, downloadResults };
    }
+    console.log('✅ Batch 2 succeeded');
    
    // Merge both batch results
-   console.log('Both batches succeeded, merging results...');
+    console.log('\n✅ GEMINI ANALYZED ALL IMAGES (2 batches merged)');
    const mergedVisualDna = mergeVisualDNAResults(batch1Result.visualDna, batch2Result.visualDna);
    
-   return { visualDna: mergedVisualDna, imagesAnalyzed: imageParts.length };
+    return { visualDna: mergedVisualDna, imagesAnalyzed: imageParts.length, downloadResults };
  }
  
  async function analyzeVoiceWithClaude(posts: Post[], apiKey: string): Promise<VoiceDNA | null> {
-   console.log('Starting Claude voice analysis');
-   
    const captions = posts
      .map(p => p.caption)
      .filter(c => c && c.trim().length > 0)
      .slice(0, 12);
    
+    console.log('========================================');
+    console.log(`🎤 SENDING ${captions.length} CAPTIONS TO CLAUDE...`);
+    console.log('========================================');
+    
    if (captions.length === 0) {
-     console.log('No captions to analyze');
+      console.log('⚠️ No captions to analyze');
      return null;
    }
    
@@ -570,7 +636,7 @@ function extractJsonFromResponse(response: string): unknown {
      const text = data.content?.[0]?.text;
      
      if (!text) {
-       console.error('No text in Claude response');
+        console.error('❌ CLAUDE FAILED: No text in response');
        return null;
      }
      
@@ -579,16 +645,22 @@ function extractJsonFromResponse(response: string): unknown {
        cleanText = cleanText.replace(/^```json?\n?/, '').replace(/\n?```$/, '');
      }
      
-     console.log('Claude voice response:', cleanText.substring(0, 200));
-     return JSON.parse(cleanText) as VoiceDNA;
+      const voiceDna = JSON.parse(cleanText) as VoiceDNA;
+      console.log('✅ CLAUDE VOICE ANALYSIS COMPLETE');
+      console.log(`   Tone: ${voiceDna.tone}`);
+      console.log(`   Caption length: ${voiceDna.average_length}`);
+      console.log(`   Emoji frequency: ${voiceDna.emoji_frequency}`);
+      return voiceDna;
    } catch (error) {
-     console.error('Claude voice analysis failed:', error);
+      console.error('❌ CLAUDE VOICE ANALYSIS FAILED:', error);
      return null;
    }
  }
  
  async function matchCTLTStylesWithClaude(visualDna: VisualDNA, apiKey: string): Promise<CTLTMatches | null> {
-   console.log('Starting CTLT style matching');
+    console.log('========================================');
+    console.log('🎨 MATCHING CTLT STYLES WITH CLAUDE...');
+    console.log('========================================');
    
    const prompt = `Based on this visual identity analysis of a sports/fitness club's Instagram, match it against photography styles.
  
@@ -649,7 +721,7 @@ function extractJsonFromResponse(response: string): unknown {
      const text = data.content?.[0]?.text;
      
      if (!text) {
-       console.error('No text in Claude CTLT response');
+        console.error('❌ CLAUDE CTLT FAILED: No text in response');
        return null;
      }
      
@@ -658,10 +730,13 @@ function extractJsonFromResponse(response: string): unknown {
        cleanText = cleanText.replace(/^```json?\n?/, '').replace(/\n?```$/, '');
      }
      
-     console.log('Claude CTLT response:', cleanText.substring(0, 200));
-     return JSON.parse(cleanText) as CTLTMatches;
+      const ctltMatches = JSON.parse(cleanText) as CTLTMatches;
+      console.log('✅ CTLT STYLE MATCHING COMPLETE');
+      console.log(`   Top match: ${ctltMatches.matched_styles?.[0]?.style_name} (${ctltMatches.matched_styles?.[0]?.match_score}/10)`);
+      console.log(`   Styles to avoid: ${ctltMatches.styles_to_avoid?.map(s => s.style_name).join(', ')}`);
+      return ctltMatches;
    } catch (error) {
-     console.error('Claude CTLT matching failed:', error);
+      console.error('❌ CLAUDE CTLT MATCHING FAILED:', error);
      return null;
    }
  }
@@ -904,7 +979,7 @@ function extractJsonFromResponse(response: string): unknown {
     }
   }
  
- serve(async (req) => {
+ Deno.serve(async (req) => {
    if (req.method === 'OPTIONS') {
      return new Response(null, { headers: corsHeaders });
    }
@@ -1053,32 +1128,40 @@ function extractJsonFromResponse(response: string): unknown {
  
       // Step 2: Visual analysis with Gemini
       currentStep = 'analyzing_images';
-      console.log(`Step 2: Analyzing ${posts.length} images with Gemini...`);
+       console.log('\n📸 Step 2: VISUAL ANALYSIS WITH GEMINI');
       const geminiResult = await analyzeVisualWithGemini(posts, GEMINI_API_KEY);
-     const { visualDna, imagesAnalyzed, error: geminiError } = geminiResult;
-      console.log(`Gemini result: ${imagesAnalyzed} images analyzed, visualDna: ${visualDna ? 'SUCCESS' : 'FAILED'}`);
-     if (geminiError) {
-       console.log('Gemini error details:', geminiError);
-     }
+      const { visualDna, imagesAnalyzed, error: geminiError, downloadResults } = geminiResult;
+      
+      // Log download summary
+      console.log('\n📊 IMAGE DOWNLOAD RESULTS:');
+      downloadResults.forEach(r => {
+        if (r.success) {
+          console.log(`   Image ${r.index}: ✅ ${Math.round((r.sizeBytes || 0) / 1024)}KB (${r.mimeType})`);
+        } else {
+          console.log(`   Image ${r.index}: ❌ ${r.error}`);
+        }
+      });
+      console.log(`\nGemini result: ${imagesAnalyzed} images analyzed, visualDna: ${visualDna ? '✅ SUCCESS' : '❌ FAILED'}`);
+      if (geminiError) console.log('Gemini error details:', geminiError);
  
       // Step 3: Voice analysis with Claude
       currentStep = 'analyzing_captions';
-      console.log('Step 3: Analyzing captions with Claude...');
+       console.log('\n🎤 Step 3: VOICE ANALYSIS WITH CLAUDE');
       const voiceDna = await analyzeVoiceWithClaude(posts, ANTHROPIC_API_KEY);
-      console.log(`Claude result: voiceDna: ${voiceDna ? 'SUCCESS' : 'FAILED'}`);
+       console.log(`Claude result: voiceDna: ${voiceDna ? '✅ SUCCESS' : '❌ FAILED'}`);
 
       // Step 4: CTLT matching (depends on visual DNA)
       currentStep = 'matching_styles';
      let ctltMatches: CTLTMatches | null = null;
      if (visualDna) {
-        console.log('Step 4: Matching CTLT styles...');
+         console.log('\n🎨 Step 4: CTLT STYLE MATCHING');
        ctltMatches = await matchCTLTStylesWithClaude(visualDna, ANTHROPIC_API_KEY);
-        console.log(`CTLT result: ${ctltMatches ? 'SUCCESS' : 'FAILED'}`);
+         console.log(`CTLT result: ${ctltMatches ? '✅ SUCCESS' : '❌ FAILED'}`);
      }
  
       // Step 5: Calculate invisibility score
       currentStep = 'calculating_score';
-      console.log('Step 5: Calculating invisibility score...');
+       console.log('\n📊 Step 5: CALCULATING INVISIBILITY SCORE');
       
      // Calculate score even if visual analysis failed (will use defaults)
      if (!visualDna) {
@@ -1144,8 +1227,17 @@ function extractJsonFromResponse(response: string): unknown {
          .eq('id', visual_dna_row_id);
      }
  
-      console.log('===== VISUAL DNA ANALYSIS COMPLETE =====');
-      console.log(`Total time: ${processingTime}ms | Images: ${imagesAnalyzed} | Score: ${invisibilityScore}`);
+       console.log('\n========================================');
+       console.log('🎉 VISUAL DNA ANALYSIS COMPLETE');
+       console.log('========================================');
+       console.log(`⏱️  Total time: ${processingTime}ms`);
+       console.log(`📷 Images downloaded: ${downloadResults.filter(r => r.success).length}/${downloadResults.length}`);
+       console.log(`🔍 Images analyzed: ${imagesAnalyzed}`);
+       console.log(`📊 Invisibility Score: ${invisibilityScore} (${invisibilityCategory})`);
+       console.log(`✅ Visual DNA: ${visualDna ? 'Yes' : 'No'}`);
+       console.log(`✅ Voice DNA: ${voiceDna ? 'Yes' : 'No'}`);
+       console.log(`✅ CTLT Matches: ${ctltMatches ? 'Yes' : 'No'}`);
+       console.log('========================================\n');
  
      return new Response(
        JSON.stringify({
@@ -1155,12 +1247,15 @@ function extractJsonFromResponse(response: string): unknown {
          invisibility_category: invisibilityCategory,
           posts_found: posts.length,
           images_analyzed: imagesAnalyzed,
+          images_downloaded: downloadResults.filter(r => r.success).length,
+          images_failed: downloadResults.filter(r => !r.success).length,
          processing_time_ms: processingTime,
          has_visual_dna: !!visualDna,
          has_voice_dna: !!voiceDna,
          has_ctlt_matches: !!ctltMatches,
          visual_analysis_error: geminiError || null,
-         partial_score: !visualDna
+          partial_score: !visualDna,
+          download_details: downloadResults
        }),
        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
      );
