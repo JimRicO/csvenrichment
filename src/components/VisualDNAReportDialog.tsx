@@ -133,7 +133,17 @@ export default function VisualDNAReportDialog({
     fetchData();
   }, [open, clubId]);
 
-  const proofDetails = proof?.download_details || [];
+  const proofDetails = proof?.download_details ?? [];
+
+  // Extract media URLs for the gallery from the proof download_details
+  const mediaUrls = useMemo(() => {
+    if (proofDetails.length > 0) {
+      return proofDetails
+        .filter((d) => d.success && d.url)
+        .map((d) => d.url);
+    }
+    return [];
+  }, [proofDetails]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -199,6 +209,7 @@ export default function VisualDNAReportDialog({
                 invisibilityCategory={club.invisibility_category}
                 analyzedAt={club.visual_dna_analyzed_at}
                 postsAnalyzed={effectivePostsAnalyzed}
+                mediaUrls={mediaUrls}
               />
 
               {/* Proof (only available immediately after a run, since it isn't persisted) */}

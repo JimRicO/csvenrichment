@@ -9,6 +9,8 @@
  import { cn } from "@/lib/utils";
  import { useState } from "react";
  import { Button } from "@/components/ui/button";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
  
  interface VisualDNA {
    color_palette?: string[];
@@ -65,6 +67,8 @@
    invisibilityCategory: string | null;
    analyzedAt: string | null;
    postsAnalyzed?: number;
+  /** URLs of the images that were analyzed (for the media gallery) */
+  mediaUrls?: string[];
  }
  
  const getCategoryColor = (category: string | null) => {
@@ -181,7 +185,8 @@
    invisibilityScore,
    invisibilityCategory,
    analyzedAt,
-   postsAnalyzed
+  postsAnalyzed,
+  mediaUrls
  }: VisualDNACardProps) => {
    const [showRawData, setShowRawData] = useState(false);
    
@@ -234,6 +239,39 @@
          </div>
        </div>
  
+        {/* Media Gallery - horizontal scrolling */}
+        {mediaUrls && mediaUrls.length > 0 && (
+          <div>
+            <SectionHeader icon={Image} title={`Analyzed Media (${mediaUrls.length})`} />
+            <ScrollArea className="w-full whitespace-nowrap rounded-lg">
+              <div className="flex gap-3 pb-3">
+                {mediaUrls.map((url, idx) => (
+                  <a
+                    key={idx}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 w-32 block rounded-lg overflow-hidden border border-border hover:border-primary transition-colors group"
+                  >
+                    <AspectRatio ratio={1}>
+                      <img
+                        src={url}
+                        alt={`Analyzed image ${idx + 1}`}
+                        className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/placeholder.svg';
+                        }}
+                      />
+                    </AspectRatio>
+                  </a>
+                ))}
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+          </div>
+        )}
+
        {/* Score Breakdown Table */}
        {(visualDna || voiceDna) && (
          <div className="bg-muted/30 rounded-lg p-4">
