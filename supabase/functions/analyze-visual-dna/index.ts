@@ -15,8 +15,8 @@
  ];
  
 // Model names
-const CLAUDE_MODEL = 'claude-3-5-sonnet-20241022';
-const GEMINI_MODEL = 'gemini-1.5-flash';
+const CLAUDE_MODEL = 'claude-sonnet-4-5-20250514';
+const GEMINI_MODEL = 'gemini-2.5-flash-preview-04-17';
 
  interface Post {
    id: string;
