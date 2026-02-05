@@ -1208,16 +1208,17 @@ async function uploadImageToStorage(
     let currentStep = 'initializing';
  
    try {
-     const { enriched_club_id, visual_dna_row_id } = await req.json();
+      const { enriched_club_id, visual_dna_row_id, instagram_handle } = await req.json();
      
-     if (!enriched_club_id) {
+      // Support either enriched_club_id OR direct instagram_handle
+      const isDirectMode = !enriched_club_id && instagram_handle;
+      
+      if (!enriched_club_id && !instagram_handle) {
        return new Response(
-         JSON.stringify({ error: 'enriched_club_id is required', code: 'INVALID_INPUT' }),
+          JSON.stringify({ error: 'enriched_club_id or instagram_handle is required', code: 'INVALID_INPUT' }),
          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
        );
      }
- 
-     console.log('Analyzing Visual DNA for club:', enriched_club_id);
  
      // Initialize Supabase client
      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -1237,43 +1238,57 @@ async function uploadImageToStorage(
        );
      }
  
-     // Fetch club data
-     const { data: club, error: clubError } = await supabase
-       .from('enriched_clubs')
-       .select('*')
-       .eq('id', enriched_club_id)
-       .single();
- 
-     if (clubError || !club) {
-       console.error('Club not found:', clubError);
-       return new Response(
-         JSON.stringify({ error: 'Club not found', code: 'NOT_FOUND' }),
-         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-       );
+      if (!APIFY_API_TOKEN) {
+         return new Response(
+           JSON.stringify({ error: 'APIFY_API_TOKEN not configured', code: 'CONFIG_ERROR' }),
+           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+         );
      }
  
-     if (!club.instagram_handle) {
-       return new Response(
-         JSON.stringify({ error: 'No Instagram handle found', code: 'NO_HANDLE' }),
-         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-       );
-     }
+      let username: string;
+      let club: any = null;
+      let followersCount = 0;
  
-     const username = club.instagram_handle.replace('@', '').toLowerCase();
+      if (isDirectMode) {
+        // Direct mode: analyze Instagram handle without an enriched club record
+        username = instagram_handle.replace('@', '').trim().toLowerCase();
+        console.log('===== DIRECT VISUAL DNA ANALYSIS START =====');
+        console.log('Instagram handle:', username, '(no enriched club)');
+      } else {
+        // Standard mode: fetch club data
+        console.log('Analyzing Visual DNA for club:', enriched_club_id);
+        
+        const { data: clubData, error: clubError } = await supabase
+          .from('enriched_clubs')
+          .select('*')
+          .eq('id', enriched_club_id)
+          .single();
+
+        if (clubError || !clubData) {
+          console.error('Club not found:', clubError);
+          return new Response(
+            JSON.stringify({ error: 'Club not found', code: 'NOT_FOUND' }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        if (!clubData.instagram_handle) {
+          return new Response(
+            JSON.stringify({ error: 'No Instagram handle found', code: 'NO_HANDLE' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        club = clubData;
+        username = club.instagram_handle.replace('@', '').toLowerCase();
+        followersCount = club.instagram_followers || 0;
       console.log('===== VISUAL DNA ANALYSIS START =====');
       console.log('Club:', club.club_name, '| Instagram:', username);
+      }
  
       // ALWAYS perform a fresh Instagram scrape to get valid image URLs
      let posts: Post[] = [];
-     let followersCount = club.instagram_followers || 0;
       let profileData: any = null;
- 
-      if (!APIFY_API_TOKEN) {
-        return new Response(
-          JSON.stringify({ error: 'APIFY_API_TOKEN not configured', code: 'CONFIG_ERROR' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
  
       // Step 1: Fresh Instagram scrape
       currentStep = 'scraping_instagram';
@@ -1282,7 +1297,7 @@ async function uploadImageToStorage(
       
       if (!scrapeResult.success) {
         console.error('Instagram scrape failed:', scrapeResult.error);
-        if (visual_dna_row_id) {
+         if (visual_dna_row_id && !isDirectMode) {
           await supabase
             .from('visual_dna_rows')
             .update({ 
@@ -1317,18 +1332,20 @@ async function uploadImageToStorage(
       console.log(`Scraped ${posts.length} posts, ${followersCount} followers`);
       console.log('Sample post URLs:', posts.slice(0, 2).map(p => p.displayUrl?.substring(0, 60) + '...'));
  
-      // Update instagram_company_data with fresh data immediately after scrape
-      await updateInstagramCompanyData(
-        supabase,
-        enriched_club_id,
-        profileData,
-        `https://instagram.com/${username}`
-      );
+       // Update instagram_company_data with fresh data immediately after scrape (only for club mode)
+       if (!isDirectMode && enriched_club_id) {
+         await updateInstagramCompanyData(
+           supabase,
+           enriched_club_id,
+           profileData,
+           `https://instagram.com/${username}`
+         );
+       }
 
      // Check minimum posts
      if (posts.length < 4) {
         console.error('Not enough posts:', posts.length);
-       if (visual_dna_row_id) {
+        if (visual_dna_row_id && !isDirectMode) {
          await supabase
            .from('visual_dna_rows')
            .update({ 
@@ -1367,28 +1384,34 @@ async function uploadImageToStorage(
       // Step 2.5: Upload successfully downloaded images to persistent storage
       console.log('\n💾 Step 2.5: PERSISTING IMAGES TO STORAGE');
       const storageUrls: string[] = [];
-      const successfulDownloads = downloadResults.filter(r => r.success && r.buffer);
       
-      for (let i = 0; i < successfulDownloads.length; i++) {
-        const result = successfulDownloads[i];
-        if (result.buffer && result.mimeType) {
-          console.log(`   Uploading image ${i + 1}/${successfulDownloads.length} to storage...`);
-          const storageUrl = await uploadImageToStorage(
-            supabase,
-            result.buffer,
-            enriched_club_id,
-            result.index,
-            result.mimeType
-          );
-          if (storageUrl) {
-            storageUrls.push(storageUrl);
-            console.log(`   ✅ Uploaded: ${storageUrl.substring(0, 60)}...`);
-          } else {
-            console.log(`   ❌ Failed to upload image ${result.index}`);
+       // Only persist images if we have a club ID
+       if (!isDirectMode && enriched_club_id) {
+         const successfulDownloads = downloadResults.filter(r => r.success && r.buffer);
+         
+         for (let i = 0; i < successfulDownloads.length; i++) {
+           const result = successfulDownloads[i];
+           if (result.buffer && result.mimeType) {
+             console.log(`   Uploading image ${i + 1}/${successfulDownloads.length} to storage...`);
+             const storageUrl = await uploadImageToStorage(
+               supabase,
+               result.buffer,
+               enriched_club_id,
+               result.index,
+               result.mimeType
+             );
+             if (storageUrl) {
+               storageUrls.push(storageUrl);
+               console.log(`   ✅ Uploaded: ${storageUrl.substring(0, 60)}...`);
+             } else {
+               console.log(`   ❌ Failed to upload image ${result.index}`);
+             }
           }
         }
+         console.log(`   📦 Total persisted: ${storageUrls.length} images`);
+       } else {
+         console.log('   ⏭️ Skipping persistence (direct mode)');
       }
-      console.log(`   📦 Total persisted: ${storageUrls.length} images`);
 
       // Step 3: Voice analysis with Claude
       currentStep = 'analyzing_captions';
@@ -1427,56 +1450,62 @@ async function uploadImageToStorage(
        console.log('Note: Score calculated without visual analysis (using defaults)');
      }
  
-      // Step 6: Update database
-      currentStep = 'saving_results';
-      console.log('Step 6: Saving results...');
+       // Step 6: Update database (only for club mode)
+       if (!isDirectMode && enriched_club_id) {
+         currentStep = 'saving_results';
+         console.log('Step 6: Saving results...');
  
-     const updateData: any = {
-       invisibility_score: invisibilityScore,
-       invisibility_category: invisibilityCategory,
-        visual_dna_analyzed_at: new Date().toISOString(),
-        instagram_followers: followersCount,
-        score_factors: scoreFactors
-     };
+         const updateData: any = {
+           invisibility_score: invisibilityScore,
+           invisibility_category: invisibilityCategory,
+           visual_dna_analyzed_at: new Date().toISOString(),
+           instagram_followers: followersCount,
+           score_factors: scoreFactors
+         };
  
-     if (visualDna) updateData.visual_dna = visualDna;
-     if (voiceDna) updateData.voice_dna = voiceDna;
-     if (ctltMatches) updateData.ctlt_matches = ctltMatches;
-     if (storageUrls.length > 0) updateData.visual_dna_media_urls = storageUrls;
+         if (visualDna) updateData.visual_dna = visualDna;
+         if (voiceDna) updateData.voice_dna = voiceDna;
+         if (ctltMatches) updateData.ctlt_matches = ctltMatches;
+         if (storageUrls.length > 0) updateData.visual_dna_media_urls = storageUrls;
  
-     const { error: updateError } = await supabase
-       .from('enriched_clubs')
-       .update(updateData)
-       .eq('id', enriched_club_id);
+         const { error: updateError } = await supabase
+           .from('enriched_clubs')
+           .update(updateData)
+           .eq('id', enriched_club_id);
  
-     if (updateError) {
-       console.error('Failed to update enriched_clubs:', updateError);
+         if (updateError) {
+           console.error('Failed to update enriched_clubs:', updateError);
+         }
+ 
+         // Update instagram_company_data with fresh data
+         await updateInstagramCompanyData(
+           supabase,
+           enriched_club_id,
+           profileData,
+           `https://instagram.com/${username}`
+         );
+ 
+         // Update visual_dna_row if provided
+         if (visual_dna_row_id) {
+           const processingTime = Date.now() - startTime;
+           await supabase
+             .from('visual_dna_rows')
+             .update({ 
+               status: 'completed',
+               posts_analyzed: imagesAnalyzed,
+               processing_time_ms: processingTime,
+               updated_at: new Date().toISOString()
+             })
+             .eq('id', visual_dna_row_id);
+         }
+       } else {
+         console.log('Step 6: Skipping database update (direct mode)');
      }
  
-      // Update instagram_company_data with fresh data
-      await updateInstagramCompanyData(
-        supabase,
-        enriched_club_id,
-        profileData,
-        `https://instagram.com/${username}`
-      );
- 
-     // Update visual_dna_row if provided
-     const processingTime = Date.now() - startTime;
-     if (visual_dna_row_id) {
-       await supabase
-         .from('visual_dna_rows')
-         .update({ 
-           status: 'completed',
-            posts_analyzed: imagesAnalyzed,
-           processing_time_ms: processingTime,
-           updated_at: new Date().toISOString()
-         })
-         .eq('id', visual_dna_row_id);
-     }
- 
+       const processingTime = Date.now() - startTime;
+
        console.log('\n========================================');
-       console.log('🎉 VISUAL DNA ANALYSIS COMPLETE');
+        console.log(`🎉 VISUAL DNA ANALYSIS COMPLETE ${isDirectMode ? '(DIRECT MODE)' : ''}`);
        console.log('========================================');
        console.log(`⏱️  Total time: ${processingTime}ms`);
        console.log(`📷 Images downloaded: ${downloadResults.filter(r => r.success).length}/${downloadResults.length}`);
@@ -1490,7 +1519,9 @@ async function uploadImageToStorage(
      return new Response(
        JSON.stringify({
          success: true,
-         club_id: enriched_club_id,
+          club_id: enriched_club_id || null,
+          instagram_handle: username,
+          direct_mode: isDirectMode,
          invisibility_score: invisibilityScore,
          invisibility_category: invisibilityCategory,
           posts_found: posts.length,
@@ -1503,7 +1534,18 @@ async function uploadImageToStorage(
          has_ctlt_matches: !!ctltMatches,
          visual_analysis_error: geminiError || null,
           partial_score: !visualDna,
-          download_details: downloadResults
+           download_details: downloadResults,
+           visual_dna: isDirectMode ? visualDna : undefined,
+           voice_dna: isDirectMode ? voiceDna : undefined,
+           ctlt_matches: isDirectMode ? ctltMatches : undefined,
+           score_factors: isDirectMode ? scoreFactors : undefined,
+           profile_data: isDirectMode ? {
+             username: profileData?.username,
+             full_name: profileData?.fullName,
+             biography: profileData?.biography,
+             followers_count: followersCount,
+             posts_count: profileData?.postsCount
+           } : undefined
        }),
        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
      );
