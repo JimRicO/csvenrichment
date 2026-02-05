@@ -15,8 +15,13 @@
  ];
  
 // Model names
-const CLAUDE_MODEL = 'claude-sonnet-4-5-20250514';
-const GEMINI_MODEL = 'gemini-2.5-flash-preview-04-17';
+// NOTE: These providers return 404 if a model ID is not available for your API key.
+// Keep a primary + fallback so the pipeline still runs if a newer model isn't enabled.
+const CLAUDE_MODEL_PRIMARY = 'claude-sonnet-4-5-20250929';
+const CLAUDE_MODEL_FALLBACK = 'claude-sonnet-4-20250514';
+
+const GEMINI_MODEL_PRIMARY = 'gemini-2.5-flash';
+const GEMINI_MODEL_FALLBACK = 'gemini-2.0-flash';
 
  interface Post {
    id: string;
@@ -201,8 +206,8 @@ const GEMINI_MODEL = 'gemini-2.5-flash-preview-04-17';
  
  Extract dominant colors as hex codes (5-8 colors). Percentages in content_mix should sum to 100.`;
  
-   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+    const tryGemini = async (modelId: string) => {
+      return await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`, {
        method: 'POST',
        headers: {
          'Content-Type': 'application/json',
@@ -221,6 +226,17 @@ const GEMINI_MODEL = 'gemini-2.5-flash-preview-04-17';
          }
        })
      });
+    };
+
+    try {
+      let response = await tryGemini(GEMINI_MODEL_PRIMARY);
+
+      if (response.status === 404) {
+        const errorText = await response.text();
+        console.error('Gemini model not found:', GEMINI_MODEL_PRIMARY, errorText);
+        console.log('Retrying Gemini with fallback model:', GEMINI_MODEL_FALLBACK);
+        response = await tryGemini(GEMINI_MODEL_FALLBACK);
+      }
      
      if (!response.ok) {
        const error = await response.text();
@@ -285,8 +301,8 @@ const GEMINI_MODEL = 'gemini-2.5-flash-preview-04-17';
    "signature_phrases": ["phrase1", ...]
  }`;
  
-   try {
-     const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const callClaude = async (model: string) => {
+      return await fetch('https://api.anthropic.com/v1/messages', {
        method: 'POST',
        headers: {
          'Content-Type': 'application/json',
@@ -294,11 +310,22 @@ const GEMINI_MODEL = 'gemini-2.5-flash-preview-04-17';
          'anthropic-version': '2023-06-01'
        },
        body: JSON.stringify({
-          model: CLAUDE_MODEL,
+          model,
          max_tokens: 2000,
          messages: [{ role: 'user', content: prompt }]
        })
      });
+    };
+
+    try {
+      let response = await callClaude(CLAUDE_MODEL_PRIMARY);
+
+      if (response.status === 404) {
+        const errorText = await response.text();
+        console.error('Claude model not found:', CLAUDE_MODEL_PRIMARY, errorText);
+        console.log('Retrying Claude with fallback model:', CLAUDE_MODEL_FALLBACK);
+        response = await callClaude(CLAUDE_MODEL_FALLBACK);
+      }
      
      if (!response.ok) {
        const error = await response.text();
@@ -353,8 +380,8 @@ const GEMINI_MODEL = 'gemini-2.5-flash-preview-04-17';
  
  Rank the top 5 photography styles that best match this club's existing visual identity. Also identify 2-3 styles that would clash with their current aesthetic.`;
  
-   try {
-     const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const callClaude = async (model: string) => {
+      return await fetch('https://api.anthropic.com/v1/messages', {
        method: 'POST',
        headers: {
          'Content-Type': 'application/json',
@@ -362,11 +389,22 @@ const GEMINI_MODEL = 'gemini-2.5-flash-preview-04-17';
          'anthropic-version': '2023-06-01'
        },
        body: JSON.stringify({
-          model: CLAUDE_MODEL,
+          model,
          max_tokens: 2000,
          messages: [{ role: 'user', content: prompt }]
        })
      });
+    };
+
+    try {
+      let response = await callClaude(CLAUDE_MODEL_PRIMARY);
+
+      if (response.status === 404) {
+        const errorText = await response.text();
+        console.error('Claude CTLT model not found:', CLAUDE_MODEL_PRIMARY, errorText);
+        console.log('Retrying Claude CTLT with fallback model:', CLAUDE_MODEL_FALLBACK);
+        response = await callClaude(CLAUDE_MODEL_FALLBACK);
+      }
      
      if (!response.ok) {
        const error = await response.text();
