@@ -1,10 +1,10 @@
  import { Badge } from "@/components/ui/badge";
  import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
  import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronDown, Eye, Mic2, Lightbulb, Camera, Palette, BarChart3, Hash, MessageSquare, Gauge, Star, CheckCircle, XCircle, AlertTriangle, Code } from "lucide-react";
+ import { ChevronDown, Eye, Mic2, Lightbulb, Camera, Palette, BarChart3, Hash, MessageSquare, Gauge, Star, CheckCircle, XCircle, AlertTriangle, Code, Dna, Loader2 } from "lucide-react";
  import { cn } from "@/lib/utils";
  import { useState } from "react";
-import { Button } from "@/components/ui/button";
+ import { Button } from "@/components/ui/button";
  
  interface VisualDNA {
    color_palette?: string[];
@@ -68,8 +68,12 @@ interface ScoreBreakdown {
    invisibilityScore: number | null;
    invisibilityCategory: string | null;
    analyzedAt: string | null;
-  postsAnalyzed?: number;
-  compact?: boolean;
+   postsAnalyzed?: number;
+   compact?: boolean;
+   showEmptyState?: boolean;
+   onAnalyze?: () => void;
+   isAnalyzing?: boolean;
+   instagramHandle?: string | null;
  }
  
  const getCategoryColor = (category: string | null) => {
@@ -148,31 +152,37 @@ const ScoreFactorRow = ({ label, value, score, maxScore = 100 }: { label: string
   </div>
 );
 
-const BrandingIndicator = ({ label, value }: { label: string; value: boolean | undefined }) => (
-  <div className="flex items-center gap-1.5">
-    {value ? (
-      <CheckCircle className="h-3 w-3 text-green-500" />
-    ) : (
-      <XCircle className="h-3 w-3 text-muted-foreground/50" />
-    )}
-    <span className={cn("text-xs", value ? "text-foreground" : "text-muted-foreground")}>{label}</span>
-  </div>
-);
-
+ const BrandingIndicator = ({ label, value }: { label: string; value: boolean | undefined }) => (
+   <div className="flex items-center gap-1.5">
+     {value ? (
+       <CheckCircle className="h-3 w-3 text-green-500" />
+     ) : (
+       <XCircle className="h-3 w-3 text-muted-foreground/50" />
+     )}
+     <span className={cn("text-xs", value ? "text-foreground" : "text-muted-foreground")}>{label}</span>
+   </div>
+ );
+ 
  const VisualDNASection = ({
    visualDna,
    voiceDna,
    ctltMatches,
    invisibilityScore,
    invisibilityCategory,
-  analyzedAt,
-  postsAnalyzed,
-  compact = false
+   analyzedAt,
+   postsAnalyzed,
+   compact = false,
+   showEmptyState = false,
+   onAnalyze,
+   isAnalyzing = false,
+   instagramHandle = null
  }: VisualDNASectionProps) => {
    const [isOpen, setIsOpen] = useState(true);
-  const [showRawData, setShowRawData] = useState(false);
+   const [showRawData, setShowRawData] = useState(false);
  
-   if (!visualDna && !voiceDna && invisibilityScore === null) {
+   const hasData = visualDna || voiceDna || invisibilityScore !== null;
+ 
+   if (!hasData && !showEmptyState) {
      return null;
    }
  
@@ -212,6 +222,58 @@ const BrandingIndicator = ({ label, value }: { label: string; value: boolean | u
     );
   }
 
+   // Empty state - show when no data but showEmptyState is true
+   if (!hasData && showEmptyState) {
+     return (
+       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+         <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium w-full hover:bg-muted/50 p-2 rounded-lg transition-colors">
+           <Eye className="h-4 w-4 text-primary" />
+           Visual DNA
+           <ChevronDown className={cn(
+             "h-4 w-4 ml-auto transition-transform",
+             isOpen && "rotate-180"
+           )} />
+         </CollapsibleTrigger>
+         
+         <CollapsibleContent className="mt-2">
+           <div className="p-6 rounded-xl neu-pressed flex flex-col items-center justify-center text-center space-y-4">
+             <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center">
+               <Dna className="h-8 w-8 text-muted-foreground" />
+             </div>
+             <div>
+               <h4 className="text-sm font-medium">No Visual DNA Analysis Yet</h4>
+               <p className="text-xs text-muted-foreground mt-1 max-w-[280px]">
+                 {instagramHandle 
+                   ? `Analyze ${instagramHandle}'s Instagram presence to generate an Invisibility Score and content insights.`
+                   : "This club needs an Instagram handle to analyze Visual DNA."}
+               </p>
+             </div>
+             {instagramHandle && onAnalyze && (
+               <Button
+                 size="sm"
+                 onClick={onAnalyze}
+                 disabled={isAnalyzing}
+                 className="mt-2"
+               >
+                 {isAnalyzing ? (
+                   <>
+                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                     Analyzing...
+                   </>
+                 ) : (
+                   <>
+                     <Dna className="h-4 w-4 mr-2" />
+                     Analyze Visual DNA
+                   </>
+                 )}
+               </Button>
+             )}
+           </div>
+         </CollapsibleContent>
+       </Collapsible>
+     );
+   }
+ 
    return (
      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
        <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium w-full hover:bg-muted/50 p-2 rounded-lg transition-colors">

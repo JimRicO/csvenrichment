@@ -421,28 +421,6 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
                         {selectedClub.website_url}
                       </a>
                     )}
-                    {/* Analyze Visual DNA Button */}
-                    {selectedClub.instagram_handle && !selectedClub.visual_dna && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="mt-2"
-                        onClick={() => handleAnalyzeVisualDNA(selectedClub)}
-                        disabled={analyzingClubId === selectedClub.id}
-                      >
-                        {analyzingClubId === selectedClub.id ? (
-                          <>
-                            <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
-                            Analyzing...
-                          </>
-                        ) : (
-                          <>
-                            <Dna className="h-3 w-3 mr-1.5" />
-                            Analyze Visual DNA
-                          </>
-                        )}
-                      </Button>
-                    )}
                   </div>
                 </div>
 
