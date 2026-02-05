@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CollapsibleCard } from "@/components/ui/collapsible-card";
-import { Eye, Download, Sparkles, RefreshCw } from "lucide-react";
+import { Eye, Download, Sparkles, RefreshCw, Dna, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import EnrichedClubsDialog from "./EnrichedClubsDialog";
 
@@ -25,6 +25,8 @@ const EnrichmentJobsTable = () => {
   const [jobs, setJobs] = useState<EnrichmentJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [isBulkAnalyzing, setIsBulkAnalyzing] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
 
   const fetchJobs = async () => {
     try {
@@ -94,6 +96,126 @@ const EnrichmentJobsTable = () => {
     }
   };
 
+  const handleBulkAnalyzeVisualDNA = async () => {
+    try {
+      setIsBulkAnalyzing(true);
+      
+      // Find all clubs with instagram_handle but no visual_dna
+      const { data: eligibleClubs, error } = await supabase
+        .from('enriched_clubs')
+        .select('id, club_name, instagram_handle')
+        .not('instagram_handle', 'is', null)
+        .is('visual_dna', null);
+
+      if (error) throw error;
+
+      if (!eligibleClubs || eligibleClubs.length === 0) {
+        toast({
+          title: "No Clubs to Analyze",
+          description: "All clubs with Instagram handles already have Visual DNA analysis.",
+        });
+        setIsBulkAnalyzing(false);
+        return;
+      }
+
+      setBulkProgress({ current: 0, total: eligibleClubs.length });
+
+      // Create a visual_dna_jobs entry
+      const bulkJobId = `vdna_bulk_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      await supabase
+        .from('visual_dna_jobs')
+        .insert({
+          id: bulkJobId,
+          status: 'processing',
+          total_clubs: eligibleClubs.length,
+          processed_clubs: 0,
+          failed_clubs: 0
+        });
+
+      let processed = 0;
+      let failed = 0;
+
+      // Process clubs sequentially with 2-second delays
+      for (const club of eligibleClubs) {
+        try {
+          // Create visual_dna_rows entry
+          const { data: rowData } = await supabase
+            .from('visual_dna_rows')
+            .insert({
+              job_id: bulkJobId,
+              enriched_club_id: club.id,
+              club_name: club.club_name,
+              status: 'processing'
+            })
+            .select('id')
+            .single();
+
+          // Call the edge function
+          const { error: fnError } = await supabase.functions.invoke('analyze-visual-dna', {
+            body: { 
+              enriched_club_id: club.id,
+              visual_dna_row_id: rowData?.id
+            }
+          });
+
+          if (fnError) {
+            console.error('Analysis failed for club:', club.club_name, fnError);
+            failed++;
+          } else {
+            processed++;
+          }
+        } catch (clubError) {
+          console.error('Error processing club:', club.club_name, clubError);
+          failed++;
+        }
+
+        setBulkProgress({ current: processed + failed, total: eligibleClubs.length });
+
+        // Update job progress
+        await supabase
+          .from('visual_dna_jobs')
+          .update({ 
+            processed_clubs: processed,
+            failed_clubs: failed,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', bulkJobId);
+
+        // 2-second delay between analyses
+        if (processed + failed < eligibleClubs.length) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+
+      // Update final job status
+      await supabase
+        .from('visual_dna_jobs')
+        .update({ 
+          status: 'completed',
+          processed_clubs: processed,
+          failed_clubs: failed,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', bulkJobId);
+
+      toast({
+        title: "Bulk Analysis Complete",
+        description: `Analyzed ${processed} clubs successfully${failed > 0 ? `, ${failed} failed` : ''}.`,
+      });
+
+    } catch (err) {
+      console.error('Bulk Visual DNA analysis failed:', err);
+      toast({
+        title: "Bulk Analysis Failed",
+        description: err instanceof Error ? err.message : "Failed to run bulk analysis",
+        variant: "destructive",
+      });
+    } finally {
+      setIsBulkAnalyzing(false);
+      setBulkProgress({ current: 0, total: 0 });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
@@ -147,9 +269,29 @@ const EnrichmentJobsTable = () => {
               </div>
               <p className="text-sm text-muted-foreground mt-1">View and manage club enrichment jobs</p>
             </div>
-            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); fetchJobs(); }}>
-              <RefreshCw className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => { e.stopPropagation(); handleBulkAnalyzeVisualDNA(); }}
+                disabled={isBulkAnalyzing}
+              >
+                {isBulkAnalyzing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                    {bulkProgress.current}/{bulkProgress.total}
+                  </>
+                ) : (
+                  <>
+                    <Dna className="h-4 w-4 mr-1.5" />
+                    Analyze All Visual DNA
+                  </>
+                )}
+              </Button>
+              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); fetchJobs(); }}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         }
         defaultOpen={false}

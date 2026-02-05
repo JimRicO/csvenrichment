@@ -102,3 +102,6 @@ verify_jwt = false
 
 [functions.api-extract-instagram-pfp]
 verify_jwt = false
+ 
+ [functions.analyze-visual-dna]
+ verify_jwt = false

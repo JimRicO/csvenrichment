@@ -61,6 +61,7 @@ export type Database = {
           club_name: string
           color_palette: Json | null
           created_at: string
+          ctlt_matches: Json | null
           description: string | null
           email: string | null
           enrichment_row_id: string
@@ -74,6 +75,8 @@ export type Database = {
           instagram_handle: string | null
           instagram_profile_pic_url: string | null
           instagram_url: string | null
+          invisibility_category: string | null
+          invisibility_score: number | null
           job_id: string
           key_people: Json | null
           linkedin_url: string | null
@@ -87,6 +90,9 @@ export type Database = {
           scraped_content: string | null
           twitter_handle: string | null
           updated_at: string
+          visual_dna: Json | null
+          visual_dna_analyzed_at: string | null
+          voice_dna: Json | null
           website_url: string | null
         }
         Insert: {
@@ -96,6 +102,7 @@ export type Database = {
           club_name: string
           color_palette?: Json | null
           created_at?: string
+          ctlt_matches?: Json | null
           description?: string | null
           email?: string | null
           enrichment_row_id: string
@@ -109,6 +116,8 @@ export type Database = {
           instagram_handle?: string | null
           instagram_profile_pic_url?: string | null
           instagram_url?: string | null
+          invisibility_category?: string | null
+          invisibility_score?: number | null
           job_id: string
           key_people?: Json | null
           linkedin_url?: string | null
@@ -122,6 +131,9 @@ export type Database = {
           scraped_content?: string | null
           twitter_handle?: string | null
           updated_at?: string
+          visual_dna?: Json | null
+          visual_dna_analyzed_at?: string | null
+          voice_dna?: Json | null
           website_url?: string | null
         }
         Update: {
@@ -131,6 +143,7 @@ export type Database = {
           club_name?: string
           color_palette?: Json | null
           created_at?: string
+          ctlt_matches?: Json | null
           description?: string | null
           email?: string | null
           enrichment_row_id?: string
@@ -144,6 +157,8 @@ export type Database = {
           instagram_handle?: string | null
           instagram_profile_pic_url?: string | null
           instagram_url?: string | null
+          invisibility_category?: string | null
+          invisibility_score?: number | null
           job_id?: string
           key_people?: Json | null
           linkedin_url?: string | null
@@ -157,6 +172,9 @@ export type Database = {
           scraped_content?: string | null
           twitter_handle?: string | null
           updated_at?: string
+          visual_dna?: Json | null
+          visual_dna_analyzed_at?: string | null
+          voice_dna?: Json | null
           website_url?: string | null
         }
         Relationships: [
@@ -879,6 +897,93 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      visual_dna_jobs: {
+        Row: {
+          created_at: string
+          error_log: Json | null
+          failed_clubs: number
+          id: string
+          processed_clubs: number
+          status: string
+          total_clubs: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          error_log?: Json | null
+          failed_clubs?: number
+          id?: string
+          processed_clubs?: number
+          status?: string
+          total_clubs?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          error_log?: Json | null
+          failed_clubs?: number
+          id?: string
+          processed_clubs?: number
+          status?: string
+          total_clubs?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      visual_dna_rows: {
+        Row: {
+          club_name: string | null
+          created_at: string
+          enriched_club_id: string | null
+          error_message: string | null
+          id: string
+          job_id: string | null
+          posts_analyzed: number | null
+          processing_time_ms: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          club_name?: string | null
+          created_at?: string
+          enriched_club_id?: string | null
+          error_message?: string | null
+          id?: string
+          job_id?: string | null
+          posts_analyzed?: number | null
+          processing_time_ms?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          club_name?: string | null
+          created_at?: string
+          enriched_club_id?: string | null
+          error_message?: string | null
+          id?: string
+          job_id?: string | null
+          posts_analyzed?: number | null
+          processing_time_ms?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visual_dna_rows_enriched_club_id_fkey"
+            columns: ["enriched_club_id"]
+            isOneToOne: false
+            referencedRelation: "enriched_clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visual_dna_rows_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "visual_dna_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       visual_identity: {
         Row: {
