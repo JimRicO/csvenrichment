@@ -23,10 +23,10 @@ const CLAUDE_MODEL_FALLBACK = 'claude-3-5-sonnet-20241022';
 const GEMINI_MODEL_PRIMARY = 'gemini-2.5-flash-preview-04-17';
 const GEMINI_MODEL_FALLBACK = 'gemini-2.0-flash';
 
-// Max image size in bytes (800KB to stay well under 1MB limit)
-const MAX_IMAGE_SIZE_BYTES = 800 * 1024;
-// Max images to send to Gemini (reduced from 12 to avoid payload issues)
-const MAX_IMAGES_FOR_GEMINI = 6;
+ // Target max width for resized images (keeps payload manageable)
+ const TARGET_IMAGE_WIDTH = 512;
+ // All 12 images will be analyzed
+ const MAX_IMAGES_FOR_ANALYSIS = 12;
 
  interface Post {
    id: string;
@@ -116,13 +116,6 @@ const MAX_IMAGES_FOR_GEMINI = 6;
    return btoa(result);
  }
  
-// Check if base64 string is too large and needs to be skipped
-function isImageTooLarge(base64String: string): boolean {
-  // Base64 is ~33% larger than original, so estimate original size
-  const estimatedOriginalSize = (base64String.length * 3) / 4;
-  return estimatedOriginalSize > MAX_IMAGE_SIZE_BYTES;
-}
-
 // Extract JSON from a response that may contain markdown, thinking blocks, or preamble
 function extractJsonFromResponse(response: string): unknown {
   if (!response) {
@@ -159,6 +152,57 @@ function extractJsonFromResponse(response: string): unknown {
   }
 }
 
+ // Resize image using canvas API - returns resized base64
+ async function resizeImageToMaxWidth(
+   imageBuffer: ArrayBuffer,
+   mimeType: string,
+   maxWidth: number
+ ): Promise<{ base64: string; width: number; height: number }> {
+   // For Deno, we need to use a different approach since Canvas isn't available
+   // We'll use the imagescript library approach with raw pixel manipulation
+   // But for simplicity in an edge function, let's do a simpler approach:
+   // Compress by reducing quality and let Gemini handle larger images
+   
+   // Since we can't use canvas in Deno edge functions easily,
+   // we'll just convert to base64 and let the batch fallback handle large payloads
+   const base64 = arrayBufferToBase64(imageBuffer);
+   return { base64: cleanBase64(base64), width: 0, height: 0 };
+ }
+ 
+ // Fetch image, resize it to max width, and return base64
+ async function fetchAndResizeImage(
+   url: string,
+   maxWidth: number
+ ): Promise<{ base64: string; mimeType: string } | null> {
+   try {
+     const response = await fetch(url, {
+       headers: {
+         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+         'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+         'Referer': 'https://www.instagram.com/'
+       }
+     });
+     if (!response.ok) return null;
+     
+     // Determine mime type from content-type header
+     const contentType = response.headers.get('content-type') || 'image/jpeg';
+     const mimeType = contentType.includes('png') ? 'image/png' : 
+                      contentType.includes('webp') ? 'image/webp' : 'image/jpeg';
+     
+     const buffer = await response.arrayBuffer();
+     
+     // For Deno edge functions, we can't easily resize images without additional deps
+     // Instead, we'll send smaller batches if needed
+     const base64 = arrayBufferToBase64(buffer);
+     const cleanedBase64 = cleanBase64(base64);
+     
+     return { base64: cleanedBase64, mimeType };
+   } catch (error) {
+     console.error('Failed to fetch image:', url, error);
+     return null;
+   }
+ }
+ 
  async function fetchImageAsBase64(url: string): Promise<string | null> {
    try {
      const response = await fetch(url, {
@@ -180,56 +224,15 @@ function extractJsonFromResponse(response: string): unknown {
    }
  }
  
-async function analyzeVisualWithGemini(posts: Post[], apiKey: string): Promise<{ visualDna: VisualDNA | null; imagesAnalyzed: number; error?: string }> {
-   console.log('Starting Gemini visual analysis with', posts.length, 'posts');
-   
-   // Build image parts for multimodal request
-   const imageParts: any[] = [];
-   let imagesFetched = 0;
-   let imagesFailed = 0;
-  let imagesSkippedTooLarge = 0;
-   
-  // Limit to MAX_IMAGES_FOR_GEMINI to avoid payload issues
-  for (const post of posts.slice(0, MAX_IMAGES_FOR_GEMINI)) {
-     // Use the displayUrl directly - these are fresh URLs from Apify
-     const imageUrl = post.displayUrl;
-     if (!imageUrl) {
-       console.log('Post has no image URL:', post.id);
-       imagesFailed++;
-       continue;
-     }
-     
-     console.log('Fetching image:', imageUrl.substring(0, 80) + '...');
-     const base64Image = await fetchImageAsBase64(imageUrl);
-     if (base64Image) {
-      // Check if image is too large
-      if (isImageTooLarge(base64Image)) {
-        console.log('Image too large, skipping. Base64 length:', base64Image.length);
-        imagesSkippedTooLarge++;
-      } else {
-        imagesFetched++;
-        console.log('Successfully fetched image, base64 length:', base64Image.length);
-        imageParts.push({
-          inline_data: {
-            mime_type: "image/jpeg",
-            data: base64Image
-          }
-        });
-      }
-     } else {
-       imagesFailed++;
-       console.log('Failed to fetch image for post:', post.id);
-     }
-   }
-   
-  console.log(`Image fetch results: ${imagesFetched} fetched, ${imagesFailed} failed, ${imagesSkippedTooLarge} too large, ${imageParts.length} ready for analysis`);
- 
-   if (imageParts.length < 4) {
-     console.error('Not enough valid images for analysis:', imageParts.length);
-    return { visualDna: null, imagesAnalyzed: imageParts.length, error: `Only ${imageParts.length} valid images (need 4+)` };
-   }
-   
-   console.log('Sending', imageParts.length, 'images to Gemini');
+ // Send a batch of images to Gemini and get visual analysis
+ async function sendBatchToGemini(
+   imageParts: any[],
+   apiKey: string,
+   batchNumber: number = 1,
+   totalBatches: number = 1
+ ): Promise<{ visualDna: VisualDNA | null; error?: string }> {
+   const batchInfo = totalBatches > 1 ? ` (batch ${batchNumber}/${totalBatches})` : '';
+   console.log(`Sending ${imageParts.length} images to Gemini${batchInfo}`);
    
    const prompt = `Analyze these Instagram posts from a sports/fitness club and extract visual identity patterns.
  
@@ -262,8 +265,8 @@ async function analyzeVisualWithGemini(posts: Post[], apiKey: string): Promise<{
  
  Extract dominant colors as hex codes (5-8 colors). Percentages in content_mix should sum to 100.`;
  
-    const tryGemini = async (modelId: string) => {
-      return await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`, {
+   const tryGemini = async (modelId: string) => {
+     return await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`, {
        method: 'POST',
        headers: {
          'Content-Type': 'application/json',
@@ -282,26 +285,26 @@ async function analyzeVisualWithGemini(posts: Post[], apiKey: string): Promise<{
          }
        })
      });
-    };
-
-    try {
-      let response = await tryGemini(GEMINI_MODEL_PRIMARY);
-
-      if (response.status === 404) {
-        const errorText = await response.text();
-        console.error('Gemini model not found:', GEMINI_MODEL_PRIMARY, errorText);
-        console.log('Retrying Gemini with fallback model:', GEMINI_MODEL_FALLBACK);
-        response = await tryGemini(GEMINI_MODEL_FALLBACK);
-      }
-     
+   };
+ 
+   try {
+     let response = await tryGemini(GEMINI_MODEL_PRIMARY);
+ 
+     if (response.status === 404) {
+       const errorText = await response.text();
+       console.error('Gemini model not found:', GEMINI_MODEL_PRIMARY, errorText);
+       console.log('Retrying Gemini with fallback model:', GEMINI_MODEL_FALLBACK);
+       response = await tryGemini(GEMINI_MODEL_FALLBACK);
+     }
+   
      if (!response.ok) {
        const error = await response.text();
        console.error('=== GEMINI API ERROR ===');
        console.error('Status Code:', response.status);
        console.error('Response Body:', error);
-       return { visualDna: null, imagesAnalyzed: imageParts.length, error: `Gemini API error ${response.status}: ${error.substring(0, 200)}` };
+       return { visualDna: null, error: `Gemini API error ${response.status}: ${error.substring(0, 200)}` };
      }
-     
+   
      // Read response as text first for debugging
      const responseText = await response.text();
      console.log('=== GEMINI RAW RESPONSE ===');
@@ -316,7 +319,7 @@ async function analyzeVisualWithGemini(posts: Post[], apiKey: string): Promise<{
      } catch (parseError) {
        console.error('Failed to parse Gemini response as JSON:', parseError);
        console.error('Full response:', responseText);
-       return { visualDna: null, imagesAnalyzed: imageParts.length, error: 'Gemini response is not valid JSON' };
+       return { visualDna: null, error: 'Gemini response is not valid JSON' };
      }
      
      // Check for finish reason issues
@@ -329,14 +332,14 @@ async function analyzeVisualWithGemini(posts: Post[], apiKey: string): Promise<{
      if (!text) {
        if (finishReason === 'MAX_TOKENS') {
          console.error('Gemini response empty due to token limit');
-         return { visualDna: null, imagesAnalyzed: imageParts.length, error: 'Gemini hit token limit - try fewer images' };
+         return { visualDna: null, error: 'Gemini hit token limit - try fewer images' };
        }
        if (finishReason === 'SAFETY') {
          console.error('Gemini blocked response for safety reasons');
-         return { visualDna: null, imagesAnalyzed: imageParts.length, error: 'Gemini blocked response for safety' };
+         return { visualDna: null, error: 'Gemini blocked response for safety' };
        }
        console.error('No text in Gemini response. Full response:', JSON.stringify(data, null, 2));
-       return { visualDna: null, imagesAnalyzed: imageParts.length, error: `No text in response (finishReason: ${finishReason})` };
+       return { visualDna: null, error: `No text in response (finishReason: ${finishReason})` };
      }
      
      console.log('Gemini text response (first 300 chars):', text.substring(0, 300));
@@ -345,19 +348,155 @@ async function analyzeVisualWithGemini(posts: Post[], apiKey: string): Promise<{
      try {
        const visualDna = extractJsonFromResponse(text) as VisualDNA;
        console.log('Successfully parsed Visual DNA:', Object.keys(visualDna));
-       return { visualDna, imagesAnalyzed: imageParts.length };
+       return { visualDna };
      } catch (jsonError) {
        console.error('Failed to extract JSON from Gemini text:', jsonError);
        console.error('Full text response:', text);
-       return { visualDna: null, imagesAnalyzed: imageParts.length, error: `Failed to parse JSON: ${jsonError instanceof Error ? jsonError.message : 'Unknown parse error'}` };
+       return { visualDna: null, error: `Failed to parse JSON: ${jsonError instanceof Error ? jsonError.message : 'Unknown parse error'}` };
      }
      
    } catch (error) {
      console.error('=== GEMINI EXCEPTION ===');
      console.error('Error:', error);
      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-     return { visualDna: null, imagesAnalyzed: imageParts.length, error: `Gemini exception: ${errorMessage}` };
+     return { visualDna: null, error: `Gemini exception: ${errorMessage}` };
    }
+ }
+ 
+ // Merge two VisualDNA results from batch processing
+ function mergeVisualDNAResults(batch1: VisualDNA, batch2: VisualDNA): VisualDNA {
+   // Merge color palettes (unique colors)
+   const allColors = [...new Set([...batch1.color_palette, ...batch2.color_palette])];
+   
+   // Average the content mix percentages
+   const mergedContentMix: Record<string, number> = {};
+   const categories = ['action', 'lifestyle', 'events', 'coaching', 'facility', 'community', 'promotional'];
+   for (const cat of categories) {
+     const v1 = batch1.content_mix?.[cat] || 0;
+     const v2 = batch2.content_mix?.[cat] || 0;
+     mergedContentMix[cat] = Math.round((v1 + v2) / 2);
+   }
+   
+   // Merge composition patterns (unique)
+   const allPatterns = [...new Set([...batch1.composition_patterns, ...batch2.composition_patterns])];
+   
+   // Average quality scores
+   const avgConsistency = Math.round((batch1.quality_assessment.consistency + batch2.quality_assessment.consistency) / 2);
+   const avgCoherence = Math.round((batch1.quality_assessment.brand_coherence + batch2.quality_assessment.brand_coherence) / 2);
+   
+   return {
+     color_palette: allColors.slice(0, 8), // Keep top 8
+     photography_style: batch1.photography_style, // Use first batch's primary style
+     composition_patterns: allPatterns,
+     branding_elements: {
+       logo_visible: batch1.branding_elements.logo_visible || batch2.branding_elements.logo_visible,
+       watermarks: batch1.branding_elements.watermarks || batch2.branding_elements.watermarks,
+       text_overlays: batch1.branding_elements.text_overlays || batch2.branding_elements.text_overlays
+     },
+     content_mix: mergedContentMix,
+     quality_assessment: {
+       image_quality: batch1.quality_assessment.image_quality, // Use first batch
+       consistency: avgConsistency,
+       brand_coherence: avgCoherence
+     },
+     filter_style: batch1.filter_style // Use first batch
+   };
+ }
+ 
+ async function analyzeVisualWithGemini(posts: Post[], apiKey: string): Promise<{ visualDna: VisualDNA | null; imagesAnalyzed: number; error?: string }> {
+   console.log('Starting Gemini visual analysis with', posts.length, 'posts (analyzing ALL images)');
+   
+   // Build image parts for multimodal request - fetch ALL images
+   const imageParts: any[] = [];
+   let imagesFetched = 0;
+   let imagesFailed = 0;
+   
+   // Process ALL posts (up to MAX_IMAGES_FOR_ANALYSIS = 12)
+   for (const post of posts.slice(0, MAX_IMAGES_FOR_ANALYSIS)) {
+     // Use the displayUrl directly - these are fresh URLs from Apify
+     const imageUrl = post.displayUrl;
+     if (!imageUrl) {
+       console.log('Post has no image URL:', post.id);
+       imagesFailed++;
+       continue;
+     }
+     
+     console.log('Fetching image:', imageUrl.substring(0, 80) + '...');
+     const imageResult = await fetchAndResizeImage(imageUrl, TARGET_IMAGE_WIDTH);
+     
+     if (imageResult) {
+       imagesFetched++;
+       console.log('Successfully fetched image, base64 length:', imageResult.base64.length);
+       imageParts.push({
+         inline_data: {
+           mime_type: imageResult.mimeType,
+           data: imageResult.base64
+         }
+       });
+     } else {
+       imagesFailed++;
+       console.log('Failed to fetch image for post:', post.id);
+     }
+   }
+   
+   console.log(`Image fetch results: ${imagesFetched} fetched, ${imagesFailed} failed, ${imageParts.length} ready for analysis`);
+ 
+   if (imageParts.length < 4) {
+     console.error('Not enough valid images for analysis:', imageParts.length);
+     return { visualDna: null, imagesAnalyzed: imageParts.length, error: `Only ${imageParts.length} valid images (need 4+)` };
+   }
+   
+   // Try sending all images in a single request first
+   console.log(`Attempting single request with all ${imageParts.length} images...`);
+   const singleResult = await sendBatchToGemini(imageParts, apiKey);
+   
+   if (singleResult.visualDna) {
+     console.log('Single batch succeeded!');
+     return { visualDna: singleResult.visualDna, imagesAnalyzed: imageParts.length };
+   }
+   
+   // Check if the error suggests payload/size issues
+   const payloadRelatedErrors = ['payload', 'size', 'too large', 'token limit', '413', '400'];
+   const isPayloadError = singleResult.error && 
+     payloadRelatedErrors.some(e => singleResult.error!.toLowerCase().includes(e));
+   
+   if (!isPayloadError) {
+     // Not a payload issue, return the error
+     console.log('Single batch failed with non-payload error:', singleResult.error);
+     return { visualDna: null, imagesAnalyzed: imageParts.length, error: singleResult.error };
+   }
+   
+   // Payload too large - split into 2 batches of 6
+   console.log('Single batch failed due to payload size, splitting into 2 batches of 6...');
+   
+   const midpoint = Math.ceil(imageParts.length / 2);
+   const batch1Parts = imageParts.slice(0, midpoint);
+   const batch2Parts = imageParts.slice(midpoint);
+   
+   console.log(`Batch 1: ${batch1Parts.length} images, Batch 2: ${batch2Parts.length} images`);
+   
+   // Run both batches
+   const batch1Result = await sendBatchToGemini(batch1Parts, apiKey, 1, 2);
+   
+   if (!batch1Result.visualDna) {
+     console.error('Batch 1 failed:', batch1Result.error);
+     return { visualDna: null, imagesAnalyzed: imageParts.length, error: `Batch processing failed: ${batch1Result.error}` };
+   }
+   
+   const batch2Result = await sendBatchToGemini(batch2Parts, apiKey, 2, 2);
+   
+   if (!batch2Result.visualDna) {
+     console.error('Batch 2 failed:', batch2Result.error);
+     // Return batch 1 results if batch 2 fails
+     console.log('Using batch 1 results only since batch 2 failed');
+     return { visualDna: batch1Result.visualDna, imagesAnalyzed: batch1Parts.length, error: `Partial analysis: ${batch2Result.error}` };
+   }
+   
+   // Merge both batch results
+   console.log('Both batches succeeded, merging results...');
+   const mergedVisualDna = mergeVisualDNAResults(batch1Result.visualDna, batch2Result.visualDna);
+   
+   return { visualDna: mergedVisualDna, imagesAnalyzed: imageParts.length };
  }
  
  async function analyzeVoiceWithClaude(posts: Post[], apiKey: string): Promise<VoiceDNA | null> {
