@@ -15,8 +15,8 @@
  ];
  
 // Model names
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const CLAUDE_MODEL = 'claude-3-5-sonnet-20241022';
+const GEMINI_MODEL = 'gemini-1.5-flash';
 
  interface Post {
    id: string;
@@ -751,6 +751,14 @@ const GEMINI_MODEL = 'gemini-2.0-flash';
       console.log(`Scraped ${posts.length} posts, ${followersCount} followers`);
       console.log('Sample post URLs:', posts.slice(0, 2).map(p => p.displayUrl?.substring(0, 60) + '...'));
  
+      // Update instagram_company_data with fresh data immediately after scrape
+      await updateInstagramCompanyData(
+        supabase,
+        enriched_club_id,
+        profileData,
+        `https://instagram.com/${username}`
+      );
+
      // Check minimum posts
      if (posts.length < 4) {
         console.error('Not enough posts:', posts.length);
