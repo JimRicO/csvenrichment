@@ -5,10 +5,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import VisualDNASection from "./VisualDNASection";
 import { 
   Building2, Globe, Instagram, MapPin, Phone, Mail, Palette, Type, 
   MessageSquare, Sparkles, Eye, User, Calendar, Activity, Link2, ChevronDown, Users,
-  Facebook, Twitter, Linkedin
+  Facebook, Twitter, Linkedin, Loader2, Dna
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +25,53 @@ interface KeyPerson {
   name: string;
   role: string;
   context?: string;
+}
+
+interface VisualDNAData {
+  color_palette?: string[];
+  photography_style?: string;
+  composition_patterns?: string[];
+  branding_elements?: {
+    logo_visible?: boolean;
+    watermarks?: boolean;
+    text_overlays?: boolean;
+  };
+  content_mix?: Record<string, number>;
+  quality_assessment?: {
+    image_quality?: string;
+    consistency?: number;
+    brand_coherence?: number;
+  };
+  filter_style?: string;
+}
+
+interface VoiceDNAData {
+  tone?: string;
+  average_length?: string;
+  emoji_frequency?: string;
+  common_emojis?: string[];
+  hashtag_strategy?: {
+    average_count?: number;
+    branded_vs_generic?: string;
+    placement?: string;
+  };
+  cta_patterns?: string[];
+  languages?: string[];
+  recurring_themes?: string[];
+  signature_phrases?: string[];
+}
+
+interface CTLTMatchesData {
+  matched_styles?: Array<{
+    style_name: string;
+    match_score: number;
+    reason: string;
+  }>;
+  styles_to_avoid?: Array<{
+    style_name: string;
+    reason: string;
+  }>;
+  enhancement_suggestion?: string;
 }
 
 interface EnrichedClub {
@@ -52,6 +102,12 @@ interface EnrichedClub {
   perplexity_citations: string[];
   key_people: KeyPerson[];
   created_at: string;
+  visual_dna: VisualDNAData | null;
+  voice_dna: VoiceDNAData | null;
+  ctlt_matches: CTLTMatchesData | null;
+  invisibility_score: number | null;
+  invisibility_category: string | null;
+  visual_dna_analyzed_at: string | null;
 }
 
 interface EnrichedClubsDialogProps {
@@ -61,10 +117,12 @@ interface EnrichedClubsDialogProps {
 }
 
 const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogProps) => {
+  const { toast } = useToast();
   const [clubs, setClubs] = useState<EnrichedClub[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedClub, setSelectedClub] = useState<EnrichedClub | null>(null);
   const [citationsOpen, setCitationsOpen] = useState(false);
+  const [analyzingClubId, setAnalyzingClubId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -81,20 +139,28 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
         if (error) throw error;
         
         // Type cast the data with explicit handling
-        const typedClubs = (data || []).map(club => ({
-          ...club,
-          color_palette: (club.color_palette as Record<string, string>) || {},
-          fonts: (club.fonts as Record<string, string>) || {},
-          recent_activities: (Array.isArray(club.recent_activities) 
-            ? club.recent_activities as unknown as RecentActivity[] 
-            : []),
-          perplexity_citations: (Array.isArray(club.perplexity_citations) 
-            ? club.perplexity_citations as unknown as string[] 
-            : []),
-          key_people: (Array.isArray(club.key_people) 
-            ? club.key_people as unknown as KeyPerson[] 
-            : [])
-        })) as EnrichedClub[];
+        const typedClubs = (data || []).map(club => {
+          return {
+            ...club,
+            color_palette: (club.color_palette as Record<string, string>) || {},
+            fonts: (club.fonts as Record<string, string>) || {},
+            recent_activities: (Array.isArray(club.recent_activities) 
+              ? club.recent_activities as unknown as RecentActivity[] 
+              : []),
+            perplexity_citations: (Array.isArray(club.perplexity_citations) 
+              ? club.perplexity_citations as unknown as string[] 
+              : []),
+            key_people: (Array.isArray(club.key_people) 
+              ? club.key_people as unknown as KeyPerson[] 
+              : []),
+            visual_dna: club.visual_dna as VisualDNAData | null,
+            voice_dna: club.voice_dna as VoiceDNAData | null,
+            ctlt_matches: club.ctlt_matches as CTLTMatchesData | null,
+            invisibility_score: club.invisibility_score,
+            invisibility_category: club.invisibility_category,
+            visual_dna_analyzed_at: club.visual_dna_analyzed_at,
+          };
+        }) as EnrichedClub[];
         
         setClubs(typedClubs);
         if (typedClubs.length > 0) {
@@ -109,6 +175,121 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
 
     fetchClubs();
   }, [jobId, open]);
+
+  const handleAnalyzeVisualDNA = async (club: EnrichedClub) => {
+    if (!club.instagram_handle) {
+      toast({
+        title: "No Instagram Handle",
+        description: "This club doesn't have an Instagram handle to analyze.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setAnalyzingClubId(club.id);
+
+    try {
+      // Create visual_dna_jobs entry
+      const jobId = `vdna_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const { error: jobError } = await supabase
+        .from('visual_dna_jobs')
+        .insert({
+          id: jobId,
+          status: 'processing',
+          total_clubs: 1,
+          processed_clubs: 0,
+          failed_clubs: 0
+        });
+
+      if (jobError) {
+        console.error('Failed to create visual_dna_jobs entry:', jobError);
+      }
+
+      // Create visual_dna_rows entry
+      const { data: rowData, error: rowError } = await supabase
+        .from('visual_dna_rows')
+        .insert({
+          job_id: jobId,
+          enriched_club_id: club.id,
+          club_name: club.club_name,
+          status: 'processing'
+        })
+        .select('id')
+        .single();
+
+      if (rowError) {
+        console.error('Failed to create visual_dna_rows entry:', rowError);
+      }
+
+      // Call the analyze-visual-dna edge function
+      const { data, error } = await supabase.functions.invoke('analyze-visual-dna', {
+        body: { 
+          enriched_club_id: club.id,
+          visual_dna_row_id: rowData?.id
+        }
+      });
+
+      if (error) throw error;
+
+      // Update job status
+      await supabase
+        .from('visual_dna_jobs')
+        .update({ 
+          status: 'completed', 
+          processed_clubs: 1,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', jobId);
+
+      // Refresh club data
+      const { data: updatedClub } = await supabase
+        .from('enriched_clubs')
+        .select('*')
+        .eq('id', club.id)
+        .single();
+
+      if (updatedClub) {
+        const typedClub = {
+          ...updatedClub,
+          color_palette: (updatedClub.color_palette as Record<string, string>) || {},
+          fonts: (updatedClub.fonts as Record<string, string>) || {},
+          recent_activities: (Array.isArray(updatedClub.recent_activities) 
+            ? updatedClub.recent_activities as unknown as RecentActivity[] 
+            : []),
+          perplexity_citations: (Array.isArray(updatedClub.perplexity_citations) 
+            ? updatedClub.perplexity_citations as unknown as string[] 
+            : []),
+          key_people: (Array.isArray(updatedClub.key_people) 
+            ? updatedClub.key_people as unknown as KeyPerson[] 
+            : []),
+          visual_dna: updatedClub.visual_dna as VisualDNAData | null,
+          voice_dna: updatedClub.voice_dna as VoiceDNAData | null,
+          ctlt_matches: updatedClub.ctlt_matches as CTLTMatchesData | null,
+          invisibility_score: updatedClub.invisibility_score,
+          invisibility_category: updatedClub.invisibility_category,
+          visual_dna_analyzed_at: updatedClub.visual_dna_analyzed_at,
+        } as EnrichedClub;
+
+        setClubs(prev => prev.map(c => c.id === club.id ? typedClub : c));
+        setSelectedClub(typedClub);
+      }
+
+      toast({
+        title: "Visual DNA Analysis Complete",
+        description: `Score: ${data.invisibility_score} (${data.invisibility_category}) • ${data.posts_analyzed} posts analyzed`,
+      });
+
+    } catch (err) {
+      console.error('Visual DNA analysis failed:', err);
+      toast({
+        title: "Analysis Failed",
+        description: err instanceof Error ? err.message : "Failed to analyze Visual DNA",
+        variant: "destructive",
+      });
+    } finally {
+      setAnalyzingClubId(null);
+    }
+  };
 
   const ColorSwatch = ({ color, label }: { color: string; label: string }) => (
     <div className="flex items-center gap-2">
@@ -213,6 +394,21 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
                           Est. {selectedClub.founding_year}
                         </Badge>
                       )}
+                      {selectedClub.invisibility_score !== null && (
+                        <Badge 
+                          className={cn(
+                            "flex items-center gap-1",
+                            selectedClub.invisibility_category?.toLowerCase() === 'excellent' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
+                            selectedClub.invisibility_category?.toLowerCase() === 'strong' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
+                            selectedClub.invisibility_category?.toLowerCase() === 'average' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
+                            selectedClub.invisibility_category?.toLowerCase() === 'struggling' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
+                            'bg-red-500/20 text-red-400 border-red-500/30'
+                          )}
+                        >
+                          <Dna className="h-3 w-3" />
+                          {selectedClub.invisibility_score}
+                        </Badge>
+                      )}
                     </div>
                     {selectedClub.website_url && (
                       <a 
@@ -224,6 +420,28 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
                         <Globe className="h-3 w-3" />
                         {selectedClub.website_url}
                       </a>
+                    )}
+                    {/* Analyze Visual DNA Button */}
+                    {selectedClub.instagram_handle && !selectedClub.visual_dna && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-2"
+                        onClick={() => handleAnalyzeVisualDNA(selectedClub)}
+                        disabled={analyzingClubId === selectedClub.id}
+                      >
+                        {analyzingClubId === selectedClub.id ? (
+                          <>
+                            <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                            Analyzing...
+                          </>
+                        ) : (
+                          <>
+                            <Dna className="h-3 w-3 mr-1.5" />
+                            Analyze Visual DNA
+                          </>
+                        )}
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -505,6 +723,16 @@ const EnrichedClubsDialog = ({ jobId, open, onOpenChange }: EnrichedClubsDialogP
                     </CollapsibleContent>
                   </Collapsible>
                 )}
+
+                {/* Visual DNA Section */}
+                <VisualDNASection
+                  visualDna={selectedClub.visual_dna}
+                  voiceDna={selectedClub.voice_dna}
+                  ctltMatches={selectedClub.ctlt_matches}
+                  invisibilityScore={selectedClub.invisibility_score}
+                  invisibilityCategory={selectedClub.invisibility_category}
+                  analyzedAt={selectedClub.visual_dna_analyzed_at}
+                />
               </div>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
