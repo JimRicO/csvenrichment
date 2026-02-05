@@ -75,6 +75,7 @@ serve(async (req) => {
         raw_instagram_data,
         scraped_content,
         visual_dna,
+        visual_dna_media_urls,
         voice_dna,
         ctlt_matches,
         invisibility_score,
