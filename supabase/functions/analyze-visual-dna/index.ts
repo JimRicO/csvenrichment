@@ -1076,7 +1076,7 @@ async function uploadImageToStorage(
      // Poll for completion
      let status = 'RUNNING';
      let attempts = 0;
-     const maxAttempts = 20;
+     const maxAttempts = 40; // 2+ minute timeout (40 * 3s = 120s)
  
      await new Promise(resolve => setTimeout(resolve, 3000));
  
