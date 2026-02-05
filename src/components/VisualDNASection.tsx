@@ -1,9 +1,10 @@
  import { Badge } from "@/components/ui/badge";
  import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
  import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
- import { ChevronDown, Eye, Mic2, Lightbulb, Camera, Palette, BarChart3 } from "lucide-react";
+import { ChevronDown, Eye, Mic2, Lightbulb, Camera, Palette, BarChart3, Hash, MessageSquare, Gauge, Star, CheckCircle, XCircle, AlertTriangle, Code } from "lucide-react";
  import { cn } from "@/lib/utils";
  import { useState } from "react";
+import { Button } from "@/components/ui/button";
  
  interface VisualDNA {
    color_palette?: string[];
@@ -52,6 +53,14 @@
    enhancement_suggestion?: string;
  }
  
+interface ScoreBreakdown {
+  postingFrequency?: { postsPerWeek: number; score: number };
+  contentQuality?: { level: string; score: number };
+  brandConsistency?: { rating: number; score: number };
+  engagementRate?: { rate: number; score: number };
+  captionEffort?: { length: string; score: number };
+}
+
  interface VisualDNASectionProps {
    visualDna: VisualDNA | null;
    voiceDna: VoiceDNA | null;
@@ -59,6 +68,8 @@
    invisibilityScore: number | null;
    invisibilityCategory: string | null;
    analyzedAt: string | null;
+  postsAnalyzed?: number;
+  compact?: boolean;
  }
  
  const getCategoryColor = (category: string | null) => {
@@ -108,7 +119,7 @@
      <div className="space-y-2">
        {entries.map(([key, value]) => (
          <div key={key} className="flex items-center gap-2">
-           <span className="text-xs text-muted-foreground w-20 capitalize">{key}</span>
+          <span className="text-xs text-muted-foreground w-24 capitalize">{key}</span>
            <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
              <div 
                className={cn("h-full rounded-full", colors[key] || 'bg-primary')}
@@ -122,15 +133,44 @@
    );
  };
  
+const ScoreFactorRow = ({ label, value, score, maxScore = 100 }: { label: string; value: string; score: number; maxScore?: number }) => (
+  <div className="flex items-center justify-between py-1.5 border-b border-border/30 last:border-0">
+    <span className="text-xs text-muted-foreground">{label}</span>
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-foreground">{value}</span>
+      <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+        <div 
+          className="h-full bg-primary rounded-full"
+          style={{ width: `${(score / maxScore) * 100}%` }}
+        />
+      </div>
+    </div>
+  </div>
+);
+
+const BrandingIndicator = ({ label, value }: { label: string; value: boolean | undefined }) => (
+  <div className="flex items-center gap-1.5">
+    {value ? (
+      <CheckCircle className="h-3 w-3 text-green-500" />
+    ) : (
+      <XCircle className="h-3 w-3 text-muted-foreground/50" />
+    )}
+    <span className={cn("text-xs", value ? "text-foreground" : "text-muted-foreground")}>{label}</span>
+  </div>
+);
+
  const VisualDNASection = ({
    visualDna,
    voiceDna,
    ctltMatches,
    invisibilityScore,
    invisibilityCategory,
-   analyzedAt
+  analyzedAt,
+  postsAnalyzed,
+  compact = false
  }: VisualDNASectionProps) => {
    const [isOpen, setIsOpen] = useState(true);
+  const [showRawData, setShowRawData] = useState(false);
  
    if (!visualDna && !voiceDna && invisibilityScore === null) {
      return null;
@@ -145,6 +185,33 @@
      });
    };
  
+  // Calculate score breakdown from data
+  const qualityScore = visualDna?.quality_assessment?.image_quality === 'professional' ? 100 :
+                       visualDna?.quality_assessment?.image_quality === 'semi-professional' ? 70 :
+                       visualDna?.quality_assessment?.image_quality === 'phone-camera' ? 40 : 55;
+  
+  const consistencyScore = (visualDna?.quality_assessment?.brand_coherence || 5) * 10;
+  
+  const captionScore = voiceDna?.average_length === 'long' ? 100 :
+                       voiceDna?.average_length === 'medium' ? 70 : 30;
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-2">
+        {invisibilityScore !== null && (
+          <>
+            <span className={cn("text-lg font-bold", getScoreTextColor(invisibilityCategory))}>
+              {invisibilityScore}
+            </span>
+            <Badge className={cn("text-xs", getCategoryColor(invisibilityCategory))}>
+              {invisibilityCategory}
+            </Badge>
+          </>
+        )}
+      </div>
+    );
+  }
+
    return (
      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
        <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium w-full hover:bg-muted/50 p-2 rounded-lg transition-colors">
@@ -158,22 +225,63 @@
        
        <CollapsibleContent className="mt-2 space-y-4">
          <div className="p-4 rounded-xl neu-pressed space-y-4">
-           {/* Invisibility Score */}
+          {/* Header: Invisibility Score + Category */}
            {invisibilityScore !== null && (
-             <div className="flex items-center gap-4">
-               <div className={cn("text-4xl font-bold", getScoreTextColor(invisibilityCategory))}>
-                 {invisibilityScore}
-               </div>
-               <div>
-                 <Badge className={cn("text-xs font-semibold", getCategoryColor(invisibilityCategory))}>
-                   {invisibilityCategory || 'Unknown'}
-                 </Badge>
-                 <p className="text-xs text-muted-foreground mt-1">Invisibility Score</p>
+            <div className="flex items-center justify-between border-b border-border/50 pb-4">
+              <div className="flex items-center gap-4">
+                <div className={cn("text-5xl font-bold", getScoreTextColor(invisibilityCategory))}>
+                  {invisibilityScore}
+                </div>
+                <div>
+                  <Badge className={cn("text-sm font-semibold", getCategoryColor(invisibilityCategory))}>
+                    {invisibilityCategory || 'Unknown'}
+                  </Badge>
+                  <p className="text-xs text-muted-foreground mt-1">Invisibility Score</p>
+                </div>
+              </div>
+              <div className="text-right">
+                {analyzedAt && (
+                  <p className="text-xs text-muted-foreground">
+                    Analyzed {formatDate(analyzedAt)}
+                  </p>
+                )}
+                {postsAnalyzed !== undefined && (
+                  <p className="text-xs text-muted-foreground">
+                    {postsAnalyzed} images analyzed
+                  </p>
+                )}
                </div>
              </div>
            )}
  
-           {/* Color Palette */}
+          {/* Score Breakdown */}
+          {(visualDna || voiceDna) && (
+            <div className="space-y-2">
+              <h4 className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
+                <Gauge className="h-3 w-3" />
+                Score Breakdown
+              </h4>
+              <div className="bg-muted/30 rounded-lg p-3">
+                <ScoreFactorRow 
+                  label="Content Quality (25%)" 
+                  value={visualDna?.quality_assessment?.image_quality || 'Mixed'} 
+                  score={qualityScore} 
+                />
+                <ScoreFactorRow 
+                  label="Brand Consistency (20%)" 
+                  value={`${visualDna?.quality_assessment?.brand_coherence || 5}/10`} 
+                  score={consistencyScore} 
+                />
+                <ScoreFactorRow 
+                  label="Caption Effort (10%)" 
+                  value={voiceDna?.average_length || 'Unknown'} 
+                  score={captionScore} 
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Color Palette - Enhanced */}
            {visualDna?.color_palette && visualDna.color_palette.length > 0 && (
              <div className="space-y-2">
                <h4 className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
@@ -181,12 +289,12 @@
                  Color Palette
                </h4>
                <TooltipProvider>
-                 <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-3">
                    {visualDna.color_palette.map((color, idx) => (
                      <Tooltip key={idx}>
                        <TooltipTrigger>
                          <div
-                           className="w-6 h-6 rounded-full border border-border/50 shadow-sm cursor-pointer hover:scale-110 transition-transform"
+                          className="w-8 h-8 rounded-full border-2 border-border/50 shadow-md cursor-pointer hover:scale-110 transition-transform"
                            style={{ backgroundColor: color }}
                          />
                        </TooltipTrigger>
@@ -200,7 +308,7 @@
              </div>
            )}
  
-           {/* Photography Style & Composition */}
+          {/* Photography Style & Composition - Enhanced */}
            {(visualDna?.photography_style || visualDna?.composition_patterns) && (
              <div className="space-y-2">
                <h4 className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
@@ -209,13 +317,13 @@
                </h4>
                <div className="flex flex-wrap gap-1.5">
                  {visualDna.photography_style && (
-                   <Badge variant="secondary" className="text-xs capitalize">
+                  <Badge variant="default" className="text-xs capitalize">
                      {visualDna.photography_style}
                    </Badge>
                  )}
                  {visualDna.filter_style && (
                    <Badge variant="outline" className="text-xs capitalize">
-                     {visualDna.filter_style}
+                    {visualDna.filter_style} filter
                    </Badge>
                  )}
                  {visualDna.composition_patterns?.map((pattern, idx) => (
@@ -227,39 +335,89 @@
              </div>
            )}
  
-           {/* Voice Profile */}
+          {/* Branding Elements */}
+          {visualDna?.branding_elements && (
+            <div className="space-y-2">
+              <h4 className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
+                <Star className="h-3 w-3" />
+                Branding Elements
+              </h4>
+              <div className="flex flex-wrap gap-4">
+                <BrandingIndicator label="Logo Visible" value={visualDna.branding_elements.logo_visible} />
+                <BrandingIndicator label="Watermarks" value={visualDna.branding_elements.watermarks} />
+                <BrandingIndicator label="Text Overlays" value={visualDna.branding_elements.text_overlays} />
+              </div>
+            </div>
+          )}
+
+          {/* Voice Profile - Enhanced */}
            {voiceDna && (
              <div className="space-y-2">
                <h4 className="text-xs font-medium flex items-center gap-1.5 text-muted-foreground">
                  <Mic2 className="h-3 w-3" />
                  Voice Profile
                </h4>
-               <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                 {voiceDna.tone && (
-                   <span>Tone: <span className="text-foreground capitalize">{voiceDna.tone}</span></span>
-                 )}
-                 {voiceDna.emoji_frequency && (
-                   <>
-                     <span className="text-border">•</span>
-                     <span>Emoji: <span className="text-foreground capitalize">{voiceDna.emoji_frequency}</span></span>
-                   </>
-                 )}
-                 {voiceDna.hashtag_strategy?.average_count !== undefined && (
-                   <>
-                     <span className="text-border">•</span>
-                     <span>Hashtags: <span className="text-foreground">{voiceDna.hashtag_strategy.average_count} avg</span></span>
-                   </>
-                 )}
-                 {voiceDna.cta_patterns && voiceDna.cta_patterns.length > 0 && (
-                   <>
-                     <span className="text-border">•</span>
-                     <span>CTAs: <span className="text-foreground">{voiceDna.cta_patterns.length} types</span></span>
-                   </>
-                 )}
+              <div className="bg-muted/30 rounded-lg p-3 space-y-2">
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {voiceDna.tone && (
+                    <div>
+                      <span className="text-muted-foreground">Tone: </span>
+                      <span className="text-foreground capitalize">{voiceDna.tone}</span>
+                    </div>
+                  )}
+                  {voiceDna.average_length && (
+                    <div>
+                      <span className="text-muted-foreground">Length: </span>
+                      <span className="text-foreground capitalize">{voiceDna.average_length}</span>
+                    </div>
+                  )}
+                  {voiceDna.emoji_frequency && (
+                    <div>
+                      <span className="text-muted-foreground">Emoji use: </span>
+                      <span className="text-foreground capitalize">{voiceDna.emoji_frequency}</span>
+                    </div>
+                  )}
+                  {voiceDna.hashtag_strategy?.average_count !== undefined && (
+                    <div>
+                      <span className="text-muted-foreground">Hashtags: </span>
+                      <span className="text-foreground">{voiceDna.hashtag_strategy.average_count} avg</span>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Common Emojis */}
+                {voiceDna.common_emojis && voiceDna.common_emojis.length > 0 && (
+                  <div className="pt-2 border-t border-border/30">
+                    <span className="text-xs text-muted-foreground">Common emojis: </span>
+                    <span className="text-sm">{voiceDna.common_emojis.slice(0, 8).join(' ')}</span>
+                  </div>
+                )}
+                
+                {/* CTA Patterns */}
+                {voiceDna.cta_patterns && voiceDna.cta_patterns.length > 0 && (
+                  <div className="pt-2 border-t border-border/30">
+                    <span className="text-xs text-muted-foreground block mb-1">CTA patterns:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {voiceDna.cta_patterns.slice(0, 5).map((cta, idx) => (
+                        <Badge key={idx} variant="outline" className="text-xs">
+                          {cta}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Hashtag Strategy */}
+                {voiceDna.hashtag_strategy && (
+                  <div className="pt-2 border-t border-border/30 flex items-center gap-2 text-xs">
+                    <Hash className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-muted-foreground">Strategy:</span>
+                    <span className="text-foreground capitalize">{voiceDna.hashtag_strategy.branded_vs_generic}</span>
+                    <span className="text-muted-foreground">•</span>
+                    <span className="text-foreground capitalize">{voiceDna.hashtag_strategy.placement}</span>
+                  </div>
+                )}
                </div>
-               {voiceDna.common_emojis && voiceDna.common_emojis.length > 0 && (
-                 <div className="text-sm">{voiceDna.common_emojis.slice(0, 5).join(' ')}</div>
-               )}
              </div>
            )}
  
@@ -277,7 +435,10 @@
            {/* CTLT Style Matches */}
            {ctltMatches?.matched_styles && ctltMatches.matched_styles.length > 0 && (
              <div className="space-y-2 pt-2 border-t border-border/50">
-               <h4 className="text-xs font-medium text-muted-foreground">CTLT Style Matches</h4>
+              <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <Star className="h-3 w-3" />
+                CTLT Style Matches
+              </h4>
                <div className="flex flex-wrap gap-1.5">
                  {ctltMatches.matched_styles.slice(0, 5).map((style, idx) => (
                    <TooltipProvider key={idx}>
@@ -305,14 +466,14 @@
  
                {/* Styles to Avoid */}
                {ctltMatches.styles_to_avoid && ctltMatches.styles_to_avoid.length > 0 && (
-                 <div className="mt-2">
-                   <span className="text-xs text-muted-foreground">Avoid: </span>
+                <div className="mt-2 flex items-start gap-2">
+                  <AlertTriangle className="h-3 w-3 text-orange-400 mt-0.5" />
                    <div className="inline-flex flex-wrap gap-1 ml-1">
                      {ctltMatches.styles_to_avoid.map((style, idx) => (
                        <TooltipProvider key={idx}>
                          <Tooltip>
                            <TooltipTrigger>
-                             <Badge variant="outline" className="text-xs text-muted-foreground cursor-pointer">
+                            <Badge variant="outline" className="text-xs text-orange-400 border-orange-400/30 cursor-pointer">
                                {style.style_name}
                              </Badge>
                            </TooltipTrigger>
@@ -330,17 +491,33 @@
                {ctltMatches.enhancement_suggestion && (
                  <div className="flex items-start gap-2 mt-2 p-2 rounded-lg bg-primary/5 border border-primary/10">
                    <Lightbulb className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                   <p className="text-xs text-muted-foreground">{ctltMatches.enhancement_suggestion}</p>
+                  <p className="text-xs text-muted-foreground italic">{ctltMatches.enhancement_suggestion}</p>
                  </div>
                )}
              </div>
            )}
  
-           {/* Analyzed Timestamp */}
-           {analyzedAt && (
-             <p className="text-xs text-muted-foreground pt-2 border-t border-border/30">
-               Analyzed on {formatDate(analyzedAt)}
-             </p>
+          {/* Raw Data Toggle */}
+          {(visualDna || voiceDna || ctltMatches) && (
+            <div className="pt-2 border-t border-border/30">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowRawData(!showRawData)}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                <Code className="h-3 w-3 mr-1" />
+                {showRawData ? 'Hide' : 'Show'} Raw Data
+              </Button>
+              
+              {showRawData && (
+                <div className="mt-2 p-3 bg-muted/50 rounded-lg overflow-x-auto">
+                  <pre className="text-xs text-muted-foreground whitespace-pre-wrap">
+                    {JSON.stringify({ visualDna, voiceDna, ctltMatches }, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
            )}
          </div>
        </CollapsibleContent>

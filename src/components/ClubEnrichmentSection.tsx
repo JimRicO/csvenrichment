@@ -66,6 +66,13 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
 
   const handleAnalyzeVisualDna = async (clubId: string, clubName: string) => {
     setAnalyzingClubId(clubId);
+    
+    // Show initial toast
+    toast({
+      title: "Analyzing Visual DNA",
+      description: `Starting analysis for ${clubName}... This may take 30-60 seconds.`,
+    });
+
     try {
       const { data, error } = await supabase.functions.invoke('analyze-visual-dna', {
         body: { enriched_club_id: clubId },
@@ -73,9 +80,11 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
 
       if (error) throw error;
 
+      const imagesMsg = data.images_analyzed ? `${data.images_analyzed} images analyzed` : '';
+      
       toast({
         title: "Visual DNA Complete",
-        description: `${clubName}: Score ${data.invisibility_score}/100 (${data.invisibility_category})`,
+        description: `${clubName}: Score ${data.invisibility_score}/100 (${data.invisibility_category}). ${imagesMsg}`,
       });
 
       // Refresh the list
@@ -84,7 +93,7 @@ const ClubEnrichmentSection = ({ onJobCreated }: ClubEnrichmentSectionProps) => 
       console.error('Visual DNA error:', err);
       toast({
         title: "Analysis Failed",
-        description: err instanceof Error ? err.message : "Failed to analyze visual DNA",
+        description: err instanceof Error ? err.message : "Failed to analyze visual DNA. Check console for details.",
         variant: "destructive",
       });
     } finally {
