@@ -71,6 +71,14 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
    postsAnalyzed?: number;
   /** URLs of the images that were analyzed (for the media gallery) */
   mediaUrls?: string[];
+  /** Score breakdown factors from the analysis */
+  scoreFactors?: {
+    posting_frequency?: { value: string; score: number; weight: number };
+    content_quality?: { value: string; score: number; weight: number };
+    brand_consistency?: { value: string; score: number; weight: number };
+    engagement_rate?: { value: string; score: number; weight: number };
+    caption_effort?: { value: string; score: number; weight: number };
+  } | null;
  }
  
  const getCategoryColor = (category: string | null) => {
@@ -188,26 +196,14 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
    invisibilityCategory,
    analyzedAt,
   postsAnalyzed,
-  mediaUrls
+  mediaUrls,
+  scoreFactors
  }: VisualDNACardProps) => {
    const [showRawData, setShowRawData] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
    
    const categoryColors = getCategoryColor(invisibilityCategory);
-   
-   // Calculate individual scores for breakdown
-   const qualityLevel = visualDna?.quality_assessment?.image_quality || 'mixed';
-   const qualityScore = qualityLevel === 'professional' ? 100 :
-                        qualityLevel === 'semi-professional' ? 70 :
-                        qualityLevel === 'phone-camera' ? 40 : 55;
-   
-   const consistencyRating = visualDna?.quality_assessment?.brand_coherence || 5;
-   const consistencyScore = consistencyRating * 10;
-   
-   const captionLength = voiceDna?.average_length || 'medium';
-   const captionScore = captionLength === 'long' ? 100 :
-                        captionLength === 'medium' ? 70 : 30;
  
    const formatDate = (dateStr: string | null) => {
      if (!dateStr) return null;
@@ -353,14 +349,39 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
         </Dialog>
 
        {/* Score Breakdown Table */}
-       {(visualDna || voiceDna) && (
+       {(scoreFactors || visualDna || voiceDna) && (
          <div className="bg-muted/30 rounded-lg p-4">
            <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Score Breakdown</h5>
-           <ScoreFactorRow label="Posting Frequency" value="~2/week" score={50} weight="30%" />
-           <ScoreFactorRow label="Content Quality" value={qualityLevel} score={qualityScore} weight="25%" />
-           <ScoreFactorRow label="Brand Consistency" value={`${consistencyRating}/10`} score={consistencyScore} weight="20%" />
-           <ScoreFactorRow label="Engagement Rate" value="~2%" score={60} weight="15%" />
-           <ScoreFactorRow label="Caption Effort" value={captionLength} score={captionScore} weight="10%" />
+           <ScoreFactorRow 
+             label="Posting Frequency" 
+             value={scoreFactors?.posting_frequency?.value ?? "—"} 
+             score={scoreFactors?.posting_frequency?.score ?? 0} 
+             weight={`${scoreFactors?.posting_frequency?.weight ?? 30}%`} 
+           />
+           <ScoreFactorRow 
+             label="Content Quality" 
+             value={scoreFactors?.content_quality?.value ?? "—"} 
+             score={scoreFactors?.content_quality?.score ?? 0} 
+             weight={`${scoreFactors?.content_quality?.weight ?? 25}%`} 
+           />
+           <ScoreFactorRow 
+             label="Brand Consistency" 
+             value={scoreFactors?.brand_consistency?.value ?? "—"} 
+             score={scoreFactors?.brand_consistency?.score ?? 0} 
+             weight={`${scoreFactors?.brand_consistency?.weight ?? 20}%`} 
+           />
+           <ScoreFactorRow 
+             label="Engagement Rate" 
+             value={scoreFactors?.engagement_rate?.value ?? "—"} 
+             score={scoreFactors?.engagement_rate?.score ?? 0} 
+             weight={`${scoreFactors?.engagement_rate?.weight ?? 15}%`} 
+           />
+           <ScoreFactorRow 
+             label="Caption Effort" 
+             value={scoreFactors?.caption_effort?.value ?? "—"} 
+             score={scoreFactors?.caption_effort?.score ?? 0} 
+             weight={`${scoreFactors?.caption_effort?.weight ?? 10}%`} 
+           />
          </div>
        )}
  

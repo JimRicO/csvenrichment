@@ -87,6 +87,7 @@ export type Database = {
           raw_branding_data: Json | null
           raw_instagram_data: Json | null
           recent_activities: Json | null
+          score_factors: Json | null
           scraped_content: string | null
           twitter_handle: string | null
           updated_at: string
@@ -129,6 +130,7 @@ export type Database = {
           raw_branding_data?: Json | null
           raw_instagram_data?: Json | null
           recent_activities?: Json | null
+          score_factors?: Json | null
           scraped_content?: string | null
           twitter_handle?: string | null
           updated_at?: string
@@ -171,6 +173,7 @@ export type Database = {
           raw_branding_data?: Json | null
           raw_instagram_data?: Json | null
           recent_activities?: Json | null
+          score_factors?: Json | null
           scraped_content?: string | null
           twitter_handle?: string | null
           updated_at?: string

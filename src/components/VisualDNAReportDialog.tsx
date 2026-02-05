@@ -55,6 +55,7 @@ type EnrichedClubRow = {
   invisibility_category: string | null;
   visual_dna_analyzed_at: string | null;
   visual_dna_media_urls: string[] | null;
+  score_factors: any | null;
 };
 
 type VisualDnaRow = {
@@ -105,7 +106,7 @@ export default function VisualDNAReportDialog({
             supabase
               .from("enriched_clubs")
               .select(
-                "id, club_name, instagram_handle, visual_dna, voice_dna, ctlt_matches, invisibility_score, invisibility_category, visual_dna_analyzed_at, visual_dna_media_urls"
+                "id, club_name, instagram_handle, visual_dna, voice_dna, ctlt_matches, invisibility_score, invisibility_category, visual_dna_analyzed_at, visual_dna_media_urls, score_factors"
               )
               .eq("id", clubId)
               .single(),
@@ -218,6 +219,7 @@ export default function VisualDNAReportDialog({
                 analyzedAt={club.visual_dna_analyzed_at}
                 postsAnalyzed={effectivePostsAnalyzed}
                 mediaUrls={mediaUrls}
+                scoreFactors={club.score_factors}
               />
 
               {/* Proof (only available immediately after a run, since it isn't persisted) */}
