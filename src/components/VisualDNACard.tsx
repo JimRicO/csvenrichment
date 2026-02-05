@@ -11,6 +11,8 @@
  import { Button } from "@/components/ui/button";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
  
  interface VisualDNA {
    color_palette?: string[];
@@ -189,6 +191,8 @@ import { AspectRatio } from "@/components/ui/aspect-ratio";
   mediaUrls
  }: VisualDNACardProps) => {
    const [showRawData, setShowRawData] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
    
    const categoryColors = getCategoryColor(invisibilityCategory);
    
@@ -214,6 +218,23 @@ import { AspectRatio } from "@/components/ui/aspect-ratio";
      });
    };
  
+  const openLightbox = (index: number) => {
+    setLightboxIndex(index);
+    setLightboxOpen(true);
+  };
+
+  const nextImage = () => {
+    if (mediaUrls && mediaUrls.length > 0) {
+      setLightboxIndex((prev) => (prev + 1) % mediaUrls.length);
+    }
+  };
+
+  const prevImage = () => {
+    if (mediaUrls && mediaUrls.length > 0) {
+      setLightboxIndex((prev) => (prev - 1 + mediaUrls.length) % mediaUrls.length);
+    }
+  };
+
    if (!visualDna && !voiceDna && invisibilityScore === null) {
      return null;
    }
@@ -246,12 +267,10 @@ import { AspectRatio } from "@/components/ui/aspect-ratio";
             <ScrollArea className="w-full whitespace-nowrap rounded-lg">
               <div className="flex gap-3 pb-3">
                 {mediaUrls.map((url, idx) => (
-                  <a
+                  <button
                     key={idx}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="shrink-0 w-32 block rounded-lg overflow-hidden border border-border hover:border-primary transition-colors group"
+                    onClick={() => openLightbox(idx)}
+                    className="shrink-0 w-32 rounded-lg overflow-hidden border border-border hover:border-primary transition-colors group focus:outline-none focus:ring-2 focus:ring-primary"
                   >
                     <AspectRatio ratio={1}>
                       <img
@@ -264,13 +283,74 @@ import { AspectRatio } from "@/components/ui/aspect-ratio";
                         }}
                       />
                     </AspectRatio>
-                  </a>
+                  </button>
                 ))}
               </div>
               <ScrollBar orientation="horizontal" />
             </ScrollArea>
           </div>
         )}
+
+        {/* Lightbox Dialog */}
+        <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
+          <DialogContent className="max-w-4xl p-0 bg-black/95 border-none">
+            <div className="relative flex items-center justify-center min-h-[60vh]">
+              {/* Close button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 z-10 text-white hover:bg-white/20"
+                onClick={() => setLightboxOpen(false)}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+              
+              {/* Previous button */}
+              {mediaUrls && mediaUrls.length > 1 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute left-2 z-10 text-white hover:bg-white/20"
+                  onClick={prevImage}
+                >
+                  <ChevronLeft className="h-8 w-8" />
+                </Button>
+              )}
+              
+              {/* Image */}
+              {mediaUrls && mediaUrls[lightboxIndex] && (
+                <img
+                  src={mediaUrls[lightboxIndex]}
+                  alt={`Image ${lightboxIndex + 1} of ${mediaUrls.length}`}
+                  className="max-h-[80vh] max-w-full object-contain"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = '/placeholder.svg';
+                  }}
+                />
+              )}
+              
+              {/* Next button */}
+              {mediaUrls && mediaUrls.length > 1 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-2 z-10 text-white hover:bg-white/20"
+                  onClick={nextImage}
+                >
+                  <ChevronRight className="h-8 w-8" />
+                </Button>
+              )}
+              
+              {/* Counter */}
+              {mediaUrls && mediaUrls.length > 1 && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/80 text-sm">
+                  {lightboxIndex + 1} / {mediaUrls.length}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
        {/* Score Breakdown Table */}
        {(visualDna || voiceDna) && (
