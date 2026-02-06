@@ -87,7 +87,7 @@ async function discoverSocialMedia(clubName: string, apiKey: string): Promise<Di
         messages: [
           { 
             role: 'system', 
-            content: 'You are a research assistant. Find and return business social media profiles. Always return valid JSON.' 
+            content: 'You are an expert Padel Sport Industry Market Researcher. Your goal is to identify and extract business social media profiles for entities within the padel sport. Always return valid JSON.' 
           },
           { 
             role: 'user', 
