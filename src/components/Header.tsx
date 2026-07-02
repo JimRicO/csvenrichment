@@ -1,5 +1,7 @@
-import { Database, Zap } from "lucide-react";
+import { Database, Zap, BookOpen } from "lucide-react";
+import { Link } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
+import { Button } from "./ui/button";
 
 const Header = () => {
   return (
@@ -20,6 +22,12 @@ const Header = () => {
               <Zap className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium text-foreground">Real-time Processing</span>
             </div>
+            <Link to="/docs">
+              <Button variant="ghost" size="sm" className="gap-2">
+                <BookOpen className="h-4 w-4" />
+                Docs
+              </Button>
+            </Link>
             <ThemeToggle />
           </div>
         </div>
